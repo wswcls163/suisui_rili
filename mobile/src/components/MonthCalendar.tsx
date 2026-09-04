@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { type BirthdayEntry } from '../core/birthday';
 import { DAY_NAMES, MONTH_NAMES, lunarCalendar, lunarLabel } from '../core/calendar';
 import { festivalsOn } from '../core/festivals';
 import { monthGrid, shiftMonth, supported } from '../core/dates';
-import { Button, colors, common, Dialog, Icon } from './ui';
+import { DateJumpDialog } from './DateJumpDialog';
+import { Button, colors, common, Icon } from './ui';
 
 export function MonthCalendar({
   month,
@@ -24,9 +25,6 @@ export function MonthCalendar({
   onToday: () => void;
 }) {
   const [jump, setJump] = useState(false);
-  const [year, setYear] = useState(month.slice(0, 4));
-  const [jumpMonth, setJumpMonth] = useState(Number(month.slice(5, 7)));
-  const [error, setError] = useState('');
   const grid = useMemo(() => monthGrid(month), [month]);
   const byDate = useMemo(() => {
     const result = new Map<string, BirthdayEntry[]>();
@@ -39,13 +37,8 @@ export function MonthCalendar({
       <View style={[common.between, { paddingHorizontal: 8, paddingBottom: 20, flexWrap: 'wrap' }]}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="跳转年月"
-          onPress={() => {
-            setYear(month.slice(0, 4));
-            setJumpMonth(Number(month.slice(5, 7)));
-            setError('');
-            setJump(true);
-          }}
+          accessibilityLabel="跳转日期"
+          onPress={() => setJump(true)}
           style={common.row}
         >
           <Text style={common.heading}>
@@ -148,45 +141,16 @@ export function MonthCalendar({
         <Text style={common.muted}>● 有生日　◯ 今天</Text>
         <Text style={common.muted}>选中日期，再点「＋」新建</Text>
       </View>
-      <Dialog visible={jump} title="跳转年月" onClose={() => setJump(false)}>
-        <Text style={[common.muted, { marginBottom: 8 }]}>阳历年份（1901—2100）</Text>
-        <TextInput
-          accessibilityLabel="阳历年份"
-          value={year}
-          onChangeText={setYear}
-          keyboardType="number-pad"
-          maxLength={4}
-          style={common.input}
-        />
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 18 }}>
-          {Array.from({ length: 12 }, (_, i) => (
-            <Button
-              key={i}
-              label={`${i + 1} 月`}
-              variant={jumpMonth === i + 1 ? 'primary' : 'secondary'}
-              onPress={() => setJumpMonth(i + 1)}
-              style={{ width: '30%', flexGrow: 1 }}
-            />
-          ))}
-        </View>
-        {!!error && (
-          <Text accessibilityRole="alert" style={common.error}>
-            {error}
-          </Text>
-        )}
-        <Button
-          label="跳转"
-          onPress={() => {
-            const target = `${year}-${String(jumpMonth).padStart(2, '0')}-01`;
-            if (!supported(target)) {
-              setError('请输入 1901—2100 之间的年份');
-              return;
-            }
-            onMonth(target);
+      {jump && (
+        <DateJumpDialog
+          initialDate={selected}
+          onClose={() => setJump(false)}
+          onConfirm={(date) => {
+            onSelect(date);
             setJump(false);
           }}
         />
-      </Dialog>
+      )}
     </View>
   );
 }

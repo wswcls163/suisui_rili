@@ -120,6 +120,34 @@ test('月历七列、选日回调和多人标记；首尾月份禁止越界', ()
 });
 const clock = { now: () => Date.parse(`${today}T04:00:00Z`) };
 
+test('滚轮跳转具体日期同步月份、选中状态和详情，保留真实今天提醒；重新打开预选最新日期', async () => {
+  render(
+    <AppProvider repo={memoryRepository([fixture('a')])} clock={clock}>
+      <Home />
+    </AppProvider>,
+  );
+  await screen.findByText('今天有 1 位亲友过生日');
+  fireEvent.press(screen.getByRole('button', { name: '跳转日期' }));
+  fireEvent.press(screen.getByRole('button', { name: '2024 年' }));
+  fireEvent.press(screen.getByRole('button', { name: '2 月' }));
+  fireEvent.press(screen.getByRole('button', { name: '29 日' }));
+  fireEvent.press(screen.getByRole('button', { name: '跳转' }));
+  expect(screen.getByRole('button', { name: /2024-02-29，农历/ }).props.accessibilityState.selected).toBe(
+    true,
+  );
+  expect(screen.getByRole('button', { name: '在 2024-02-29 新建事项' })).toBeTruthy();
+  expect(screen.getByText('今天有 1 位亲友过生日')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '跳转' })).toBeNull();
+  fireEvent.press(screen.getByRole('button', { name: '跳转日期' }));
+  expect(screen.getByLabelText('日期').props.accessibilityValue.now).toBe(29);
+  fireEvent.press(screen.getByRole('button', { name: '2025 年' }));
+  fireEvent.press(screen.getByRole('button', { name: '取消' }));
+  expect(screen.getByRole('button', { name: '在 2024-02-29 新建事项' })).toBeTruthy();
+  fireEvent.press(screen.getByRole('button', { name: '跳转日期' }));
+  expect(screen.getByLabelText('年份').props.accessibilityValue.now).toBe(2024);
+  expect(screen.getByLabelText('日期').props.accessibilityValue.now).toBe(29);
+});
+
 test('节日同日保留生日姓名与完整无障碍日期，选择后显示全部节日', async () => {
   const repo = memoryRepository([fixture('a', { name: '团圆', month: 8, day: 15 })]);
   render(
