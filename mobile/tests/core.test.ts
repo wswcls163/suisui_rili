@@ -1,5 +1,6 @@
 import {
   birthdayRows,
+  birthdayTitle,
   entriesForMonth,
   normalizeDraft,
   occurrenceForYear,
@@ -108,6 +109,17 @@ describe('农历生日规则', () => {
 });
 
 describe('输入和日期', () => {
+  test.each([
+    ['爸爸', '爸爸的生日'],
+    ['爸爸生日', '爸爸生日'],
+    ['爸爸的生日', '爸爸的生日'],
+    ['江源浩生日', '江源浩生日'],
+    ['生日快乐的朋友', '生日快乐的朋友的生日'],
+  ])('生日标题 %s 显示为 %s，重复格式化不再增加后缀', (name, title) => {
+    expect(birthdayTitle(name)).toBe(title);
+    expect(birthdayTitle(birthdayTitle(name))).toBe(title);
+    expect(normalizeDraft({ ...draft, name }).name).toBe(name);
+  });
   test('去除首尾空白、按 Unicode 字符计数，不限制重名', () => {
     expect(normalizeDraft({ ...draft, name: '  妈妈  ' }).name).toBe('妈妈');
     expect(normalizeDraft({ ...draft, name: '🌷'.repeat(30) }).name).toHaveLength(60);

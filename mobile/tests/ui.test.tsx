@@ -156,11 +156,11 @@ test('节日同日保留生日姓名与完整无障碍日期，选择后显示�
     </AppProvider>,
   );
   const date = await screen.findByRole('button', {
-    name: '2020-10-01，农历八月十五，中秋节、国庆节，1 位生日：团圆',
+    name: '2020-10-01，农历八月十五，中秋节、国庆节，1 位生日：团圆的生日',
   });
   expect(within(date).getByText('中秋节')).toBeTruthy();
   expect(within(date).getByText('+1')).toBeTruthy();
-  expect(within(date).getByText('团圆')).toBeTruthy();
+  expect(within(date).getByText('团圆的生日')).toBeTruthy();
   fireEvent.press(date);
   expect(screen.getAllByText('中秋节', { exact: true })).toHaveLength(2);
   expect(screen.getByText('国庆节', { exact: true })).toBeTruthy();
@@ -204,6 +204,51 @@ test.each([
   expect(label.props.ellipsizeMode).toBe('tail');
   expect(screen.getAllByText(name, { exact: true })).toHaveLength(2);
   expect(screen.getByText('今天没有生日提醒')).toBeTruthy();
+});
+
+test.each([
+  ['爸爸', '爸爸的生日'],
+  ['爸爸生日', '爸爸生日'],
+  ['爸爸的生日', '爸爸的生日'],
+])('姓名 %s 在月历、事项、提醒和生日簿中统一显示 %s', async (name, title) => {
+  const repo = memoryRepository([fixture('a', { name }), fixture('b', { name: '江源浩生日' })]);
+  render(
+    <AppProvider repo={repo} clock={clock}>
+      <Home />
+    </AppProvider>,
+  );
+  const day = await screen.findByRole('button', { name: /2026-09-04.*2 位生日/ });
+  expect(within(day).getByText(`${title} +1`)).toBeTruthy();
+  const entry = screen.getByRole('button', { name: `查看${title}详情` });
+  expect(within(entry).getByText(title)).toBeTruthy();
+  expect(screen.getByRole('button', { name: '查看江源浩生日详情' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: `今天：${title}` })).toBeTruthy();
+  expect(screen.queryByText(/生日的生日/)).toBeNull();
+  fireEvent.press(screen.getByRole('tab', { name: '生日簿 2' }));
+  expect(within(screen.getByRole('button', { name: `查看${title}` })).getByText(title)).toBeTruthy();
+  expect(repo.create).not.toHaveBeenCalled();
+  expect(repo.update).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['爸爸', '爸爸的生日'],
+  ['爸爸生日', '爸爸生日'],
+  ['爸爸的生日', '爸爸的生日'],
+])('详情和删除提示使用 %s 的统一标题，编辑保留原始输入', async (name, title) => {
+  const repo = memoryRepository([fixture('a', { name })]);
+  render(
+    <AppProvider repo={repo} clock={clock}>
+      <BirthdayDetails />
+    </AppProvider>,
+  );
+  await screen.findByText(title, { exact: true });
+  fireEvent.press(screen.getByRole('button', { name: '删除生日' }));
+  expect(screen.getByText(`删除「${title}」？`)).toBeTruthy();
+  fireEvent.press(screen.getByRole('button', { name: '取消' }));
+  fireEvent.press(screen.getByRole('button', { name: '编辑生日' }));
+  expect(screen.getByLabelText('姓名或称呼').props.value).toBe(name);
+  expect(repo.remove).not.toHaveBeenCalled();
+  expect(repo.update).not.toHaveBeenCalled();
 });
 
 test('直接打开新建页遇到读库失败时给出重试入口', async () => {

@@ -3,7 +3,7 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Text, Vi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useBirthdays } from '../../src/state/AppProvider';
-import { adjustmentText, upcoming } from '../../src/core/birthday';
+import { adjustmentText, birthdayTitle, upcoming } from '../../src/core/birthday';
 import { lunarCalendar, lunarLabel } from '../../src/core/calendar';
 import { BirthdayForm } from '../../src/components/BirthdayForm';
 import { Avatar, Button, colors, common, Dialog } from '../../src/components/ui';
@@ -70,7 +70,7 @@ export default function BirthdayDetails() {
             <>
               <View style={[common.card, { alignItems: 'center', gap: 12, paddingVertical: 32 }]}>
                 <Avatar name={person.name} id={person.id} size={72} />
-                <Text style={common.title}>{person.name}</Text>
+                <Text style={common.title}>{birthdayTitle(person.name)}</Text>
                 <Text style={common.body}>农历{lunarLabel(person)}</Text>
                 <Text style={common.muted}>每个农历年提醒一次</Text>
               </View>
@@ -129,7 +129,7 @@ export default function BirthdayDetails() {
                 <Button label="编辑生日" icon="create-outline" onPress={() => setEditing(true)} />
               </View>
               <Dialog
-                title={`删除「${person.name}」的生日？`}
+                title={`删除「${birthdayTitle(person.name)}」？`}
                 visible={confirm}
                 onClose={() => {
                   if (!state.busy) setConfirm(false);

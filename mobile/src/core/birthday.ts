@@ -4,6 +4,10 @@ import { MONTH_NAMES } from './calendar';
 
 export type BirthdayDraft = { name: string; month: number; day: number; isLeap: boolean };
 export type Birthday = BirthdayDraft & { id: string; createdAt: string; updatedAt: string };
+export function birthdayTitle(name: string): string {
+  return name.endsWith('生日') ? name : `${name}的生日`;
+}
+
 export function normalizeDraft(value: unknown): BirthdayDraft {
   if (!value || typeof value !== 'object') throw new Error('请填写生日信息');
   const input = value as Record<string, unknown>;

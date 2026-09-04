@@ -41,6 +41,20 @@ test('加载错误不伪装空库，允许重试；CRUD 成功后同步提醒', 
   await act(() => result.current.remove(id));
   expect(result.current.people).toEqual([]);
 });
+test.each([
+  ['爸爸', '爸爸的生日'],
+  ['爸爸生日', '爸爸生日'],
+  ['爸爸的生日', '爸爸的生日'],
+])('保存 %s 时标题提示不重复，数据库和状态仍保留原始名称', async (name, title) => {
+  const repo = memoryRepository();
+  const { result } = mount(repo);
+  await waitFor(() => expect(result.current.status).toBe('ready'));
+  await act(() => result.current.save(fixture('unused', { name })));
+  expect(result.current.notice).toBe(`已保存「${title}」`);
+  expect(result.current.people[0].name).toBe(name);
+  expect((await repo.list())[0].name).toBe(name);
+});
+
 test('保存、删除失败不污染共享状态；拒绝重复写入和未开放类型', async () => {
   const repo = memoryRepository([fixture('a')]);
   const { result } = mount(repo);

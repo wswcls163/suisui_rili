@@ -5,6 +5,7 @@ import {
   type BirthdayDraft,
   type BirthdayRepository,
   birthdayRows,
+  birthdayTitle,
   requireBirthdayType,
 } from '../core/birthday';
 import { lunarCalendar } from '../core/calendar';
@@ -76,7 +77,7 @@ function useAppState(repo: BirthdayRepository, clock: Clock) {
         const row = id ? await repo.update(id, draft) : await repo.create(draft);
         setPeople((current) => (id ? current.map((p) => (p.id === id ? row : p)) : [...current, row]));
         refreshToday();
-        setNotice(`已保存「${row.name}」的生日`);
+        setNotice(`已保存「${birthdayTitle(row.name)}」`);
       } finally {
         writing.current = false;
         setBusy(false);

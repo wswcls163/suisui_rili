@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useBirthdays } from '../src/state/AppProvider';
-import { adjustmentText, entriesForMonth, type BirthdayRow } from '../src/core/birthday';
+import { adjustmentText, birthdayTitle, entriesForMonth, type BirthdayRow } from '../src/core/birthday';
 import { lunarCalendar, lunarLabel } from '../src/core/calendar';
 import { festivalsOn } from '../src/core/festivals';
 import { supported } from '../src/core/dates';
@@ -24,13 +24,13 @@ function PersonRow({ row }: { row: BirthdayRow }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`查看${row.person.name}的生日`}
+      accessibilityLabel={`查看${birthdayTitle(row.person.name)}`}
       onPress={() => router.push({ pathname: '/birthday/[id]', params: { id: row.person.id } })}
       style={({ pressed }) => [styles.person, pressed && { backgroundColor: '#FAF8F4' }]}
     >
       <Avatar name={row.person.name} id={row.person.id} />
       <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-        <Text style={styles.personName}>{row.person.name}</Text>
+        <Text style={styles.personName}>{birthdayTitle(row.person.name)}</Text>
         <Text style={common.muted}>农历{lunarLabel(row.person)}</Text>
       </View>
       <View style={{ alignItems: 'flex-end', gap: 4 }}>
@@ -178,11 +178,11 @@ export default function Home() {
                     <Pressable
                       key={person.id}
                       accessibilityRole="button"
-                      accessibilityLabel={`今天：${person.name}的生日`}
+                      accessibilityLabel={`今天：${birthdayTitle(person.name)}`}
                       onPress={() => router.push({ pathname: '/birthday/[id]', params: { id: person.id } })}
                     >
                       <Text style={{ fontSize: 13, lineHeight: 22, color: '#EBE7E1' }}>
-                        {person.name} · 农历{lunarLabel(person)}
+                        {birthdayTitle(person.name)} · 农历{lunarLabel(person)}
                         {next?.adjustments
                           .map((code) => `（${adjustmentText(code, person.month)}）`)
                           .join('')}
@@ -254,13 +254,13 @@ export default function Home() {
                       <Pressable
                         key={id}
                         accessibilityRole="button"
-                        accessibilityLabel={`查看${person.name}的生日详情`}
+                        accessibilityLabel={`查看${birthdayTitle(person.name)}详情`}
                         onPress={() => router.push({ pathname: '/birthday/[id]', params: { id: person.id } })}
                         style={[common.row, { alignItems: 'flex-start' }]}
                       >
                         <Avatar name={person.name} id={person.id} size={38} />
                         <View style={{ flex: 1, gap: 5 }}>
-                          <Text style={styles.personName}>{person.name}的生日</Text>
+                          <Text style={styles.personName}>{birthdayTitle(person.name)}</Text>
                           <Text style={common.muted}>农历{lunarLabel(person)}</Text>
                           {occurrence.adjustments.map((code) => (
                             <Text key={code} style={[common.muted, { color: colors.accent }]}>
