@@ -1,5 +1,6 @@
 import { upcomingOccurrences, daysUntil } from './calendar.ts';
 import type { LunarBirthday } from './calendar.ts';
+import { dateInMonth, isSupportedDate, monthStart } from './calendar-view.ts';
 export type Person = LunarBirthday & {
   id: string;
   name: string;
@@ -18,6 +19,8 @@ export type DemoState = {
   people: Person[];
   emptyPeople: Person[];
   scenario: ScenarioId;
+  selectedDate: string;
+  displayMonth: string;
 };
 const SEEDS: Person[] = [
   { id: 'mom', name: '妈妈', month: 9, day: 9, isLeap: false, color: 'rose' },
@@ -53,6 +56,8 @@ export function initialState(): DemoState {
     people: SEEDS.map((p) => ({ ...p })),
     emptyPeople: [],
     scenario: 'today',
+    selectedDate: '2026-10-18',
+    displayMonth: '2026-10-01',
   };
 }
 export function visiblePeople(state: DemoState) {
@@ -90,16 +95,42 @@ export function normalizeDraft(input: unknown): Draft {
   };
 }
 export type Action =
+  | { type: 'select-date'; date: string }
+  | { type: 'view-month'; month: string }
   | { type: 'scenario'; id: ScenarioId }
   | { type: 'save'; id: string; draft: Draft }
   | { type: 'delete'; id: string }
   | { type: 'reset' };
 export function demoReducer(state: DemoState, action: Action): DemoState {
   if (action.type === 'reset') return initialState();
+  if (action.type === 'select-date') {
+    if (!isSupportedDate(action.date)) throw new Error('日期超出演示历表范围');
+    return {
+      ...state,
+      selectedDate: action.date,
+      displayMonth: monthStart(action.date),
+    };
+  }
+  if (action.type === 'view-month') {
+    return {
+      ...state,
+      displayMonth: monthStart(action.month),
+      selectedDate: dateInMonth(
+        state.selectedDate ?? scenarioOf(state).date,
+        action.month,
+      ),
+    };
+  }
   if (action.type === 'scenario') {
     if (!SCENARIOS.some((s) => s.id === action.id))
       throw new Error('未知演示场景');
-    return { ...state, scenario: action.id };
+    const date = SCENARIOS.find((s) => s.id === action.id)!.date;
+    return {
+      ...state,
+      scenario: action.id,
+      selectedDate: date,
+      displayMonth: monthStart(date),
+    };
   }
   const key = state.scenario === 'empty' ? 'emptyPeople' : 'people';
   const people = state[key];
