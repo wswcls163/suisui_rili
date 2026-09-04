@@ -128,14 +128,14 @@ test('节日同日保留生日姓名与完整无障碍日期，选择后显示�
     </AppProvider>,
   );
   const date = await screen.findByRole('button', {
-    name: '2020-10-01，农历八月十五，中秋、国庆，1 位生日：团圆',
+    name: '2020-10-01，农历八月十五，中秋节、国庆节，1 位生日：团圆',
   });
-  expect(within(date).getByText('中秋')).toBeTruthy();
+  expect(within(date).getByText('中秋节')).toBeTruthy();
   expect(within(date).getByText('+1')).toBeTruthy();
   expect(within(date).getByText('团圆')).toBeTruthy();
   fireEvent.press(date);
-  expect(screen.getAllByText('中秋', { exact: true })).toHaveLength(2);
-  expect(screen.getByText('国庆', { exact: true })).toBeTruthy();
+  expect(screen.getAllByText('中秋节', { exact: true })).toHaveLength(2);
+  expect(screen.getByText('国庆节', { exact: true })).toBeTruthy();
   expect(screen.getByText('2020 农历年 · 八月十五')).toBeTruthy();
   expect(screen.getByRole('button', { name: '查看团圆的生日详情' })).toBeTruthy();
   expect(screen.getByText('今天没有生日提醒')).toBeTruthy();
@@ -148,22 +148,33 @@ test('小年与节气同日时保留数量提示，选日展示全部名称', as
     </AppProvider>,
   );
   const date = await screen.findByRole('button', { name: '2017-01-20，农历腊月廿三，北方小年、大寒' });
-  expect(within(date).getByText('北小年')).toBeTruthy();
-  expect(screen.getByText('北方小年')).toBeTruthy();
+  expect(within(date).getByText('北方小年')).toHaveStyle({ fontSize: 10 });
+  expect(screen.getAllByText('北方小年')).toHaveLength(2);
   expect(within(date).getByText('+1')).toBeTruthy();
   expect(screen.getByText('大寒')).toBeTruthy();
   expect(screen.getByText('今天没有生日提醒')).toBeTruthy();
 });
 
-test('长纪念日名称在网格用简称，选日和无障碍标签显示完整名称', async () => {
+test.each([
+  ['2026-02-10', '北方小年'],
+  ['2026-02-11', '南方小年'],
+  ['2026-08-15', '日本投降日'],
+  ['2026-09-03', '抗战胜利纪念日'],
+  ['2026-09-18', '九一八事变'],
+  ['2026-09-25', '中秋节'],
+  ['2026-10-01', '国庆节'],
+])('%s 的 %s 使用原字号和尾部省略，选日仍显示完整名称', async (date, name) => {
   render(
-    <AppProvider repo={memoryRepository()} clock={{ now: () => Date.parse('2026-09-18T04:00:00Z') }}>
+    <AppProvider repo={memoryRepository()} clock={{ now: () => Date.parse(`${date}T04:00:00Z`) }}>
       <Home />
     </AppProvider>,
   );
-  const date = await screen.findByRole('button', { name: /2026-09-18.*九一八事变纪念日/ });
-  expect(within(date).getByText('九一八')).toBeTruthy();
-  expect(screen.getByText('九一八事变纪念日')).toBeTruthy();
+  const day = await screen.findByRole('button', { name: new RegExp(`${date}.*${name}`) });
+  const label = within(day).getByText(name);
+  expect(label).toHaveStyle({ fontSize: 10 });
+  expect(label.props.numberOfLines).toBe(1);
+  expect(label.props.ellipsizeMode).toBe('tail');
+  expect(screen.getAllByText(name, { exact: true })).toHaveLength(2);
   expect(screen.getByText('今天没有生日提醒')).toBeTruthy();
 });
 

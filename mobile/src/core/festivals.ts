@@ -7,14 +7,14 @@ const solarFestivals: Record<string, string> = {
   '05-01': '劳动节',
   '06-01': '儿童节',
   '09-10': '教师节',
-  '10-01': '国庆',
+  '10-01': '国庆节',
 };
 const lunarFestivals: Record<string, string> = {
   '1-1': '春节',
   '1-15': '元宵',
   '5-5': '端午',
   '7-7': '七夕',
-  '8-15': '中秋',
+  '8-15': '中秋节',
   '9-9': '重阳',
   '12-23': '北方小年',
   '12-24': '南方小年',
@@ -23,19 +23,8 @@ const lunarFestivals: Record<string, string> = {
 const memorials: Record<string, { name: string; fromYear: number }> = {
   '08-15': { name: '日本投降日', fromYear: 1945 },
   '09-03': { name: '抗战胜利纪念日', fromYear: 1945 },
-  '09-18': { name: '九一八事变纪念日', fromYear: 1931 },
+  '09-18': { name: '九一八事变', fromYear: 1931 },
 };
-const shortNames: Record<string, string> = {
-  北方小年: '北小年',
-  南方小年: '南小年',
-  日本投降日: '日本投降',
-  抗战胜利纪念日: '抗战胜利',
-  九一八事变纪念日: '九一八',
-};
-
-export function shortFestivalName(name: string): string {
-  return shortNames[name] ?? name;
-}
 
 export function festivalsOn(date: string): string[] {
   const lunar = lunarCalendar.lunarOn(date);

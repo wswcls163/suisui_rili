@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { type BirthdayEntry } from '../core/birthday';
 import { DAY_NAMES, MONTH_NAMES, lunarCalendar, lunarLabel } from '../core/calendar';
-import { festivalsOn, shortFestivalName } from '../core/festivals';
+import { festivalsOn } from '../core/festivals';
 import { monthGrid, shiftMonth, supported } from '../core/dates';
 import { Button, colors, common, Dialog, Icon } from './ui';
 
@@ -95,7 +95,7 @@ export function MonthCalendar({
                 : DAY_NAMES[lunar.day - 1];
             const birthdays = byDate.get(date) ?? [];
             const festivals = festivalsOn(date);
-            const dayLabel = festivals.length ? shortFestivalName(festivals[0]) : label;
+            const dayLabel = festivals[0] ?? label;
             const isSelected = date === selected;
             return (
               <Pressable
@@ -116,10 +116,10 @@ export function MonthCalendar({
                 <View style={styles.labelLine}>
                   <Text
                     numberOfLines={1}
+                    ellipsizeMode="tail"
                     style={[
                       styles.lunar,
                       festivals.length > 0 && styles.festival,
-                      (dayLabel.length > 3 || festivals.length > 1) && { fontSize: 9 },
                       isSelected && { color: '#FADED4' },
                     ]}
                   >

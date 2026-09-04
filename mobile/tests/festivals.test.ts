@@ -1,18 +1,7 @@
-import { festivalsOn, shortFestivalName } from '../src/core/festivals';
+import { festivalsOn } from '../src/core/festivals';
 import { solarTermOn } from '../src/core/calendar';
 import { addDays, LAST_DATE } from '../src/core/dates';
 import hko from './fixtures/hko-months.json';
-
-test.each([
-  ['北方小年', '北小年'],
-  ['南方小年', '南小年'],
-  ['日本投降日', '日本投降'],
-  ['抗战胜利纪念日', '抗战胜利'],
-  ['九一八事变纪念日', '九一八'],
-  ['大寒', '大寒'],
-])('网格简称 %s 保持清楚：%s', (name, shortName) => {
-  expect(shortFestivalName(name)).toBe(shortName);
-});
 
 test.each([
   ['2026-01-01', '元旦'],
@@ -25,22 +14,22 @@ test.each([
   ['2026-06-19', '端午'],
   ['2026-08-19', '七夕'],
   ['2026-09-10', '教师节'],
-  ['2026-09-25', '中秋'],
-  ['2026-10-01', '国庆'],
+  ['2026-09-25', '中秋节'],
+  ['2026-10-01', '国庆节'],
   ['2026-10-18', '重阳'],
   ['2026-02-10', '北方小年'],
   ['2026-02-11', '南方小年'],
   ['2026-08-15', '日本投降日'],
   ['2026-09-03', '抗战胜利纪念日'],
-  ['2026-09-18', '九一八事变纪念日'],
+  ['2026-09-18', '九一八事变'],
 ])('%s 标注常见节日 %s', (date, name) => {
   expect(festivalsOn(date)).toContain(name);
 });
 
 test('农历节日逐年变化，不把某年的阳历日期重复到下一年', () => {
-  expect(festivalsOn('2025-10-06')).toContain('中秋');
-  expect(festivalsOn('2026-10-06')).not.toContain('中秋');
-  expect(festivalsOn('2027-09-15')).toContain('中秋');
+  expect(festivalsOn('2025-10-06')).toContain('中秋节');
+  expect(festivalsOn('2026-10-06')).not.toContain('中秋节');
+  expect(festivalsOn('2027-09-15')).toContain('中秋节');
 });
 
 test('除夕兼容腊月三十和廿九，农历新年前一天只标一次', () => {
@@ -111,7 +100,7 @@ test('南北小年逐年按腊月日期换算，同日大寒也保留；清明�
 test.each([
   ['08-15', 1945, '日本投降日'],
   ['09-03', 1945, '抗战胜利纪念日'],
-  ['09-18', 1931, '九一八事变纪念日'],
+  ['09-18', 1931, '九一八事变'],
 ])('纪念日 %s 不标注到事件发生之前', (monthDay, firstYear, name) => {
   expect(festivalsOn(`${firstYear}-${monthDay}`)).toContain(name);
   expect(festivalsOn(`${Number(firstYear) - 1}-${monthDay}`)).not.toContain(name);
@@ -131,7 +120,7 @@ test.each([
 });
 
 test('中秋与国庆同日，完整保留两种节日', () => {
-  expect(festivalsOn('2020-10-01')).toEqual(['中秋', '国庆']);
+  expect(festivalsOn('2020-10-01')).toEqual(['中秋节', '国庆节']);
 });
 
 test('闰月不重复标注传统节日，覆盖独立历表中所有对应闰月', () => {
@@ -139,7 +128,7 @@ test('闰月不重复标注传统节日，覆盖独立历表中所有对应闰�
     [1, { day: 1, name: '春节' }],
     [5, { day: 5, name: '端午' }],
     [7, { day: 7, name: '七夕' }],
-    [8, { day: 15, name: '中秋' }],
+    [8, { day: 15, name: '中秋节' }],
     [9, { day: 9, name: '重阳' }],
   ]);
   let checked = 0;
