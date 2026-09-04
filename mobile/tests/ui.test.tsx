@@ -33,7 +33,10 @@ test('新建先选择类型，预填所选闰月日期；未开放类型不可�
   fireEvent.changeText(screen.getByLabelText('姓名或称呼'), '  妈妈  ');
   fireEvent.press(screen.getByRole('button', { name: '保存生日' }));
   await waitFor(() =>
-    expect(save).toHaveBeenCalledWith({ name: '妈妈', month: 2, day: 1, isLeap: true }, 'birthday'),
+    expect(save).toHaveBeenCalledWith(
+      { name: '妈妈', lunar: { month: 2, day: 1, isLeap: true }, solar: null },
+      'birthday',
+    ),
   );
 });
 test('校验长称呼不崩溃；失败保留输入、支持重试且阻止连点保存', async () => {
@@ -64,7 +67,7 @@ test('校验长称呼不崩溃；失败保留输入、支持重试且阻止连�
 test('编辑回填原始闰月三十，预览调整不改变原始输入', () => {
   render(
     <BirthdayForm
-      person={fixture('a', { month: 2, day: 30, isLeap: true })}
+      person={fixture('a', { lunar: { month: 2, day: 30, isLeap: true } })}
       selectedDate={today}
       today="2025-01-01"
       onSave={async () => {}}
@@ -149,7 +152,9 @@ test('滚轮跳转具体日期同步月份、选中状态和详情，保留真�
 });
 
 test('节日同日保留生日姓名与完整无障碍日期，选择后显示全部节日', async () => {
-  const repo = memoryRepository([fixture('a', { name: '团圆', month: 8, day: 15 })]);
+  const repo = memoryRepository([
+    fixture('a', { name: '团圆', lunar: { month: 8, day: 15, isLeap: false } }),
+  ]);
   render(
     <AppProvider repo={repo} clock={{ now: () => Date.parse('2020-10-02T04:00:00Z') }}>
       <Home />
@@ -249,6 +254,118 @@ test.each([
   expect(screen.getByLabelText('姓名或称呼').props.value).toBe(name);
   expect(repo.remove).not.toHaveBeenCalled();
   expect(repo.update).not.toHaveBeenCalled();
+});
+
+test('已有农历生日开启两个都过，明确填写阳历且只保存一条记录', async () => {
+  const save = jest.fn(async () => {});
+  render(
+    <BirthdayForm
+      person={fixture('a', { lunar: { month: 12, day: 9, isLeap: false } })}
+      selectedDate={today}
+      today={today}
+      onSave={save}
+      onCancel={() => {}}
+    />,
+  );
+  fireEvent.press(screen.getByRole('button', { name: '两个都过' }));
+  expect(screen.getByRole('button', { name: '两个都过' }).props.accessibilityState.selected).toBe(true);
+  expect(screen.getByLabelText('农历日期：初九')).toBeTruthy();
+  fireEvent.press(screen.getByRole('button', { name: '保存修改' }));
+  expect(screen.getByText('请选择有效的阳历月份')).toBeTruthy();
+  expect(save).not.toHaveBeenCalled();
+  fireEvent.press(screen.getByLabelText('阳历月份：请选择'));
+  fireEvent.press(screen.getByRole('button', { name: '1 月' }));
+  fireEvent.press(screen.getByLabelText('阳历日期：请选择'));
+  fireEvent.press(screen.getByRole('button', { name: '11 日' }));
+  expect(screen.getByText('2027.01.11')).toBeTruthy();
+  expect(screen.getByText('2027.01.16')).toBeTruthy();
+  fireEvent.press(screen.getByLabelText('农历日期：初九'));
+  fireEvent.press(screen.getByRole('button', { name: '初十' }));
+  expect(screen.getByText('2027.01.11')).toBeTruthy();
+  fireEvent.press(screen.getByRole('button', { name: '只过农历' }));
+  fireEvent.press(screen.getByRole('button', { name: '两个都过' }));
+  expect(screen.getByLabelText('阳历日期：11 日')).toBeTruthy();
+  fireEvent.press(screen.getByRole('button', { name: '保存修改' }));
+  await waitFor(() =>
+    expect(save).toHaveBeenCalledWith(
+      { name: '亲友a', lunar: { month: 12, day: 10, isLeap: false }, solar: { month: 1, day: 11 } },
+      'birthday',
+    ),
+  );
+  expect(save).toHaveBeenCalledTimes(1);
+});
+
+test('仅阳历独立编辑，月份变化收敛到有效日期，平年闰日显示说明', async () => {
+  const save = jest.fn(async () => {});
+  render(
+    <BirthdayForm
+      person={fixture('a', { lunar: null, solar: { month: 1, day: 31 } })}
+      selectedDate={today}
+      today={today}
+      onSave={save}
+      onCancel={() => {}}
+    />,
+  );
+  expect(screen.queryByLabelText('这是闰月生日')).toBeNull();
+  fireEvent.press(screen.getByLabelText('阳历月份：1 月'));
+  fireEvent.press(screen.getByRole('button', { name: '2 月' }));
+  expect(screen.getByLabelText('阳历日期：29 日')).toBeTruthy();
+  expect(screen.getByText('2027.02.28')).toBeTruthy();
+  expect(screen.getByText('今年没有 2 月 29 日，提前到 2 月 28 日提醒')).toBeTruthy();
+  fireEvent.press(screen.getByRole('button', { name: '保存修改' }));
+  await waitFor(() =>
+    expect(save).toHaveBeenCalledWith(
+      { name: '亲友a', lunar: null, solar: { month: 2, day: 29 } },
+      'birthday',
+    ),
+  );
+});
+
+test('仅阳历记录补农历时不拿当前浏览日期当生日', () => {
+  render(
+    <BirthdayForm
+      person={fixture('a', { lunar: null, solar: { month: 1, day: 11 } })}
+      selectedDate={today}
+      today={today}
+      onSave={async () => {}}
+      onCancel={() => {}}
+    />,
+  );
+  fireEvent.press(screen.getByRole('button', { name: '两个都过' }));
+  expect(screen.getByLabelText('农历月份：请选择')).toBeTruthy();
+  expect(screen.getByText('请选择农历月日')).toBeTruthy();
+});
+
+test('双生日同一天在提醒、月历和事项中只算一人，生日簿保留两套日期', async () => {
+  render(
+    <AppProvider repo={memoryRepository([fixture('a', { solar: { month: 9, day: 4 } })])} clock={clock}>
+      <Home />
+    </AppProvider>,
+  );
+  await screen.findByText('今天有 1 位亲友过生日');
+  const day = screen.getByRole('button', { name: /2026-09-04.*1 位生日.*农历与阳历生日/ });
+  expect(within(day).queryByText(/\+1/)).toBeNull();
+  expect(screen.getAllByRole('button', { name: '查看亲友a的生日详情' })).toHaveLength(1);
+  expect(screen.getByText('农历与阳历生日 · 同一天')).toBeTruthy();
+  fireEvent.press(screen.getByRole('tab', { name: '生日簿 1' }));
+  const row = screen.getByRole('button', { name: '查看亲友a的生日' });
+  expect(within(row).getByText('农历七月廿三 · 阳历9月4日')).toBeTruthy();
+});
+
+test('双生日详情按时间展示每次类型，删除整个人之前可取消', async () => {
+  const repo = memoryRepository([fixture('a', { solar: { month: 9, day: 4 } })]);
+  render(
+    <AppProvider repo={repo} clock={clock}>
+      <BirthdayDetails />
+    </AppProvider>,
+  );
+  await screen.findByText('两个生日分别提醒，同一天重合时只提醒一次');
+  expect(screen.getByText('农历与阳历生日 · 同一天 · 下次')).toBeTruthy();
+  expect(screen.getAllByText('2026.09.04')).toHaveLength(1);
+  fireEvent.press(screen.getByRole('button', { name: '删除生日' }));
+  expect(screen.getByText('删除后，这个人的农历和阳历生日都将从日历、生日簿和当天提醒中移除。')).toBeTruthy();
+  fireEvent.press(screen.getByRole('button', { name: '取消' }));
+  expect(repo.remove).not.toHaveBeenCalled();
 });
 
 test('直接打开新建页遇到读库失败时给出重试入口', async () => {

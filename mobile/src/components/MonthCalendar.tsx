@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { birthdayTitle, type BirthdayEntry } from '../core/birthday';
+import { birthdayTitle, occurrenceLabel, type BirthdayEntry } from '../core/birthday';
 import { DAY_NAMES, MONTH_NAMES, lunarCalendar, lunarLabel } from '../core/calendar';
 import { festivalsOn } from '../core/festivals';
 import { monthGrid, shiftMonth, supported } from '../core/dates';
@@ -94,7 +94,7 @@ export function MonthCalendar({
               <Pressable
                 key={date}
                 accessibilityRole="button"
-                accessibilityLabel={`${date}，农历${lunarLabel(lunar)}${festivals.length ? `，${festivals.join('、')}` : ''}${birthdays.length ? `，${birthdays.length} 位生日：${birthdays.map((b) => birthdayTitle(b.person.name)).join('、')}` : ''}`}
+                accessibilityLabel={`${date}，农历${lunarLabel(lunar)}${festivals.length ? `，${festivals.join('、')}` : ''}${birthdays.length ? `，${birthdays.length} 位生日：${birthdays.map((b) => birthdayTitle(b.person.name) + (b.person.solar ? `（${occurrenceLabel(b.occurrence)}）` : '')).join('、')}` : ''}`}
                 accessibilityState={{ selected: isSelected }}
                 onPress={() => onSelect(date)}
                 style={({ pressed }) => [

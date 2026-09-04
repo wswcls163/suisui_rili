@@ -11,13 +11,32 @@ export class WebBirthdayRepository implements BirthdayRepository {
   ) {
     this.db = new Dexie(name);
     this.db.version(1).stores({ birthdays: 'id,createdAt' });
+    this.db
+      .version(2)
+      .stores({ birthdays: 'id,createdAt' })
+      .upgrade((tx) =>
+        tx
+          .table('birthdays')
+          .toCollection()
+          .modify((row) => {
+            const draft = normalizeDraft({
+              name: row.name,
+              lunar: { month: row.month, day: row.day, isLeap: row.isLeap },
+              solar: null,
+            });
+            Object.assign(row, draft);
+            delete row.month;
+            delete row.day;
+            delete row.isLeap;
+          }),
+      );
     this.birthdays = this.db.table('birthdays');
   }
   async initialize(): Promise<void> {
     await this.db.open();
     // Dexie keeps the declared verno on downgrade-compatible opens; native IDB
     // exposes the actual version, using Dexie's documented factor of ten.
-    if (this.db.backendDB().version > 10) {
+    if (this.db.backendDB().version > 20) {
       this.db.close();
       throw new Error('数据来自更新版本，请先升级应用。现有数据未被修改。');
     }

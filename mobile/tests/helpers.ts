@@ -8,9 +8,8 @@ import {
 export const fixture = (id: string, values: Partial<Birthday> = {}): Birthday => ({
   id,
   name: `亲友${id}`,
-  month: 7,
-  day: 23,
-  isLeap: false,
+  lunar: { month: 7, day: 23, isLeap: false },
+  solar: null,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
   ...values,

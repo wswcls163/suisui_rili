@@ -12,7 +12,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useBirthdays } from '../src/state/AppProvider';
-import { adjustmentText, birthdayTitle, entriesForMonth, type BirthdayRow } from '../src/core/birthday';
+import {
+  adjustmentText,
+  birthdayTitle,
+  birthdayDates,
+  occurrenceLabel,
+  entriesForMonth,
+  type BirthdayRow,
+} from '../src/core/birthday';
 import { lunarCalendar, lunarLabel } from '../src/core/calendar';
 import { festivalsOn } from '../src/core/festivals';
 import { supported } from '../src/core/dates';
@@ -31,7 +38,8 @@ function PersonRow({ row }: { row: BirthdayRow }) {
       <Avatar name={row.person.name} id={row.person.id} />
       <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
         <Text style={styles.personName}>{birthdayTitle(row.person.name)}</Text>
-        <Text style={common.muted}>农历{lunarLabel(row.person)}</Text>
+        <Text style={common.muted}>{birthdayDates(row.person)}</Text>
+        {row.next && <Text style={common.muted}>下次 · {occurrenceLabel(row.next)}</Text>}
       </View>
       <View style={{ alignItems: 'flex-end', gap: 4 }}>
         <Text style={[styles.remaining, row.remaining === 0 && { color: colors.accent }]}>
@@ -182,9 +190,10 @@ export default function Home() {
                       onPress={() => router.push({ pathname: '/birthday/[id]', params: { id: person.id } })}
                     >
                       <Text style={{ fontSize: 13, lineHeight: 22, color: '#EBE7E1' }}>
-                        {birthdayTitle(person.name)} · 农历{lunarLabel(person)}
+                        {birthdayTitle(person.name)} · {birthdayDates(person, next?.kinds)}
+                        {next?.kinds.length === 2 ? '（农历与阳历生日同一天）' : ''}
                         {next?.adjustments
-                          .map((code) => `（${adjustmentText(code, person.month)}）`)
+                          .map((code) => `（${adjustmentText(code, person.lunar?.month ?? 0)}）`)
                           .join('')}
                         　›
                       </Text>
@@ -192,9 +201,7 @@ export default function Home() {
                   ))
                 ) : (
                   <Text style={common.muted}>
-                    {state.people.length
-                      ? '重要的日子，都好好记着。'
-                      : '从一个农历生日开始，把牵挂记在这里。'}
+                    {state.people.length ? '重要的日子，都好好记着。' : '从一个生日开始，把牵挂记在这里。'}
                   </Text>
                 )}
               </View>
@@ -261,10 +268,15 @@ export default function Home() {
                         <Avatar name={person.name} id={person.id} size={38} />
                         <View style={{ flex: 1, gap: 5 }}>
                           <Text style={styles.personName}>{birthdayTitle(person.name)}</Text>
-                          <Text style={common.muted}>农历{lunarLabel(person)}</Text>
+                          <Text style={common.muted}>{birthdayDates(person, occurrence.kinds)}</Text>
+                          {occurrence.kinds.length === 2 && (
+                            <Text style={[common.muted, { color: colors.green }]}>
+                              农历与阳历生日 · 同一天
+                            </Text>
+                          )}
                           {occurrence.adjustments.map((code) => (
                             <Text key={code} style={[common.muted, { color: colors.accent }]}>
-                              {adjustmentText(code, person.month)}
+                              {adjustmentText(code, person.lunar?.month ?? 0)}
                             </Text>
                           ))}
                         </View>
@@ -276,7 +288,7 @@ export default function Home() {
                       <Icon name="leaf-outline" size={32} color="#ABB4A7" />
                       <Text style={[common.body, { marginTop: 14 }]}>这一天还没有事项</Text>
                       <Text style={[common.muted, { textAlign: 'center', marginTop: 6 }]}>
-                        点一下右上角的「＋」，{'\n'}记下亲友的农历生日。
+                        点一下右上角的「＋」，{'\n'}记下亲友的生日。
                       </Text>
                       {!state.people.length && (
                         <Button
@@ -291,7 +303,7 @@ export default function Home() {
                   <Text
                     style={[common.muted, { borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 16 }]}
                   >
-                    保存农历的那一天，每一年重新计算。
+                    农历逐年换算，阳历固定月日，两个生日都能记住。
                   </Text>
                 </View>
               </View>

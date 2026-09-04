@@ -24,7 +24,7 @@ export default function NewBirthday() {
             <Text accessibilityRole="header" style={common.title}>
               新建事项
             </Text>
-            <Text style={common.muted}>记住农历的这一天，每一年都不落下。</Text>
+            <Text style={common.muted}>农历、阳历，或两个都过，每一年都不落下。</Text>
           </View>
           <View style={common.card}>
             {state.status === 'error' ? (

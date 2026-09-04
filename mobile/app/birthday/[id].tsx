@@ -3,7 +3,13 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Text, Vi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useBirthdays } from '../../src/state/AppProvider';
-import { adjustmentText, birthdayTitle, upcoming } from '../../src/core/birthday';
+import {
+  adjustmentText,
+  birthdayTitle,
+  birthdayDates,
+  occurrenceLabel,
+  upcoming,
+} from '../../src/core/birthday';
 import { lunarCalendar, lunarLabel } from '../../src/core/calendar';
 import { BirthdayForm } from '../../src/components/BirthdayForm';
 import { Avatar, Button, colors, common, Dialog } from '../../src/components/ui';
@@ -71,15 +77,21 @@ export default function BirthdayDetails() {
               <View style={[common.card, { alignItems: 'center', gap: 12, paddingVertical: 32 }]}>
                 <Avatar name={person.name} id={person.id} size={72} />
                 <Text style={common.title}>{birthdayTitle(person.name)}</Text>
-                <Text style={common.body}>农历{lunarLabel(person)}</Text>
-                <Text style={common.muted}>每个农历年提醒一次</Text>
+                <Text style={common.body}>{birthdayDates(person)}</Text>
+                <Text style={common.muted}>
+                  {person.lunar && person.solar
+                    ? '两个生日分别提醒，同一天重合时只提醒一次'
+                    : person.lunar
+                      ? '每个农历年提醒一次'
+                      : '每个阳历年提醒一次'}
+                </Text>
               </View>
               <View style={[common.card, { gap: 20 }]}>
                 <Text style={common.heading}>接下来的生日</Text>
                 {occurrences.length ? (
                   occurrences.map((item, index) => (
                     <View
-                      key={item.lunarYear}
+                      key={item.solar}
                       style={{
                         gap: 8,
                         paddingBottom: 15,
@@ -89,24 +101,24 @@ export default function BirthdayDetails() {
                     >
                       <View style={[common.between, { flexWrap: 'wrap' }]}>
                         <Text style={common.muted}>
-                          {item.lunarYear} 农历年{index === 0 ? ' · 下次' : ''}
+                          {occurrenceLabel(item)}
+                          {index === 0 ? ' · 下次' : ''}
                         </Text>
                         <Text style={[common.heading, { color: index === 0 ? colors.accent : colors.ink }]}>
                           {item.solar.replaceAll('-', '.')}
                         </Text>
                       </View>
-                      <Text style={common.muted}>
-                        实际按
-                        {lunarLabel({
-                          month: item.actualMonth,
-                          day: item.actualDay,
-                          isLeap: item.actualLeap,
-                        })}
-                        提醒
-                      </Text>
+                      {item.lunar && (
+                        <Text style={common.muted}>
+                          {item.lunar.year} 农历年 · 实际按{lunarLabel(item.lunar)}提醒
+                        </Text>
+                      )}
+                      {item.kinds.includes('solar') && (
+                        <Text style={common.muted}>{birthdayDates(person, ['solar'])} · 每年固定月日</Text>
+                      )}
                       {item.adjustments.map((code) => (
                         <Text key={code} style={[common.muted, { color: colors.accent }]}>
-                          {adjustmentText(code, person.month)}
+                          {adjustmentText(code, person.lunar?.month ?? 0)}
                         </Text>
                       ))}
                     </View>
@@ -114,7 +126,9 @@ export default function BirthdayDetails() {
                 ) : (
                   <Text style={common.muted}>下次生日超出支持范围（1901—2100 年），原始记录仍然保留。</Text>
                 )}
-                <Text style={common.muted}>原始生日始终保留。闰月或小月调整只影响对应年份的提醒。</Text>
+                <Text style={common.muted}>
+                  原始生日始终保留。闰月、小月或 2 月 29 日的调整只影响对应年份的提醒。
+                </Text>
               </View>
               <View style={common.between}>
                 <Button
@@ -136,7 +150,7 @@ export default function BirthdayDetails() {
                 }}
               >
                 <Text style={[common.body, { marginBottom: 20 }]}>
-                  删除后，该生日将从日历、生日簿和当天提醒中移除。
+                  删除后，这个人的农历和阳历生日都将从日历、生日簿和当天提醒中移除。
                 </Text>
                 {!!error && (
                   <Text accessibilityRole="alert" style={[common.error, { marginBottom: 15 }]}>

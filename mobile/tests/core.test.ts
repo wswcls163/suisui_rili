@@ -4,6 +4,8 @@ import {
   entriesForMonth,
   normalizeDraft,
   occurrenceForYear,
+  solarOccurrenceForYear,
+  birthdayDates,
   upcoming,
   requireBirthdayType,
   type Birthday,
@@ -24,7 +26,7 @@ import {
 } from '../src/core/dates';
 import { TodayWatcher } from '../src/core/clock';
 
-const draft: BirthdayDraft = { name: '妈妈', month: 2, day: 1, isLeap: false };
+const draft: BirthdayDraft = { name: '妈妈', lunar: { month: 2, day: 1, isLeap: false }, solar: null };
 const person = (id: string, value = draft): Birthday => ({
   ...value,
   id,
@@ -34,34 +36,31 @@ const person = (id: string, value = draft): Birthday => ({
 
 describe('农历生日规则', () => {
   test('普通二月不会在闰二月再次过生日；每年重算阳历', () => {
-    expect(occurrenceForYear(lunarCalendar, draft, 2023).solar).toBe('2023-02-20');
-    expect(occurrenceForYear(lunarCalendar, draft, 2024).solar).toBe('2024-03-10');
+    expect(occurrenceForYear(lunarCalendar, draft.lunar!, 2023).solar).toBe('2023-02-20');
+    expect(occurrenceForYear(lunarCalendar, draft.lunar!, 2024).solar).toBe('2024-03-10');
     expect(entriesForMonth(lunarCalendar, [person('a')], '2023-03-01')).toEqual([]);
   });
   test('有闰月使用闰月，没有则回退；先选月份再处理小月', () => {
-    const leap = Object.freeze({ ...draft, day: 30, isLeap: true });
+    const leap = Object.freeze({ ...draft.lunar!, day: 30, isLeap: true });
     expect(occurrenceForYear(lunarCalendar, leap, 2023)).toMatchObject({
       solar: '2023-04-19',
-      actualLeap: true,
-      actualDay: 29,
+      lunar: { isLeap: true, day: 29 },
       adjustments: ['short-month'],
     });
     expect(occurrenceForYear(lunarCalendar, leap, 2024)).toMatchObject({
       solar: '2024-04-08',
-      actualLeap: false,
-      actualDay: 30,
+      lunar: { isLeap: false, day: 30 },
       adjustments: ['leap-fallback'],
     });
     expect(occurrenceForYear(lunarCalendar, leap, 2025)).toMatchObject({
       solar: '2025-03-28',
-      actualLeap: false,
-      actualDay: 29,
+      lunar: { isLeap: false, day: 29 },
       adjustments: ['leap-fallback', 'short-month'],
     });
-    expect(leap).toEqual({ name: '妈妈', month: 2, day: 30, isLeap: true });
+    expect(leap).toEqual({ month: 2, day: 30, isLeap: true });
   });
   test('春节前从上一农历年计算；当天包含，次日找下一年', () => {
-    const birthday = { ...draft, month: 12, day: 29 };
+    const birthday = { ...draft, lunar: { month: 12, day: 29, isLeap: false } };
     expect(upcoming(lunarCalendar, birthday, '2024-01-01')[0].solar).toBe('2024-02-08');
     expect(upcoming(lunarCalendar, birthday, '2024-02-08')[0].solar).toBe('2024-02-08');
     expect(upcoming(lunarCalendar, birthday, '2024-02-09')[0].solar).toBe('2025-01-28');
@@ -69,8 +68,8 @@ describe('农历生日规则', () => {
   test('历史月历包含本月已经过去的生日，同日多人不丢失', () => {
     const rows = entriesForMonth(lunarCalendar, [person('a'), person('b')], '2023-02-28');
     expect(rows.map((r) => [r.id, r.occurrence.solar])).toEqual([
-      ['a-2023', '2023-02-20'],
-      ['b-2023', '2023-02-20'],
+      ['a-2023-02-20', '2023-02-20'],
+      ['b-2023-02-20', '2023-02-20'],
     ]);
     expect(
       birthdayRows(lunarCalendar, [person('b'), person('a')], '2023-02-20').map((r) => [
@@ -84,7 +83,7 @@ describe('农历生日规则', () => {
   });
   test('支持首尾日期；最后一年查不到未来生日时返回空', () => {
     for (const date of [FIRST_DATE, LAST_DATE]) {
-      const birthday = { ...lunarCalendar.lunarOn(date), name: '边界' };
+      const birthday = { lunar: lunarCalendar.lunarOn(date), solar: null, name: '边界' };
       expect(upcoming(lunarCalendar, birthday, date)[0].solar).toBe(date);
       expect(entriesForMonth(lunarCalendar, [person(date, birthday)], date)).toHaveLength(1);
     }
@@ -100,11 +99,118 @@ describe('农历生日规则', () => {
     expect(lunarCalendar.lunarOn('2057-09-28')).toMatchObject({ month: 9, day: 1 });
     expect(lunarCalendar.lunarOn('2057-10-27')).toMatchObject({ month: 9, day: 30 });
     expect(lunarCalendar.lunarOn('2057-10-28')).toMatchObject({ month: 10, day: 1 });
-    expect(occurrenceForYear(lunarCalendar, { ...draft, month: 8, day: 30 }, 2057)).toMatchObject({
+    expect(occurrenceForYear(lunarCalendar, { ...draft.lunar!, month: 8, day: 30 }, 2057)).toMatchObject({
       solar: '2057-09-27',
       adjustments: ['short-month'],
     });
-    expect(occurrenceForYear(lunarCalendar, { ...draft, month: 9 }, 2057).solar).toBe('2057-09-28');
+    expect(occurrenceForYear(lunarCalendar, { ...draft.lunar!, month: 9 }, 2057).solar).toBe('2057-09-28');
+  });
+});
+
+describe('阳历生日与两个都过', () => {
+  const both: BirthdayDraft = {
+    name: '自己',
+    lunar: { month: 12, day: 9, isLeap: false },
+    solar: { month: 1, day: 11 },
+  };
+  test('腊月初九和 1 月 11 日分别按自己的历法跨年重复', () => {
+    const dates = upcoming(lunarCalendar, both, '2026-09-05', 6);
+    expect(dates.filter((date) => date.kinds.includes('solar')).map((date) => date.solar)).toEqual([
+      '2027-01-11',
+      '2028-01-11',
+      '2029-01-11',
+    ]);
+    expect(dates[1]).toMatchObject({
+      solar: '2027-01-16',
+      kinds: ['lunar'],
+      lunar: { year: 2026, month: 12, day: 9 },
+    });
+    expect(birthdayDates(both)).toBe('农历腊月初九 · 阳历1月11日');
+    expect(both.solar).toEqual({ month: 1, day: 11 });
+  });
+  test('阳历生日不调用农历计算，包含当天、次日转入下一年', () => {
+    const calendar = {
+      ...lunarCalendar,
+      lunarOn: jest.fn(() => {
+        throw new Error('不应换算');
+      }),
+    };
+    const solar = { ...both, lunar: null };
+    expect(upcoming(calendar, solar, '2027-01-11')[0].solar).toBe('2027-01-11');
+    expect(upcoming(calendar, solar, '2027-01-12')[0].solar).toBe('2028-01-11');
+    expect(calendar.lunarOn).not.toHaveBeenCalled();
+  });
+  test('同一个人的双生日重合只产生一条事项；同名不同人分别保留', () => {
+    const value = { ...draft, lunar: { month: 7, day: 23, isLeap: false }, solar: { month: 9, day: 4 } };
+    const dates = upcoming(lunarCalendar, value, '2026-09-04', 3);
+    expect(dates).toHaveLength(3);
+    expect(dates[0].kinds).toEqual(['lunar', 'solar']);
+    expect(new Set(dates.map((date) => date.solar)).size).toBe(3);
+    const entries = entriesForMonth(lunarCalendar, [person('a', value), person('b', value)], '2026-09-01');
+    expect(entries).toHaveLength(2);
+    expect(entries.every((entry) => entry.occurrence.kinds.length === 2)).toBe(true);
+    expect(birthdayRows(lunarCalendar, [person('a', value)], '2026-09-04')).toHaveLength(1);
+  });
+  test('同月两天都标注，最近一次排序包含年初上一农历年', () => {
+    const entries = entriesForMonth(lunarCalendar, [person('a', both)], '2027-01-31');
+    expect(entries.map((entry) => [entry.occurrence.solar, entry.occurrence.kinds])).toEqual([
+      ['2027-01-11', ['solar']],
+      ['2027-01-16', ['lunar']],
+    ]);
+    expect(birthdayRows(lunarCalendar, [person('a', both)], '2027-01-12')[0]).toMatchObject({
+      remaining: 4,
+      next: { kinds: ['lunar'] },
+    });
+  });
+  test.each([2024, 2025, 2100])('2 月 29 日在 %s 年按月末过，始终保留原日期', (year) => {
+    const solar = Object.freeze({ month: 2, day: 29 });
+    const result = solarOccurrenceForYear(solar, year);
+    expect(result.solar).toBe(`${year}-02-${year === 2024 ? '29' : '28'}`);
+    expect(result.adjustments).toEqual(year === 2024 ? [] : ['solar-leap-day']);
+    expect(solar.day).toBe(29);
+  });
+  test('双生日同日且农历回退和阳历闰日调整并存，调整信息均保留', () => {
+    const lunar = lunarCalendar.lunarOn('2025-02-28');
+    const result = upcoming(
+      lunarCalendar,
+      { name: '双生日', lunar: { ...lunar, isLeap: true }, solar: { month: 2, day: 29 } },
+      '2025-02-28',
+    )[0];
+    expect(result.kinds).toEqual(['lunar', 'solar']);
+    expect(result.adjustments).toEqual(['leap-fallback', 'solar-leap-day']);
+  });
+  test('阳历支持范围首尾不越界，双生日到终点仍只合并同一天', () => {
+    for (const date of [FIRST_DATE, LAST_DATE]) {
+      const value = {
+        name: '边界',
+        lunar: lunarCalendar.lunarOn(date),
+        solar: { month: Number(date.slice(5, 7)), day: Number(date.slice(8)) },
+      };
+      expect(upcoming(lunarCalendar, value, date)[0]).toMatchObject({
+        solar: date,
+        kinds: ['lunar', 'solar'],
+      });
+    }
+    expect(upcoming(lunarCalendar, { ...both, lunar: null }, LAST_DATE, 3)).toEqual([]);
+  });
+  test.each([
+    { month: 2, day: 30 },
+    { month: 4, day: 31 },
+    { month: 0, day: 1 },
+    { month: 13, day: 1 },
+    { month: 1, day: 0 },
+    { month: 1, day: 1.5 },
+    { month: '1', day: 11 },
+  ])('拒绝无效阳历月日 %j', (solar) => {
+    expect(() => normalizeDraft({ ...both, solar })).toThrow('阳历');
+  });
+  test('不可保存空的生日方式，切换为阳历时不需要农历字段', () => {
+    expect(() => normalizeDraft({ name: '自己', lunar: null, solar: null })).toThrow('至少');
+    expect(normalizeDraft({ ...both, lunar: null })).toEqual({
+      name: '自己',
+      lunar: null,
+      solar: { month: 1, day: 11 },
+    });
   });
 });
 
@@ -128,13 +234,13 @@ describe('输入和日期', () => {
   test.each([
     { name: ' ' },
     { name: 12 },
-    { month: 0 },
-    { month: 13 },
-    { month: '2' },
-    { day: 31 },
-    { day: 1.1 },
-    { day: 0 },
-    { isLeap: 1 },
+    { lunar: { ...draft.lunar, month: 0 } },
+    { lunar: { ...draft.lunar, month: 13 } },
+    { lunar: { ...draft.lunar, month: '2' } },
+    { lunar: { ...draft.lunar, day: 31 } },
+    { lunar: { ...draft.lunar, day: 1.1 } },
+    { lunar: { ...draft.lunar, day: 0 } },
+    { lunar: { ...draft.lunar, isLeap: 1 } },
   ])('拒绝非法字段 %j', (invalid) => {
     expect(() => normalizeDraft({ ...draft, ...invalid })).toThrow();
   });

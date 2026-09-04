@@ -71,6 +71,7 @@ export function Button({
   variant = 'primary',
   icon,
   style,
+  selected,
 }: {
   label: string;
   onPress: () => void;
@@ -79,6 +80,7 @@ export function Button({
   variant?: 'primary' | 'secondary' | 'quiet' | 'danger';
   icon?: keyof typeof Ionicons.glyphMap;
   style?: StyleProp<ViewStyle>;
+  selected?: boolean;
 }) {
   const solid = variant === 'primary' || variant === 'danger';
   const foreground = solid ? '#FFF' : variant === 'quiet' ? colors.muted : colors.ink;
@@ -86,7 +88,7 @@ export function Button({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ disabled: disabled || busy, busy }}
+      accessibilityState={{ disabled: disabled || busy, busy, selected }}
       disabled={disabled || busy}
       onPress={onPress}
       style={({ pressed }) => [
@@ -178,22 +180,26 @@ export function ChoiceField({
   options,
   value,
   onChange,
+  disabled = false,
 }: {
   label: string;
   options: string[];
   value: number;
   onChange: (value: number) => void;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${label}：${options[value - 1]}`}
+        accessibilityLabel={`${label}：${options[value - 1] ?? '请选择'}`}
+        disabled={disabled}
+        accessibilityState={{ disabled }}
         onPress={() => setOpen(true)}
         style={[common.input, common.between, { flex: 1 }]}
       >
-        <Text style={common.body}>{options[value - 1]}</Text>
+        <Text style={common.body}>{options[value - 1] ?? '请选择'}</Text>
         <Icon name="chevron-down" size={16} color={colors.muted} />
       </Pressable>
       <Dialog title={`选择${label}`} visible={open} onClose={() => setOpen(false)}>
