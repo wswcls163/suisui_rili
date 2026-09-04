@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "岁岁日历",
+    "slug": "suisui-calendar",
+    "version": "0.1.0",
+    "scheme": "suisui",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.suisui.calendar"
+    },
+    "android": {
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "adaptiveIcon": {
+        "backgroundColor": "#F5F4F0",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.suisui.calendar",
+      "predictiveBackGestureEnabled": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "output": "single",
+      "name": "岁岁日历"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      [
+        "expo-splash-screen",
+        { "backgroundColor": "#F5F4F0", "image": "./assets/splash-icon.png", "imageWidth": 120 }
+      ]
+    ]
+  }
+}

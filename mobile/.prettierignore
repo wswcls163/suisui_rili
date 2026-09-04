@@ -1,0 +1,9 @@
+node_modules
+.expo
+.cache
+dist
+dist-native
+android
+ios
+package-lock.json
+tests/fixtures/hko-months.json

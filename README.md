@@ -4,9 +4,25 @@
 
 - [产品设计文档](docs/product-design.md)
 - [移动端技术方案](docs/technical-design.md)
+- [应用运行与测试说明](mobile/README.md)
+- [本次验证记录与手机验收项](docs/validation.md)
 - [交互 Demo 与运行说明](demo/README.md)
 
-正式版技术路线已确定为 React Native + Expo + TypeScript + SQLite，面向 Android 和 iOS。当前仅有模拟数据的界面 Demo，移动端应用尚未实现；第一期仅做应用内提醒。
+应用代码位于 `mobile/`，使用 React Native + Expo + TypeScript。已实现双历月历、生日增删改查、逐年换算、本地保存和应用内当天提醒。手机使用 SQLite，电脑浏览器预览使用 IndexedDB；两端共用界面与生日规则，数据暂不互通。旧 `demo/` 保留为交互参考。
+
+当前优先完成手机端，并提供电脑浏览器测试入口。Android / iOS 已通过资源打包检查，安装包及真机验收尚未完成；Windows 独立安装包留到手机端稳定后再做。
+
+## 在电脑上运行
+
+需要 Node.js 22.13 以上版本（建议使用 `.nvmrc` 指定的版本，也可使用 Node.js 24）。
+
+```sh
+cd mobile
+npm ci
+npm run web
+```
+
+打开终端输出的地址，默认是 [电脑预览](http://localhost:8081)。可实际新增、编辑、删除生日，刷新页面后保留数据。关闭终端中的开发服务后，需要重新运行命令才能访问。
 
 ## 文档验证
 

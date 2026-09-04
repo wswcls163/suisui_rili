@@ -19,6 +19,8 @@ async function markdownFiles(directory) {
 const documents = [
   join(root, 'README.md'),
   join(root, 'demo', 'README.md'),
+  join(root, 'mobile', 'README.md'),
+  join(root, 'mobile', 'tests', 'fixtures', 'README.md'),
   ...(await markdownFiles(join(root, 'docs'))),
 ];
 

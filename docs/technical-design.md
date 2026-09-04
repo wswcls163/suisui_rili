@@ -1,16 +1,18 @@
 # 岁岁日历 · 技术方案
 
-版本：V0.1｜日期：2026-09-04｜状态：技术路线已确认，移动端尚未实现
+版本：V0.2｜日期：2026-09-04｜状态：核心功能已实现，电脑预览可测试，手机安装包与真机验收待完成
 
 依据：[产品设计文档](product-design.md) 与 [交互 Demo](../demo/README.md)。本方案面向第一期生日功能，重点是手机端交付、便于修改，以及为后续功能保留清晰的接入位置。
 
 ## 1. 技术决策与交付范围
 
-正式应用采用 **React Native + Expo + TypeScript + SQLite**，面向 Android 和 iOS，共享业务代码，并分别验证平台行为。现有 Web Demo 保留为交互参考，正式项目计划放在仓库的 `mobile/` 目录；本次仅编写方案，不创建移动端工程。
+正式应用采用 **React Native + Expo + TypeScript + SQLite**，面向 Android 和 iOS，共享业务代码，并分别验证平台行为。应用已放在仓库的 `mobile/` 目录，现有 Web Demo 保留为交互参考。
+
+按后续确认的交付顺序，**手机优先，同时提供可实际操作的电脑浏览器预览**。浏览器通过 React Native Web 复用界面和业务规则，用 IndexedDB 保存本机数据；手机使用 SQLite，两端数据暂不互通。浏览器预览可用于亲自测试功能，不能替代手机上的原生模块、安装包和生命周期验收。Windows 独立安装包推迟到手机端稳定后；届时评估复用 Web 界面接入桌面外壳，并处理桌面数据与升级流程。
 
 第一期交付生日增删改查、双历月历、下次生日、本地持久保存和应用内当天提醒。应用安装完成后，核心功能可离线使用，首次启动为空数据。第一期不接入账号、服务端、云同步、系统通知、通讯录或桌面小组件，也不实现普通日程等预留事项类型。
 
-开发时先在当前 Windows 环境完成 Android 开发闭环，并尽早验证 iOS；这不代表只支持 Android。正式发布的平台顺序、最低系统版本和上架渠道，在初始化工程时结合目标设备确定并记录，不默认承诺微信小程序、鸿蒙原生应用或正式 Web 版本。
+先在当前 Windows 环境开发 Android，并保留 iOS 构建路径。当前 Expo SDK 57 最低支持 Android 7、iOS 16.4。正式分发顺序、签名和渠道按实际测试设备确定，不默认承诺微信小程序、鸿蒙原生应用或网站公网发布。
 
 ## 2. 技术栈
 
@@ -20,14 +22,15 @@
 | 语言 | TypeScript，开启 strict | 明确生日、农历日期、计算结果和存储接口的类型 |
 | 页面导航 | Expo Router | 管理首页、生日簿、详情和编辑页面；路由文件仅组装页面 |
 | 界面与样式 | React Native 基础组件 + StyleSheet + 统一主题变量 | 复用颜色、字号、间距、按钮和卡片，延续 Demo 的视觉方向 |
-| 界面状态 | React Hooks、Context、useReducer | 集中维护生日快照，局部表单状态留在组件内 |
+| 界面状态 | React Hooks、Context、useState | 集中维护生日快照，局部表单状态留在组件内；当前规模无需额外状态库 |
 | 本地数据库 | SQLite，通过 expo-sqlite 访问 | 存储原始生日，用版本化迁移管理字段变化 |
-| 农历引擎 | 优先采用 lunar-javascript，封装为适配器 | 验证 React Native 兼容性和历法结果后锁定版本，页面不直接依赖历法库 |
+| 农历引擎 | lunar-javascript 1.7.7，封装为适配器 | 按独立对照表核验声明范围；页面不直接依赖历法库 |
+| 电脑预览存储 | Dexie + IndexedDB | 平台入口选择 Web 仓库，共享页面不判断数据库类型 |
 | 测试 | Jest / jest-expo + React Native Testing Library | 规则、状态和组件交互测试；原生存储另做设备集成验证 |
 
 导航、本地保存和开发构建参考 [Router 文档](https://docs.expo.dev/router/introduction/)、[SQLite 文档](https://docs.expo.dev/versions/latest/sdk/sqlite/) 和 [development build 文档](https://docs.expo.dev/develop/development-builds/introduction/)。测试环境参考 [Expo 单元测试文档](https://docs.expo.dev/develop/unit-testing/)。
 
-初始化工程时选择受支持的稳定 Expo SDK，使用其匹配的 React Native、React 和原生模块版本，通过 `expo install` 安装对应模块，并提交锁文件、记录 Node.js 版本。避免分别追逐各依赖的最新版本。Demo 的 Vite、Vinext、浏览器组件和部署配置不迁入手机工程。
+工程使用 Expo SDK 57、React Native 0.86、React 19.2 和匹配的原生模块，提交 npm 锁文件及 `.nvmrc`（Node.js 22.23.2），并用 `expo-doctor` 检查依赖匹配。代码通过 ESLint、Prettier 统一规范。避免分别追逐各依赖的最新版本。Demo 的 Vite、Vinext、浏览器组件和部署配置不迁入手机工程。
 
 月历先用 React Native 基础组件实现七列网格，单日接收阳历、农历标签、生日数量和选中状态，月份计算放在业务模块。第一期不引入完整日程系统。
 
@@ -39,20 +42,24 @@
 mobile/
   app/                    # Expo Router 路由和页面入口
   src/
-    components/           # 月历网格、生日卡片、日期输入等
-    theme/                # 颜色、字号、间距等主题变量
-    domain/
-      birthday/           # 原始生日类型、校验、年度生日规则
-      calendar/           # 日期类型、月份网格、历法接口
-    application/          # 增删改流程、共享状态、月历与提醒派生数据
-    infrastructure/
-      calendar/           # lunar-javascript 适配器
-      storage/            # SQLite、生日仓库实现、数据库迁移
-      clock/              # 当前时间、时区与前台刷新
+    components/           # 月历、生日表单；ui.tsx 合并小组件与主题变量
+    core/
+      birthday.ts         # 类型、校验、年度生日规则与展示结果
+      calendar.ts         # 历法接口、库适配与核验口径
+      dates.ts            # 严格日期、月历网格、北京时间
+      clock.ts            # 可注入时钟与前台刷新
+    state/AppProvider.tsx # CRUD、共享快照、手机生命周期接入
+    data/
+      sqlite.ts           # SQLite 仓库与迁移，真实 SQL 可单独测试
+      web.ts              # IndexedDB 仓库
+      repository.ts      # 原生平台入口
+      repository.web.ts  # 浏览器平台入口
+    types/                # 历法库所用 API 的类型声明
   tests/                  # 规则、组件、存储集成测试及历法核验数据
+  scripts/                # 历法对照数据抓取、核验与图标生成
 ```
 
-这是职责划分，不要求每个函数单独建文件。第一期保持单一手机工程，出现第二个真实客户端时，再评估将纯业务模块提取为共享包。
+这是职责划分，不为每个函数创建单独文件。当前保持一个 Expo 工程，通过平台文件扩展名选择存储；不建立多包仓库、通用服务层或空的未来模块。农历与生日逻辑不依赖界面，可以独立运行和测试。
 
 “日历”和“生日簿”读取同一份生日状态。选中日期、浏览月份与真实今天分别保存。新增类型通过简单的事项类型目录展示，未开放类型在界面和业务入口都不能提交。
 
@@ -64,8 +71,8 @@ mobile/
 | --- | --- |
 | id | 创建时生成的 UUID，修改生日不更换 ID |
 | name | 去除首尾空白后的称呼，1—30 个字符，允许不同记录重名 |
-| lunarMonth | 原始农历月份，整数 1—12 |
-| lunarDay | 原始农历日期，整数 1—30；不因某年小月而改写 |
+| month | 原始农历月份，整数 1—12 |
+| day | 原始农历日期，整数 1—30；不因某年小月而改写 |
 | isLeap | 原始闰月标记；业务层为布尔值，SQLite 中约束为 0 或 1 |
 | createdAt / updatedAt | UTC 时间戳，记录创建、修改时间，不参与生日日期计算 |
 
@@ -79,7 +86,7 @@ mobile/
 
 ## 5. 农历引擎与年度生日规则
 
-历法适配器负责阳历与农历互转、查询某农历年的闰月和月份天数。优先验证 [lunar-javascript](https://github.com/6tail/lunar-javascript) 在目标环境中的兼容性、类型封装和计算结果，不能将 Demo 的有限历表直接当作正式引擎。
+历法适配器负责阳历转农历、查询指定农历月份的月首和天数，通过月首加日序得到阳历结果。采用 [lunar-javascript](https://github.com/6tail/lunar-javascript) 并封装项目使用的类型，不能将 Demo 的有限历表直接当作正式引擎。原生打包检查已通过，运行表现仍需真机确认。
 
 生日模块在适配器之上执行以下规则：
 
@@ -92,7 +99,7 @@ mobile/
 
 下次生日从“今天所在的农历年份”开始向后计算，取不早于今天的第一个结果；不能直接使用今天的阳历年份作为起点。月历则根据阳历月份首尾对应的农历年份生成结果，再按阳历范围筛选，包含本月已经过去的生日。
 
-正式版目标支持 **阳历 1901-01-01 至 2100-12-31**。这是待验证的支持目标，不代表现有 Demo 或历法库已通过该范围验收。适配器需覆盖这些日期涉及的农历年份，包括 1901 年初涉及的上一农历年。发布前按声明范围完成验证，未通过则先解决差异或明确调整范围。
+应用支持 **阳历 1901-01-01 至 2100-12-31**。已对 73,049 个日期及涉及的 2,475 个农历月份进行香港天文台公开对照表核验，包括 1901 年初涉及的上一农历年。天文台原文中 2069-12-30 缺行，按前后连续日序补出并明确标记；2057 年九月初一与库存在一天差异，统一采用天文台表口径，同时调整两个方向的计算。校正后比对无差异，出处、原文摘要和处理说明见[历法核验数据](../mobile/tests/fixtures/README.md)。不能据此声称手机平台验收也已完成。
 
 范围外日期不可选。范围内未找到下次生日时返回“超出支持范围”状态，在列表中排到有日期记录之后，生日仍可编辑和删除。详情展示未来若干次生日，接近范围末尾时允许不足，不能越界猜测或导致整页失败。
 
@@ -158,7 +165,7 @@ mobile/
 
 每次实现改动同步编写或更新测试，执行完整自动测试、类型检查、Lint 和受影响的构建及设备验证，通过后创建对应 Git commit。数据库迁移或历法库升级必须补充旧数据和日期回归验证。
 
-当前文档链接测试从仓库根目录运行 `node --test tests/*.test.mjs`，Demo 验证按其 README 执行。移动端测试和构建命令在创建工程时落实，本方案不将尚未存在的工程列为已通过验收。
+文档链接测试从仓库根目录运行 `node --test tests/*.test.mjs`，应用测试和构建命令见 [mobile/README.md](../mobile/README.md)。目前包含 39 项 Jest 测试、6 项存储集成测试及独立历法批量核验。真实 SQLite 仓库测试在 Node SQLite 引擎上运行；expo-sqlite 原生桥接、真机离线和杀进程场景留在设备验收中单独记录。[验证记录](validation.md) 区分已通过检查与尚未执行的设备验收。
 
 ## 10. 实施顺序
 
@@ -167,4 +174,6 @@ mobile/
 3. **实现第一期界面。** 完成月历、生日簿、详情和新建编辑，接入统一状态与真实今天，移除正式流程中的演示数据。
 4. **完成设备验收。** 检查跨午夜、重启保留、失败恢复和手机交互，完成支持范围核验及目标平台发布构建。
 
-iOS 本地构建和模拟器需要 macOS / Xcode；当前 Windows 环境可用 EAS Build 云构建，配合真实 iPhone 验证。云服务是可选工具，其账号、签名、费用与分发条件在实际使用时确定。本次文档变更不涉及上传工程或发布应用。参见 [Expo FAQ](https://docs.expo.dev/faq/) 与 [EAS Build 文档](https://docs.expo.dev/build/introduction/)。
+当前第 2、3 步的代码与自动测试已完成，电脑预览已走通真实 CRUD；第 1 步完成工程初始化、Android 原生工程生成和双平台 Hermes 资源导出，但本机缺少 Android SDK，尚未完成安装包编译。第 4 步的设备验收仍待具备工具链和测试手机后执行。
+
+iOS 本地构建和模拟器需要 macOS / Xcode；Windows 环境也可选择 EAS Build 云构建，配合真实 iPhone 验证。云服务是可选工具，其账号、签名、费用与分发条件在实际使用时确定，当前未上传工程或发布应用。参见 [Expo FAQ](https://docs.expo.dev/faq/) 与 [EAS Build 文档](https://docs.expo.dev/build/introduction/)。
