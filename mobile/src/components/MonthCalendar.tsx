@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { type BirthdayEntry } from '../core/birthday';
 import { DAY_NAMES, MONTH_NAMES, lunarCalendar, lunarLabel } from '../core/calendar';
-import { festivalsOn } from '../core/festivals';
+import { festivalsOn, shortFestivalName } from '../core/festivals';
 import { monthGrid, shiftMonth, supported } from '../core/dates';
 import { Button, colors, common, Dialog, Icon } from './ui';
 
@@ -95,9 +95,7 @@ export function MonthCalendar({
                 : DAY_NAMES[lunar.day - 1];
             const birthdays = byDate.get(date) ?? [];
             const festivals = festivalsOn(date);
-            const dayLabel = festivals.length
-              ? `${festivals[0]}${festivals.length > 1 ? ` +${festivals.length - 1}` : ''}`
-              : label;
+            const dayLabel = festivals.length ? shortFestivalName(festivals[0]) : label;
             const isSelected = date === selected;
             return (
               <Pressable
@@ -115,16 +113,24 @@ export function MonthCalendar({
                 ]}
               >
                 <Text style={[styles.dayNumber, isSelected && styles.white]}>{Number(date.slice(8))}</Text>
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    styles.lunar,
-                    festivals.length > 0 && styles.festival,
-                    isSelected && { color: '#FADED4' },
-                  ]}
-                >
-                  {dayLabel}
-                </Text>
+                <View style={styles.labelLine}>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.lunar,
+                      festivals.length > 0 && styles.festival,
+                      (dayLabel.length > 3 || festivals.length > 1) && { fontSize: 9 },
+                      isSelected && { color: '#FADED4' },
+                    ]}
+                  >
+                    {dayLabel}
+                  </Text>
+                  {festivals.length > 1 && (
+                    <Text style={[styles.labelCount, isSelected && styles.white]}>
+                      +{festivals.length - 1}
+                    </Text>
+                  )}
+                </View>
                 {birthdays.length > 0 ? (
                   <Text numberOfLines={1} style={[styles.event, isSelected && styles.white]}>
                     {birthdays[0].person.name}
@@ -200,7 +206,9 @@ const styles = StyleSheet.create({
   },
   day: { alignItems: 'center', justifyContent: 'center', paddingVertical: 7, paddingHorizontal: 2 },
   dayNumber: { fontSize: 18, color: colors.ink, fontWeight: '500' },
-  lunar: { fontSize: 10, color: colors.muted, marginTop: 4 },
+  labelLine: { flexDirection: 'row', alignItems: 'center', maxWidth: '100%', marginTop: 4, gap: 1 },
+  lunar: { fontSize: 10, color: colors.muted, flexShrink: 1 },
+  labelCount: { fontSize: 8, color: colors.accent },
   festival: { color: colors.accent, fontWeight: '600' },
   event: { fontSize: 10, color: colors.accent, marginTop: 4, fontWeight: '500', maxWidth: '100%' },
   today: { borderColor: '#D7AA9D', backgroundColor: '#FCF7F3' },

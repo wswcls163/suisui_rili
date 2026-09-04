@@ -58,14 +58,61 @@ export function lunarLabel(date: { month: number; day: number; isLeap: boolean }
 }
 
 const months = new Map<string, LunarMonth | null>();
-const qingmingDates = new Map<number, string>();
+const solarTerms = new Map<number, Map<string, string>>();
+const solarTermNames = [
+  '小寒',
+  '大寒',
+  '立春',
+  '雨水',
+  '惊蛰',
+  '春分',
+  '清明',
+  '谷雨',
+  '立夏',
+  '小满',
+  '芒种',
+  '夏至',
+  '小暑',
+  '大暑',
+  '立秋',
+  '处暑',
+  '白露',
+  '秋分',
+  '寒露',
+  '霜降',
+  '立冬',
+  '小雪',
+  '大雪',
+  '冬至',
+];
+// Use the same published HKO convention as the lunar-date adapter.
+// The six day-boundary differences are documented in tests/fixtures/README.md.
+const hkoSolarTerms: Record<string, string> = {
+  '1912-小雪': '1912-11-23',
+  '1913-秋分': '1913-09-24',
+  '1917-大雪': '1917-12-07',
+  '1927-白露': '1927-09-08',
+  '1928-夏至': '1928-06-21',
+  '1979-大寒': '1979-01-21',
+};
 
-export function qingmingDate(year: number): string {
-  requireSupported(`${year}-04-01`);
-  if (!qingmingDates.has(year)) {
-    qingmingDates.set(year, Solar.fromYmd(year, 4, 1).getLunar().getJieQiTable()['清明'].toYmd());
+export function solarTermOn(date: string): string | null {
+  requireSupported(date);
+  const year = Number(date.slice(0, 4));
+  if (!solarTerms.has(year)) {
+    const table = Solar.fromYmd(year, 4, 1).getLunar().getJieQiTable();
+    solarTerms.set(
+      year,
+      new Map(
+        solarTermNames.map((name) => [
+          // The library's Chinese 冬至 key refers to the previous December.
+          hkoSolarTerms[`${year}-${name}`] ?? table[name === '冬至' ? 'DONG_ZHI' : name].toYmd(),
+          name,
+        ]),
+      ),
+    );
   }
-  return qingmingDates.get(year)!;
+  return solarTerms.get(year)!.get(date) ?? null;
 }
 
 // HKO's published 2057 table places the ninth-month new moon one day earlier

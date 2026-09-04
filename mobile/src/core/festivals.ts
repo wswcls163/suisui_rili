@@ -1,4 +1,4 @@
-import { lunarCalendar, qingmingDate } from './calendar';
+import { lunarCalendar, solarTermOn } from './calendar';
 import { addDays } from './dates';
 
 // A curated list of familiar festivals, independent of birthdays and holiday leave schedules.
@@ -16,7 +16,26 @@ const lunarFestivals: Record<string, string> = {
   '7-7': '七夕',
   '8-15': '中秋',
   '9-9': '重阳',
+  '12-23': '北方小年',
+  '12-24': '南方小年',
 };
+
+const memorials: Record<string, { name: string; fromYear: number }> = {
+  '08-15': { name: '日本投降日', fromYear: 1945 },
+  '09-03': { name: '抗战胜利纪念日', fromYear: 1945 },
+  '09-18': { name: '九一八事变纪念日', fromYear: 1931 },
+};
+const shortNames: Record<string, string> = {
+  北方小年: '北小年',
+  南方小年: '南小年',
+  日本投降日: '日本投降',
+  抗战胜利纪念日: '抗战胜利',
+  九一八事变纪念日: '九一八',
+};
+
+export function shortFestivalName(name: string): string {
+  return shortNames[name] ?? name;
+}
 
 export function festivalsOn(date: string): string[] {
   const lunar = lunarCalendar.lunarOn(date);
@@ -28,8 +47,11 @@ export function festivalsOn(date: string): string[] {
     const newYear = lunarCalendar.month(lunar.year + 1, 1, false)!;
     if (date === addDays(newYear.start, -1)) names.push('除夕');
   }
-  if (date.slice(5, 7) === '04' && date === qingmingDate(Number(date.slice(0, 4)))) names.push('清明');
   const solar = solarFestivals[date.slice(5)];
   if (solar) names.push(solar);
+  const memorial = memorials[date.slice(5)];
+  if (memorial && Number(date.slice(0, 4)) >= memorial.fromYear) names.push(memorial.name);
+  const term = solarTermOn(date);
+  if (term) names.push(term);
   return names;
 }

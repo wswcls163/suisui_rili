@@ -130,13 +130,40 @@ test('节日同日保留生日姓名与完整无障碍日期，选择后显示�
   const date = await screen.findByRole('button', {
     name: '2020-10-01，农历八月十五，中秋、国庆，1 位生日：团圆',
   });
-  expect(within(date).getByText('中秋 +1')).toBeTruthy();
+  expect(within(date).getByText('中秋')).toBeTruthy();
+  expect(within(date).getByText('+1')).toBeTruthy();
   expect(within(date).getByText('团圆')).toBeTruthy();
   fireEvent.press(date);
-  expect(screen.getByText('中秋', { exact: true })).toBeTruthy();
+  expect(screen.getAllByText('中秋', { exact: true })).toHaveLength(2);
   expect(screen.getByText('国庆', { exact: true })).toBeTruthy();
   expect(screen.getByText('2020 农历年 · 八月十五')).toBeTruthy();
   expect(screen.getByRole('button', { name: '查看团圆的生日详情' })).toBeTruthy();
+  expect(screen.getByText('今天没有生日提醒')).toBeTruthy();
+});
+
+test('小年与节气同日时保留数量提示，选日展示全部名称', async () => {
+  render(
+    <AppProvider repo={memoryRepository()} clock={{ now: () => Date.parse('2017-01-20T04:00:00Z') }}>
+      <Home />
+    </AppProvider>,
+  );
+  const date = await screen.findByRole('button', { name: '2017-01-20，农历腊月廿三，北方小年、大寒' });
+  expect(within(date).getByText('北小年')).toBeTruthy();
+  expect(screen.getByText('北方小年')).toBeTruthy();
+  expect(within(date).getByText('+1')).toBeTruthy();
+  expect(screen.getByText('大寒')).toBeTruthy();
+  expect(screen.getByText('今天没有生日提醒')).toBeTruthy();
+});
+
+test('长纪念日名称在网格用简称，选日和无障碍标签显示完整名称', async () => {
+  render(
+    <AppProvider repo={memoryRepository()} clock={{ now: () => Date.parse('2026-09-18T04:00:00Z') }}>
+      <Home />
+    </AppProvider>,
+  );
+  const date = await screen.findByRole('button', { name: /2026-09-18.*九一八事变纪念日/ });
+  expect(within(date).getByText('九一八')).toBeTruthy();
+  expect(screen.getByText('九一八事变纪念日')).toBeTruthy();
   expect(screen.getByText('今天没有生日提醒')).toBeTruthy();
 });
 

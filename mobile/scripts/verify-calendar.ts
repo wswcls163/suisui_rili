@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-import { lunarCalendar, qingmingDate } from '../src/core/calendar';
+import { lunarCalendar, solarTermOn } from '../src/core/calendar';
 import { addDays, dayNumber, FIRST_DATE, LAST_DATE } from '../src/core/dates';
 
 const data = JSON.parse(
@@ -8,8 +8,11 @@ const data = JSON.parse(
 ) as {
   days: number;
   months: [string, number, number][];
-  qingming: string[];
+  solarTerms: [string, string][];
 };
+assert.equal(data.solarTerms.length, 200 * 24);
+const expectedTerms = new Map(data.solarTerms);
+assert.equal(expectedTerms.size, 200 * 24);
 const differences: { date: string; expected: unknown; actual: unknown }[] = [];
 let index = 0,
   checked = 0;
@@ -24,6 +27,7 @@ for (let date = FIRST_DATE; date <= LAST_DATE; date = addDays(date, 1)) {
   };
   const actual = lunarCalendar.lunarOn(date);
   if (JSON.stringify(actual) !== JSON.stringify(expected)) differences.push({ date, expected, actual });
+  assert.equal(solarTermOn(date), expectedTerms.get(date) ?? null, `Solar term on ${date}`);
   checked++;
 }
 assert.equal(checked, data.days);
@@ -41,18 +45,12 @@ for (let i = 0; i < data.months.length; i++) {
     );
   monthsChecked++;
 }
-assert.equal(data.qingming.length, 200);
-for (const [index, expected] of data.qingming.entries()) {
-  const year = 1901 + index;
-  assert.equal(Number(expected.slice(0, 4)), year);
-  assert.equal(qingmingDate(year), expected, `Qingming ${year}`);
-}
 console.log(
   JSON.stringify(
     {
       checked,
       monthsChecked,
-      qingmingChecked: data.qingming.length,
+      solarTermsChecked: expectedTerms.size,
       differences: differences.length,
       firstDifferences: differences.slice(0, 12),
     },

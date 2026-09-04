@@ -16,7 +16,34 @@ const links = [...index.matchAll(/href="([^"\n]*\/T(\d{4})e\.txt)"/g)]
 assert.equal(new Set(links.map((l) => l.year)).size, 200);
 const sources = [];
 const interpolated = [];
-const qingming = [];
+const solarTerms = [];
+// HKO's English names, in Gregorian-year order, mapped independently of the library.
+const termNames = {
+  'Moderate Cold': '小寒',
+  'Severe Cold': '大寒',
+  'Spring Commences': '立春',
+  'Spring Showers': '雨水',
+  'Insects Waken': '惊蛰',
+  'Vernal Equinox': '春分',
+  'Bright & Clear': '清明',
+  'Corn Rain': '谷雨',
+  'Summer Commences': '立夏',
+  'Corn Forms': '小满',
+  'Corn on Ear': '芒种',
+  'Summer Solstice': '夏至',
+  'Moderate Heat': '小暑',
+  'Great Heat': '大暑',
+  'Autumn Commences': '立秋',
+  'End of Heat': '处暑',
+  'White Dew': '白露',
+  'Autumnal Equinox': '秋分',
+  'Cold Dew': '寒露',
+  Frost: '霜降',
+  'Winter Commences': '立冬',
+  'Light Snow': '小雪',
+  'Heavy Snow': '大雪',
+  'Winter Solstice': '冬至',
+};
 const byYear = new Map();
 let position = 0;
 async function worker() {
@@ -32,13 +59,22 @@ async function worker() {
       raw = await res.text();
       await writeFile(target, raw);
     }
-    const qingmingRows = raw.split(/\r?\n/).filter((line) => /Bright\s*&\s*Clear/i.test(line));
-    assert.equal(qingmingRows.length, 1, `Missing or duplicated Qingming in HKO ${year}`);
-    const qingmingMatch = /^(\d{4})\/(\d+)\/(\d+)\s/.exec(qingmingRows[0]);
-    assert.ok(qingmingMatch, qingmingRows[0]);
-    qingming.push(
-      `${qingmingMatch[1]}-${qingmingMatch[2].padStart(2, '0')}-${qingmingMatch[3].padStart(2, '0')}`,
-    );
+    const termRows = raw
+      .split(/\r?\n/)
+      .filter((line) => /^\d{4}\//.test(line))
+      .map((line) => line.trim().split(/\s{2,}/))
+      .filter((columns) => columns.length === 4);
+    assert.equal(termRows.length, 24, `Incomplete solar terms in HKO ${year}`);
+    assert.equal(new Set(termRows.map((columns) => columns[3])).size, 24, `Duplicate solar term in ${year}`);
+    for (const columns of termRows) {
+      const name = termNames[columns[3]];
+      assert.ok(name, `Unknown HKO solar term: ${columns[3]}`);
+      const date = columns[0]
+        .split('/')
+        .map((value, index) => (index ? value.padStart(2, '0') : value))
+        .join('-');
+      solarTerms.push([date, name]);
+    }
     const rows = raw
       .split(/\r?\n/)
       .filter((l) => /^\d{4}\/\d+\/\d+\s/.test(l))
@@ -112,7 +148,7 @@ await writeFile(
       interpolated,
       columns: ['solarStart', 'lunarYear', 'signedLunarMonth'],
       months,
-      qingming: qingming.sort(),
+      solarTerms: solarTerms.sort(([a], [b]) => a.localeCompare(b)),
       sources: sources.sort((a, b) => a.year - b.year),
     },
     null,
