@@ -58,6 +58,16 @@ export function lunarLabel(date: { month: number; day: number; isLeap: boolean }
 }
 
 const months = new Map<string, LunarMonth | null>();
+const qingmingDates = new Map<number, string>();
+
+export function qingmingDate(year: number): string {
+  requireSupported(`${year}-04-01`);
+  if (!qingmingDates.has(year)) {
+    qingmingDates.set(year, Solar.fromYmd(year, 4, 1).getLunar().getJieQiTable()['清明'].toYmd());
+  }
+  return qingmingDates.get(year)!;
+}
+
 // HKO's published 2057 table places the ninth-month new moon one day earlier
 // than lunar-javascript 1.7.7. Both conversion directions use the same convention.
 // Source: https://www.hko.gov.hk/en/gts/time/calendar/text/files/T2057e.txt

@@ -14,6 +14,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useBirthdays } from '../src/state/AppProvider';
 import { adjustmentText, entriesForMonth, type BirthdayRow } from '../src/core/birthday';
 import { lunarCalendar, lunarLabel } from '../src/core/calendar';
+import { festivalsOn } from '../src/core/festivals';
 import { supported } from '../src/core/dates';
 import { MonthCalendar } from '../src/components/MonthCalendar';
 import { Avatar, Button, colors, common, Icon } from '../src/components/ui';
@@ -54,6 +55,7 @@ export default function Home() {
   );
   const selected = entries.filter((entry) => entry.occurrence.solar === state.selectedDate);
   const selectedLunar = lunarCalendar.lunarOn(state.selectedDate);
+  const selectedFestivals = festivalsOn(state.selectedDate);
   const create = () => router.push('/new');
   return (
     <SafeAreaView style={common.page}>
@@ -232,6 +234,17 @@ export default function Home() {
                       <Icon name="add" color="#FFF" size={26} />
                     </Pressable>
                   </View>
+                  {selectedFestivals.length > 0 && (
+                    <View style={[common.row, { flexWrap: 'wrap' }]}>
+                      {selectedFestivals.map((name) => (
+                        <View key={name} style={styles.festivalTag}>
+                          <Text style={{ color: colors.accent, fontSize: 13, fontWeight: '600' }}>
+                            {name}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                   <View style={{ height: 1, backgroundColor: colors.line }} />
                   <Text style={[common.heading, { fontSize: 14 }]}>
                     这一天的事项　<Text style={{ color: colors.muted }}>{selected.length}</Text>
@@ -320,6 +333,7 @@ export default function Home() {
   );
 }
 const styles = StyleSheet.create({
+  festivalTag: { backgroundColor: colors.tint, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 },
   brand: { fontSize: 22, fontWeight: '600', color: colors.ink, letterSpacing: 3 },
   brandIcon: {
     width: 44,

@@ -4,6 +4,7 @@ declare module 'lunar-javascript' {
     getMonth(): number;
     getDay(): number;
     getSolar(): SolarValue;
+    getJieQiTable(): Record<string, SolarValue>;
   }
   interface SolarValue {
     getLunar(): LunarValue;

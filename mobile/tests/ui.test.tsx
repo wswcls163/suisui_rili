@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { BirthdayForm } from '../src/components/BirthdayForm';
 import { MonthCalendar } from '../src/components/MonthCalendar';
@@ -119,6 +119,27 @@ test('月历七列、选日回调和多人标记；首尾月份禁止越界', ()
   expect(screen.getByRole('button', { name: '下个月' })).toBeDisabled();
 });
 const clock = { now: () => Date.parse(`${today}T04:00:00Z`) };
+
+test('节日同日保留生日姓名与完整无障碍日期，选择后显示全部节日', async () => {
+  const repo = memoryRepository([fixture('a', { name: '团圆', month: 8, day: 15 })]);
+  render(
+    <AppProvider repo={repo} clock={{ now: () => Date.parse('2020-10-02T04:00:00Z') }}>
+      <Home />
+    </AppProvider>,
+  );
+  const date = await screen.findByRole('button', {
+    name: '2020-10-01，农历八月十五，中秋、国庆，1 位生日：团圆',
+  });
+  expect(within(date).getByText('中秋 +1')).toBeTruthy();
+  expect(within(date).getByText('团圆')).toBeTruthy();
+  fireEvent.press(date);
+  expect(screen.getByText('中秋', { exact: true })).toBeTruthy();
+  expect(screen.getByText('国庆', { exact: true })).toBeTruthy();
+  expect(screen.getByText('2020 农历年 · 八月十五')).toBeTruthy();
+  expect(screen.getByRole('button', { name: '查看团圆的生日详情' })).toBeTruthy();
+  expect(screen.getByText('今天没有生日提醒')).toBeTruthy();
+});
+
 test('直接打开新建页遇到读库失败时给出重试入口', async () => {
   const repo = memoryRepository();
   repo.initialize.mockRejectedValueOnce(new Error('数据库不可用'));

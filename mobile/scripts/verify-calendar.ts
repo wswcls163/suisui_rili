@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-import { lunarCalendar } from '../src/core/calendar';
+import { lunarCalendar, qingmingDate } from '../src/core/calendar';
 import { addDays, dayNumber, FIRST_DATE, LAST_DATE } from '../src/core/dates';
 
 const data = JSON.parse(
@@ -8,6 +8,7 @@ const data = JSON.parse(
 ) as {
   days: number;
   months: [string, number, number][];
+  qingming: string[];
 };
 const differences: { date: string; expected: unknown; actual: unknown }[] = [];
 let index = 0,
@@ -40,9 +41,21 @@ for (let i = 0; i < data.months.length; i++) {
     );
   monthsChecked++;
 }
+assert.equal(data.qingming.length, 200);
+for (const [index, expected] of data.qingming.entries()) {
+  const year = 1901 + index;
+  assert.equal(Number(expected.slice(0, 4)), year);
+  assert.equal(qingmingDate(year), expected, `Qingming ${year}`);
+}
 console.log(
   JSON.stringify(
-    { checked, monthsChecked, differences: differences.length, firstDifferences: differences.slice(0, 12) },
+    {
+      checked,
+      monthsChecked,
+      qingmingChecked: data.qingming.length,
+      differences: differences.length,
+      firstDifferences: differences.slice(0, 12),
+    },
     null,
     2,
   ),

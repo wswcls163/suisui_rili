@@ -59,6 +59,7 @@ npx expo-doctor
 | 页面与导航 | `app/` |
 | 月历、生日表单、共用样式和小组件 | `src/components/` |
 | 输入校验、年度生日规则 | `src/core/birthday.ts` |
+| 常见节日及同日节日列表 | `src/core/festivals.ts` |
 | 历法库与核验口径 | `src/core/calendar.ts` |
 | 日期运算、北京时间与前台时钟 | `src/core/dates.ts`、`src/core/clock.ts` |
 | 共享生日状态与手机生命周期 | `src/state/AppProvider.tsx` |

@@ -16,6 +16,7 @@ const links = [...index.matchAll(/href="([^"\n]*\/T(\d{4})e\.txt)"/g)]
 assert.equal(new Set(links.map((l) => l.year)).size, 200);
 const sources = [];
 const interpolated = [];
+const qingming = [];
 const byYear = new Map();
 let position = 0;
 async function worker() {
@@ -31,6 +32,13 @@ async function worker() {
       raw = await res.text();
       await writeFile(target, raw);
     }
+    const qingmingRows = raw.split(/\r?\n/).filter((line) => /Bright\s*&\s*Clear/i.test(line));
+    assert.equal(qingmingRows.length, 1, `Missing or duplicated Qingming in HKO ${year}`);
+    const qingmingMatch = /^(\d{4})\/(\d+)\/(\d+)\s/.exec(qingmingRows[0]);
+    assert.ok(qingmingMatch, qingmingRows[0]);
+    qingming.push(
+      `${qingmingMatch[1]}-${qingmingMatch[2].padStart(2, '0')}-${qingmingMatch[3].padStart(2, '0')}`,
+    );
     const rows = raw
       .split(/\r?\n/)
       .filter((l) => /^\d{4}\/\d+\/\d+\s/.test(l))
@@ -104,6 +112,7 @@ await writeFile(
       interpolated,
       columns: ['solarStart', 'lunarYear', 'signedLunarMonth'],
       months,
+      qingming: qingming.sort(),
       sources: sources.sort((a, b) => a.year - b.year),
     },
     null,
