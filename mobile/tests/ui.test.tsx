@@ -336,6 +336,55 @@ test('仅阳历记录补农历时不拿当前浏览日期当生日', () => {
   expect(screen.getByText('请选择农历月日')).toBeTruthy();
 });
 
+test('同一个人的月历生日按本次发生类型标明阳历和农历，名称与类型分别显示', () => {
+  const person = fixture('a', {
+    name: '我的生日',
+    lunar: { month: 12, day: 9, isLeap: false },
+    solar: { month: 1, day: 11 },
+  });
+  const select = jest.fn();
+  render(
+    <MonthCalendar
+      month="2027-01-01"
+      today={today}
+      selected="2027-01-11"
+      entries={entriesForMonth(lunarCalendar, [person], '2027-01-01')}
+      onSelect={select}
+      onMonth={() => {}}
+      onToday={() => {}}
+    />,
+  );
+  const solar = screen.getByRole('button', { name: /2027-01-11.*阳历生日/ });
+  const lunar = screen.getByRole('button', { name: /2027-01-16.*农历生日/ });
+  expect(within(solar).getByText('我的生日').props.ellipsizeMode).toBe('tail');
+  expect(within(solar).getByText('阳历')).toHaveStyle({ color: '#FFF', fontSize: 10 });
+  expect(within(solar).queryByText('农历')).toBeNull();
+  expect(within(lunar).getByText('我的生日')).toBeTruthy();
+  expect(within(lunar).getByText('农历')).toBeTruthy();
+  expect(within(lunar).queryByText('阳历')).toBeNull();
+  fireEvent.press(lunar);
+  expect(select).toHaveBeenCalledWith('2027-01-16');
+});
+
+test('多人生日的类型标记属于当前展示的首个人，保留额外人数', () => {
+  const people = [fixture('a', { lunar: null, solar: { month: 9, day: 4 } }), fixture('b')];
+  render(
+    <MonthCalendar
+      month="2026-09-01"
+      today={today}
+      selected={today}
+      entries={entriesForMonth(lunarCalendar, people, today)}
+      onSelect={() => {}}
+      onMonth={() => {}}
+      onToday={() => {}}
+    />,
+  );
+  const day = screen.getByRole('button', { name: /2026-09-04.*2 位生日/ });
+  expect(within(day).getByText('亲友a的生日 +1')).toBeTruthy();
+  expect(within(day).getByText('阳历')).toBeTruthy();
+  expect(within(day).queryByText('农历')).toBeNull();
+});
+
 test('双生日同一天在提醒、月历和事项中只算一人，生日簿保留两套日期', async () => {
   render(
     <AppProvider repo={memoryRepository([fixture('a', { solar: { month: 9, day: 4 } })])} clock={clock}>
@@ -345,6 +394,8 @@ test('双生日同一天在提醒、月历和事项中只算一人，生日簿�
   await screen.findByText('今天有 1 位亲友过生日');
   const day = screen.getByRole('button', { name: /2026-09-04.*1 位生日.*农历与阳历生日/ });
   expect(within(day).queryByText(/\+1/)).toBeNull();
+  expect(within(day).getByText('农历')).toBeTruthy();
+  expect(within(day).getByText('阳历')).toBeTruthy();
   expect(screen.getAllByRole('button', { name: '查看亲友a的生日详情' })).toHaveLength(1);
   expect(screen.getByText('农历与阳历生日 · 同一天')).toBeTruthy();
   fireEvent.press(screen.getByRole('tab', { name: '生日簿 1' }));

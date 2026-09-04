@@ -124,14 +124,27 @@ export function MonthCalendar({
                     </Text>
                   )}
                 </View>
-                {birthdays.length > 0 ? (
-                  <Text numberOfLines={1} style={[styles.event, isSelected && styles.white]}>
-                    {birthdayTitle(birthdays[0].person.name)}
-                    {birthdays.length > 1 ? ` +${birthdays.length - 1}` : ''}
-                  </Text>
-                ) : (
-                  <View style={{ minHeight: 15 }} />
-                )}
+                <View style={styles.birthday}>
+                  {birthdays.length > 0 && (
+                    <>
+                      <Text
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                        style={[styles.event, isSelected && styles.white]}
+                      >
+                        {birthdayTitle(birthdays[0].person.name)}
+                        {birthdays.length > 1 ? ` +${birthdays.length - 1}` : ''}
+                      </Text>
+                      <View style={styles.birthdayKinds}>
+                        {birthdays[0].occurrence.kinds.map((kind) => (
+                          <Text key={kind} style={[styles.birthdayKind, isSelected && styles.white]}>
+                            {kind === 'solar' ? '阳历' : '农历'}
+                          </Text>
+                        ))}
+                      </View>
+                    </>
+                  )}
+                </View>
               </Pressable>
             );
           })}
@@ -162,7 +175,7 @@ const styles = StyleSheet.create({
   cell: {
     flex: 1,
     minWidth: 0,
-    minHeight: 85,
+    minHeight: 100,
     marginVertical: 2,
     borderRadius: 11,
     borderWidth: 1,
@@ -174,7 +187,16 @@ const styles = StyleSheet.create({
   lunar: { fontSize: 10, color: colors.muted, flexShrink: 1 },
   labelCount: { fontSize: 8, color: colors.accent },
   festival: { color: colors.accent, fontWeight: '600' },
-  event: { fontSize: 10, color: colors.accent, marginTop: 4, fontWeight: '500', maxWidth: '100%' },
+  birthday: { width: '100%', minHeight: 40, marginTop: 4, alignItems: 'center' },
+  event: { fontSize: 10, lineHeight: 13, color: colors.accent, fontWeight: '500', maxWidth: '100%' },
+  birthdayKinds: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    columnGap: 3,
+    marginTop: 1,
+  },
+  birthdayKind: { fontSize: 10, lineHeight: 12, color: colors.accent },
   today: { borderColor: '#D7AA9D', backgroundColor: '#FCF7F3' },
   selected: { backgroundColor: colors.accent, borderColor: colors.accent },
   white: { color: '#FFF' },
