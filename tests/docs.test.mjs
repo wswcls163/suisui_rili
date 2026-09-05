@@ -55,3 +55,16 @@ test('账号登录产品设计覆盖已确认的核心范围', async () => {
   assert.match(content, /手机与电脑/);
   assert.match(content, /Supabase Auth \+ PostgreSQL/);
 });
+
+test('账号登录技术方案覆盖认证、同步和安全边界', async () => {
+  const content = await readFile(join(root, 'docs', 'account-login-technical-design.md'), 'utf8');
+
+  assert.match(content, /Supabase Auth \+ PostgreSQL/);
+  assert.match(content, /expo-secure-store/);
+  assert.match(content, /SQLite[\s\S]*IndexedDB/);
+  assert.match(content, /sync_outbox/);
+  assert.match(content, /baseVersion/);
+  assert.match(content, /Row Level Security/);
+  assert.match(content, /service_role[\s\S]*不得进入/);
+  assert.match(content, /邮箱深链接/);
+});

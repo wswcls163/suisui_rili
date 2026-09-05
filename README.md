@@ -5,6 +5,7 @@
 - [产品设计文档](docs/product-design.md)
 - [账号登录产品设计](docs/account-login-product-design.md)
 - [移动端技术方案](docs/technical-design.md)
+- [账号登录技术方案](docs/account-login-technical-design.md)
 - [应用运行与测试说明](mobile/README.md)
 - [本次验证记录与手机验收项](docs/validation.md)
 - [交互 Demo 与运行说明](demo/README.md)
