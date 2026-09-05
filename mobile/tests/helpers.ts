@@ -1,9 +1,6 @@
-import {
-  type Birthday,
-  type BirthdayDraft,
-  type BirthdayRepository,
-  normalizeDraft,
-} from '../src/core/birthday';
+import { type Birthday, type BirthdayDraft, normalizeDraft } from '../src/core/birthday';
+import { type Countup, type CountupDraft, normalizeCountupDraft } from '../src/core/countup';
+import type { AppRepository } from '../src/state/AppProvider';
 
 export const fixture = (id: string, values: Partial<Birthday> = {}): Birthday => ({
   id,
@@ -14,9 +11,20 @@ export const fixture = (id: string, values: Partial<Birthday> = {}): Birthday =>
   updatedAt: '2026-01-01T00:00:00Z',
   ...values,
 });
+export const countupFixture = (id: string, values: Partial<Countup> = {}): Countup => ({
+  id,
+  type: 'countup',
+  title: `累计事项${id}`,
+  startDate: '2026-09-04',
+  note: '',
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+  ...values,
+});
 // State/interaction tests inject memory; actual persistence is tested separately.
-export function memoryRepository(initial: Birthday[] = []) {
+export function memoryRepository(initial: Birthday[] = [], initialCountups: Countup[] = []) {
   let rows = [...initial],
+    countups = [...initialCountups],
     sequence = 0;
   return {
     initialize: jest.fn(async () => {}),
@@ -36,6 +44,22 @@ export function memoryRepository(initial: Birthday[] = []) {
     remove: jest.fn(async (id: string) => {
       rows = rows.filter((r) => r.id !== id);
     }),
+    listCountups: jest.fn(async () => [...countups]),
+    createCountup: jest.fn(async (input: CountupDraft) => {
+      const row = countupFixture(`countup-${++sequence}`, normalizeCountupDraft(input));
+      countups.push(row);
+      return row;
+    }),
+    updateCountup: jest.fn(async (id: string, input: CountupDraft) => {
+      const old = countups.find((item) => item.id === id);
+      if (!old) throw new Error('不存在');
+      const row = { ...old, ...normalizeCountupDraft(input) };
+      countups = countups.map((item) => (item.id === id ? row : item));
+      return row;
+    }),
+    removeCountup: jest.fn(async (id: string) => {
+      countups = countups.filter((item) => item.id !== id);
+    }),
     close: jest.fn(async () => {}),
-  } satisfies BirthdayRepository;
+  } satisfies AppRepository;
 }

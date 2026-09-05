@@ -25,6 +25,7 @@ import {
   untilMidnight,
 } from '../src/core/dates';
 import { TodayWatcher } from '../src/core/clock';
+import { countupProgress, countupProgressText, normalizeCountupDraft } from '../src/core/countup';
 
 const draft: BirthdayDraft = { name: '妈妈', lunar: { month: 2, day: 1, isLeap: false }, solar: null };
 const person = (id: string, value = draft): Birthday => ({
@@ -32,6 +33,56 @@ const person = (id: string, value = draft): Birthday => ({
   id,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
+});
+
+describe('累计日规则', () => {
+  test('开始当天为第 1 天，跨月和跨年按自然日每天递增', () => {
+    expect(countupProgress('2026-09-05', '2026-09-05')).toEqual({
+      phase: 'active',
+      day: 1,
+      elapsed: 0,
+    });
+    expect(countupProgress('2026-08-31', '2026-09-05')).toEqual({
+      phase: 'active',
+      day: 6,
+      elapsed: 5,
+    });
+    expect(countupProgress('2025-12-31', '2026-01-01')).toMatchObject({ phase: 'active', day: 2 });
+  });
+
+  test('未来开始日显示剩余天数，到当天自动切换累计', () => {
+    const item = normalizeCountupDraft({
+      type: 'countup',
+      title: ' 开始健身 ',
+      startDate: '2026-09-08',
+      note: ' 每天半小时 ',
+    });
+    expect(item).toEqual({
+      type: 'countup',
+      title: '开始健身',
+      startDate: '2026-09-08',
+      note: '每天半小时',
+    });
+    expect(countupProgressText(item, '2026-09-05')).toBe('3 天后开始');
+    expect(countupProgressText(item, '2026-09-08')).toBe('第 1 天');
+  });
+
+  test('拒绝空标题、越界日期和过长备注', () => {
+    expect(() =>
+      normalizeCountupDraft({ type: 'countup', title: ' ', startDate: '2026-09-05', note: '' }),
+    ).toThrow('累计事项');
+    expect(() =>
+      normalizeCountupDraft({ type: 'countup', title: '健身', startDate: '2101-01-01', note: '' }),
+    ).toThrow('1901—2100');
+    expect(() =>
+      normalizeCountupDraft({
+        type: 'countup',
+        title: '健身',
+        startDate: '2026-09-05',
+        note: '记'.repeat(121),
+      }),
+    ).toThrow('120');
+  });
 });
 
 describe('农历生日规则', () => {

@@ -22,6 +22,7 @@ import {
 import { lunarCalendar, lunarLabel } from '../src/core/calendar';
 import { festivalsOn } from '../src/core/festivals';
 import { supported } from '../src/core/dates';
+import type { Countup, CountupProgress } from '../src/core/countup';
 import { MonthCalendar } from '../src/components/MonthCalendar';
 import { Avatar, Button, colors, common, Icon } from '../src/components/ui';
 import { storageDescription } from '../src/data/repository';
@@ -52,13 +53,43 @@ function PersonRow({ row }: { row: BirthdayRow }) {
     </Pressable>
   );
 }
+
+function CountupRow({ item, progress }: { item: Countup; progress: CountupProgress }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`查看累计日${item.title}，${
+        progress.phase === 'active' ? `第 ${progress.day} 天` : `${progress.remaining} 天后开始`
+      }`}
+      onPress={() => router.push({ pathname: '/countup/[id]', params: { id: item.id } })}
+      style={({ pressed }) => [styles.person, pressed && { backgroundColor: '#FAF8F4' }]}
+    >
+      <View style={styles.countupIcon}>
+        <Icon name="sparkles-outline" size={21} color={colors.accent} />
+      </View>
+      <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+        <Text style={styles.personName}>{item.title}</Text>
+        <Text style={common.muted}>从 {item.startDate.replaceAll('-', '.')} 开始</Text>
+        {!!item.note && (
+          <Text numberOfLines={1} style={common.muted}>
+            {item.note}
+          </Text>
+        )}
+      </View>
+      <Text style={[styles.countupNumber, progress.phase === 'upcoming' && { color: colors.green }]}>
+        {progress.phase === 'active' ? `第 ${progress.day} 天` : `${progress.remaining} 天后`}
+      </Text>
+      <Icon name="chevron-forward" size={16} color="#9BA19B" />
+    </Pressable>
+  );
+}
 export default function Home() {
   const state = useBirthdays();
   const auth = useAuth();
   const sync = useAccountSync();
   const { width } = useWindowDimensions();
   const wide = width >= 900;
-  const [tab, setTab] = useState<'calendar' | 'book'>('calendar');
+  const [tab, setTab] = useState<'calendar' | 'book' | 'countup'>('calendar');
   useFocusEffect(state.refreshToday);
   const entries = useMemo(
     () => entriesForMonth(lunarCalendar, state.people, state.month),
@@ -67,6 +98,7 @@ export default function Home() {
   const selected = entries.filter((entry) => entry.occurrence.solar === state.selectedDate);
   const selectedLunar = lunarCalendar.lunarOn(state.selectedDate);
   const selectedFestivals = festivalsOn(state.selectedDate);
+  const leadingCountup = state.countupRows[0];
   const create = () => router.push('/new');
   return (
     <SafeAreaView style={common.page}>
@@ -112,11 +144,12 @@ export default function Home() {
             <Text style={common.eyebrow}>记住每一个重要的日子</Text>
             <Text style={[common.title, { marginTop: 8 }]}>我的日历</Text>
           </View>
-          <View accessibilityRole="tablist" style={styles.tabs}>
+          <View accessibilityRole="tablist" style={[styles.tabs, width < 600 && styles.tabsNarrow]}>
             {(
               [
                 { key: 'calendar', label: '日历', icon: 'calendar-outline' },
                 { key: 'book', label: `生日簿 ${state.people.length}`, icon: 'book-outline' },
+                { key: 'countup', label: `累计日 ${state.countups.length}`, icon: 'sparkles-outline' },
               ] as const
             ).map((item) => (
               <Pressable
@@ -128,7 +161,7 @@ export default function Home() {
                   setTab(item.key);
                   state.refreshToday();
                 }}
-                style={[styles.tab, tab === item.key && styles.activeTab]}
+                style={[styles.tab, width < 600 && styles.tabNarrow, tab === item.key && styles.activeTab]}
               >
                 <Icon name={item.icon} color={tab === item.key ? colors.accent : colors.muted} size={16} />
                 <Text
@@ -154,11 +187,11 @@ export default function Home() {
         {state.status === 'loading' ? (
           <View style={styles.loading}>
             <ActivityIndicator color={colors.accent} />
-            <Text style={common.muted}>正在读取生日…</Text>
+            <Text style={common.muted}>正在读取事项…</Text>
           </View>
         ) : state.status === 'error' ? (
           <View style={[common.card, { gap: 14 }]}>
-            <Text style={common.heading}>暂时无法读取生日</Text>
+            <Text style={common.heading}>暂时无法读取事项</Text>
             <Text accessibilityRole="alert" style={common.error}>
               {state.error}
             </Text>
@@ -228,6 +261,33 @@ export default function Home() {
                 )}
               </View>
             </View>
+            {leadingCountup && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`查看累计日${leadingCountup.item.title}`}
+                onPress={() =>
+                  router.push({ pathname: '/countup/[id]', params: { id: leadingCountup.item.id } })
+                }
+                style={({ pressed }) => [styles.countupHero, pressed && { opacity: 0.78 }]}
+              >
+                <View style={styles.countupHeroIcon}>
+                  <Icon name="sparkles-outline" size={24} color="#FFF" />
+                </View>
+                <View style={{ flex: 1, gap: 5 }}>
+                  <Text style={[common.eyebrow, { color: '#E5D9C9' }]}>每天都算数</Text>
+                  <Text style={[common.heading, { color: '#FFF' }]}>{leadingCountup.item.title}</Text>
+                  <Text style={{ color: '#E5D9C9', fontSize: 12 }}>
+                    从 {leadingCountup.item.startDate.replaceAll('-', '.')} 开始
+                  </Text>
+                </View>
+                <Text style={styles.countupHeroNumber}>
+                  {leadingCountup.progress.phase === 'active'
+                    ? `第 ${leadingCountup.progress.day} 天`
+                    : `${leadingCountup.progress.remaining} 天后开始`}
+                </Text>
+                <Icon name="chevron-forward" size={18} color="#E5D9C9" />
+              </Pressable>
+            )}
             {tab === 'calendar' ? (
               <View style={[styles.workspace, { flexDirection: wide ? 'row' : 'column' }]}>
                 <View style={wide ? { flex: 2.25 } : undefined}>
@@ -329,7 +389,7 @@ export default function Home() {
                   </Text>
                 </View>
               </View>
-            ) : (
+            ) : tab === 'book' ? (
               <View style={{ gap: 16 }}>
                 <View style={common.between}>
                   <Text style={common.muted}>按下次生日由近到远排列</Text>
@@ -350,6 +410,30 @@ export default function Home() {
                 <Text style={common.muted}>
                   闰月缺失时按普通月过；遇到小月三十，提前到二十九。原始生日始终保留。
                 </Text>
+              </View>
+            ) : (
+              <View style={{ gap: 16 }}>
+                <View style={common.between}>
+                  <Text style={common.muted}>开始当天为第 1 天，每天自动更新</Text>
+                  <Button label="新建累计日" icon="add" onPress={create} />
+                </View>
+                <View style={[common.card, { padding: state.countups.length ? 4 : 28 }]}>
+                  {state.countupRows.length ? (
+                    state.countupRows.map(({ item, progress }) => (
+                      <CountupRow key={item.id} item={item} progress={progress} />
+                    ))
+                  ) : (
+                    <View style={[styles.emptyDay, { gap: 15 }]}>
+                      <Icon name="sparkles-outline" size={40} color={colors.accent} />
+                      <Text style={common.heading}>还没有累计日</Text>
+                      <Text style={[common.muted, { textAlign: 'center' }]}>
+                        记录一件正在坚持的事，{`\n`}看时间慢慢长大。
+                      </Text>
+                      <Button label="添加第一个累计日" icon="add" onPress={create} />
+                    </View>
+                  )}
+                </View>
+                <Text style={common.muted}>适合健身、学习、戒烟、恋爱或任何值得累计的开始。</Text>
               </View>
             )}
           </>
@@ -387,6 +471,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#EAF0E9',
   },
   tabs: { flexDirection: 'row', backgroundColor: '#EDEEE9', borderRadius: 13, padding: 4, gap: 2 },
+  tabsNarrow: { width: '100%' },
   tab: {
     minHeight: 42,
     flexDirection: 'row',
@@ -396,6 +481,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   activeTab: { backgroundColor: '#FFF' },
+  tabNarrow: { flex: 1, paddingHorizontal: 7, justifyContent: 'center' },
   reminder: {
     backgroundColor: '#FBFAF6',
     borderWidth: 1,
@@ -414,6 +500,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  countupHero: {
+    minHeight: 98,
+    padding: 18,
+    borderRadius: 18,
+    backgroundColor: colors.green,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  countupHeroIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countupHeroNumber: { color: '#FFF', fontSize: 21, fontWeight: '700' },
+  countupIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: colors.tint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countupNumber: { fontSize: 16, fontWeight: '700', color: colors.accent },
   workspace: { gap: 22, alignItems: 'stretch' },
   add: {
     width: 46,

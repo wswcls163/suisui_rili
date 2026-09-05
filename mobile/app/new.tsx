@@ -2,7 +2,7 @@ import React from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { BirthdayForm } from '../src/components/BirthdayForm';
+import { NewItemForm } from '../src/components/NewItemForm';
 import { Button, common } from '../src/components/ui';
 import { useBirthdays } from '../src/state/AppProvider';
 
@@ -24,7 +24,7 @@ export default function NewBirthday() {
             <Text accessibilityRole="header" style={common.title}>
               新建事项
             </Text>
-            <Text style={common.muted}>农历、阳历，或两个都过，每一年都不落下。</Text>
+            <Text style={common.muted}>记生日，也记录一件事从哪一天开始。</Text>
           </View>
           <View style={common.card}>
             {state.status === 'error' ? (
@@ -35,13 +35,17 @@ export default function NewBirthday() {
                 <Button label="重新读取" onPress={() => void state.reload()} />
               </View>
             ) : (
-              <BirthdayForm
+              <NewItemForm
                 selectedDate={state.selectedDate}
                 today={state.today}
                 busy={state.busy || state.status !== 'ready'}
                 onCancel={back}
-                onSave={async (draft, type) => {
-                  await state.save(draft, undefined, type);
+                onSaveBirthday={async (draft) => {
+                  await state.save(draft);
+                  back();
+                }}
+                onSaveCountup={async (draft) => {
+                  await state.saveCountup(draft);
                   back();
                 }}
               />

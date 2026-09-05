@@ -12,7 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { birthdayDates, birthdayTitle, type Birthday } from '../core/birthday';
-import type { RemoteBirthday } from '../sync/model';
+import type { Countup } from '../core/countup';
+import { itemType, type CalendarItem, type RemoteItem } from '../sync/model';
 import { useAuth } from '../state/AuthProvider';
 import { useAccountSync, type SyncStatus } from '../state/SyncProvider';
 import { Button, colors, common, Dialog, Icon } from './ui';
@@ -81,15 +82,18 @@ function Message({ error, notice }: { error: string; notice: string }) {
 
 const syncCopy: Record<SyncStatus, { label: string; detail: string; color: string }> = {
   local: { label: '仅本机', detail: '登录后可以在不同设备之间同步', color: colors.muted },
-  syncing: { label: '正在同步', detail: '正在上传和读取最新生日', color: colors.accent },
+  syncing: { label: '正在同步', detail: '正在上传和读取最新事项', color: colors.accent },
   synced: { label: '已经同步', detail: '本机与云端数据一致', color: colors.green },
   error: { label: '同步失败', detail: '本机修改已经保留，可以稍后重试', color: colors.error },
-  conflict: { label: '需要选择', detail: '同一条生日在不同设备上被修改', color: colors.accent },
-  unavailable: { label: '同步未配置', detail: '生日仍会保存在本机', color: colors.muted },
+  conflict: { label: '需要选择', detail: '同一条事项在不同设备上被修改', color: colors.accent },
+  unavailable: { label: '同步未配置', detail: '事项仍会保存在本机', color: colors.muted },
 };
 
-function recordText(record: Birthday | RemoteBirthday | null): string {
-  return record ? `${birthdayTitle(record.name)} · ${birthdayDates(record)}` : '已删除这条生日';
+function recordText(record: CalendarItem | RemoteItem | null): string {
+  if (!record) return '已删除这条事项';
+  return itemType(record) === 'countup'
+    ? `${(record as Countup).title} · 从 ${(record as Countup).startDate.replaceAll('-', '.')} 开始`
+    : `${birthdayTitle((record as Birthday).name)} · ${birthdayDates(record as Birthday)}`;
 }
 
 function GuestAccount() {
@@ -280,7 +284,7 @@ function SignedInAccount() {
             <Text style={common.heading}>发现本机生日</Text>
             <Text style={common.muted}>
               登录前保存了 {sync.guestCount}{' '}
-              条生日。合并时会跳过内容完全相同的记录，成功同步后再清理本机副本。
+              条事项。合并时会跳过内容完全相同的记录，成功同步后再清理本机副本。
             </Text>
           </View>
           <Button
@@ -295,7 +299,7 @@ function SignedInAccount() {
         <View style={[common.card, { gap: 16 }]}>
           <View style={{ gap: 5 }}>
             <Text style={common.heading}>选择要保留的版本</Text>
-            <Text style={common.muted}>这些生日在不同设备上被同时修改。逐条选择后会继续同步。</Text>
+            <Text style={common.muted}>这些事项在不同设备上被同时修改。逐条选择后会继续同步。</Text>
           </View>
           {sync.conflicts.map((conflict) => (
             <View key={conflict.birthdayId} style={styles.conflict}>
@@ -332,7 +336,7 @@ function SignedInAccount() {
         <Text style={common.heading}>账号操作</Text>
         <Button label="退出登录" variant="secondary" busy={working} onPress={() => void signOut()} />
         <View style={styles.divider} />
-        <Text style={common.muted}>注销会永久删除云端账号及其中的生日数据。</Text>
+        <Text style={common.muted}>注销会永久删除云端账号及其中的事项数据。</Text>
         <Button label="注销账号" variant="danger" onPress={() => setDeleteOpen(true)} />
       </View>
 

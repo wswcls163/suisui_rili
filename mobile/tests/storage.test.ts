@@ -98,6 +98,51 @@ for (const engine of ['SQLite', 'IndexedDB'] as const) {
     }
   });
 }
+for (const engine of ['SQLite', 'IndexedDB'] as const) {
+  test(`${engine}: 累计日 CRUD、关闭重开与类型隔离`, async () => {
+    const name = engine === 'SQLite' ? join(dir, `countups-${engine}.db`) : `suisui-countups-${Date.now()}`;
+    let sequence = 0;
+    const make = () =>
+      engine === 'SQLite'
+        ? new SqliteBirthdayRepository(
+            async () => sqlite(name),
+            () => `countup-${++sequence}`,
+          )
+        : new WebBirthdayRepository(name, () => `countup-${++sequence}`);
+    let repo = make();
+    try {
+      const created = await repo.createCountup({
+        type: 'countup',
+        title: ' 开始健身 ',
+        startDate: '2026-09-05',
+        note: ' 每天半小时 ',
+      });
+      assert.equal(created.title, '开始健身');
+      assert.equal(created.note, '每天半小时');
+      assert.deepEqual(await repo.list(), []);
+      await repo.close();
+      repo = make();
+      assert.equal((await repo.listCountups())[0].startDate, '2026-09-05');
+      const updated = await repo.updateCountup(created.id, {
+        type: 'countup',
+        title: '坚持健身',
+        startDate: '2026-09-06',
+        note: '',
+      });
+      assert.equal(updated.createdAt, created.createdAt);
+      assert.equal((await repo.listCountups())[0].title, '坚持健身');
+      await assert.rejects(
+        repo.createCountup({ type: 'countup', title: '', startDate: '2026-09-05', note: '' }),
+        /累计事项/,
+      );
+      await repo.removeCountup(created.id);
+      assert.deepEqual(await repo.listCountups(), []);
+    } finally {
+      await repo.close();
+      if (engine === 'IndexedDB') await Dexie.delete(name);
+    }
+  });
+}
 test('SQLite: 迁移事务连同版本号回滚，重新打开可以恢复初始化', async () => {
   const file = join(dir, 'migration.db');
   let db = sqlite(file, 'CREATE INDEX');
@@ -107,7 +152,7 @@ test('SQLite: 迁移事务连同版本号回滚，重新打开可以恢复初始
   await db.closeAsync();
   db = sqlite(file);
   await migrateDatabase(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 3);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 4);
   await db.closeAsync();
 });
 test('SQLite: 写入事务失败保留旧记录，数据库约束防止非法原始值', async () => {
@@ -134,7 +179,7 @@ test('SQLite: 更高版本拒绝初始化，已有数据和版本号不变', asy
   const file = join(dir, 'future.db');
   const db = sqlite(file);
   await db.execAsync(
-    "CREATE TABLE future_data(value TEXT); INSERT INTO future_data VALUES ('keep me'); PRAGMA user_version=4;",
+    "CREATE TABLE future_data(value TEXT); INSERT INTO future_data VALUES ('keep me'); PRAGMA user_version=5;",
   );
   const repo = new SqliteBirthdayRepository(
     async () => sqlite(file),
@@ -145,13 +190,13 @@ test('SQLite: 更高版本拒绝初始化，已有数据和版本号不变', asy
     (await db.getFirstAsync<{ value: string }>('SELECT value FROM future_data'))?.value,
     'keep me',
   );
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 4);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 5);
   await db.closeAsync();
 });
 test('IndexedDB: 更高版本拒绝写入，保留已有记录', async () => {
   const name = `suisui-future-${Date.now()}`;
   const future = new Dexie(name);
-  future.version(4).stores({ birthdays: 'id,createdAt', extra: 'id' });
+  future.version(5).stores({ birthdays: 'id,createdAt', extra: 'id' });
   await future.open();
   await future.table('extra').add({ id: 'keep' });
   future.close();
@@ -348,7 +393,7 @@ for (const engine of ['SQLite', 'IndexedDB'] as const) {
       assert.deepEqual(await repo.importGuest(), { imported: 1, skipped: 0 });
       const [mutation] = await repo.pending();
       assert.equal(mutation.kind, 'upsert');
-      assert.equal(mutation.payload?.name, guest.name);
+      assert.equal(mutation.payload && 'name' in mutation.payload ? mutation.payload.name : null, guest.name);
       const remote = { ...mutation.payload!, version: 1, deletedAt: null };
       await repo.acknowledge(mutation, remote);
       assert.deepEqual(await repo.pending(), []);
@@ -390,8 +435,8 @@ for (const engine of ['SQLite', 'IndexedDB'] as const) {
       const remote = { ...base, name: '云端妈妈', version: 2, updatedAt: '2026-02-01T00:00:00.000Z' };
       assert.equal(await repo.mergeRemote([remote]), 1);
       assert.deepEqual(await repo.pending(), []);
-      assert.equal((await repo.conflicts())[0].local?.name, '本机妈妈');
-      assert.equal((await repo.conflicts())[0].remote.name, '云端妈妈');
+      assert.equal(((await repo.conflicts())[0].local as { name: string }).name, '本机妈妈');
+      assert.equal(((await repo.conflicts())[0].remote as { name: string }).name, '云端妈妈');
 
       await repo.resolveConflict(base.id, 'remote');
       assert.deepEqual(await repo.conflicts(), []);

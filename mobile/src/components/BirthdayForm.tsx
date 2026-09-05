@@ -25,6 +25,7 @@ export function BirthdayForm({
   onSave,
   onCancel,
   busy = false,
+  hideTypeChoice = false,
 }: {
   person?: Birthday;
   selectedDate: string;
@@ -32,6 +33,7 @@ export function BirthdayForm({
   busy?: boolean;
   onSave: (draft: BirthdayDraft, type: string) => Promise<void>;
   onCancel: () => void;
+  hideTypeChoice?: boolean;
 }) {
   const [mode, setMode] = useState<'lunar' | 'solar' | 'both'>(
     person?.solar ? (person.lunar ? 'both' : 'solar') : 'lunar',
@@ -46,7 +48,7 @@ export function BirthdayForm({
     lunar: mode === 'solar' ? null : lunar,
     solar: mode === 'lunar' ? null : solar,
   };
-  const [type, setType] = useState<string>(person ? 'birthday' : '');
+  const [type, setType] = useState<string>(person || hideTypeChoice ? 'birthday' : '');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const previews = useMemo(() => {
@@ -91,20 +93,22 @@ export function BirthdayForm({
           </View>
         </View>
       )}
-      <View style={{ gap: 10 }}>
-        <Text style={styles.label}>事项类型</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {EVENT_TYPES.map((item) => (
-            <Button
-              key={item.id}
-              label={`${item.label}${item.available ? '' : ' · 后续开放'}`}
-              variant={type === item.id ? 'primary' : 'secondary'}
-              disabled={!item.available || Boolean(person) || saving || busy}
-              onPress={() => setType(item.id)}
-            />
-          ))}
+      {!hideTypeChoice && (
+        <View style={{ gap: 10 }}>
+          <Text style={styles.label}>事项类型</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {EVENT_TYPES.filter((item) => item.id !== 'countup').map((item) => (
+              <Button
+                key={item.id}
+                label={`${item.label}${item.available ? '' : ' · 后续开放'}`}
+                variant={type === item.id ? 'primary' : 'secondary'}
+                disabled={!item.available || Boolean(person) || saving || busy}
+                onPress={() => setType(item.id)}
+              />
+            ))}
+          </View>
         </View>
-      </View>
+      )}
       {type === 'birthday' ? (
         <>
           <View style={{ gap: 9 }}>

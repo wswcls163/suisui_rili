@@ -2,7 +2,7 @@ import React from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { AppProvider, useBirthdays } from '../src/state/AppProvider';
-import { fixture, memoryRepository } from './helpers';
+import { countupFixture, fixture, memoryRepository } from './helpers';
 
 const now = Date.parse('2026-09-04T04:00:00Z'); // 农历七月廿三
 function mount(repo = memoryRepository(), clock = { now: () => now }) {
@@ -143,5 +143,33 @@ test('后台恢复、首页刷新和成功写入都会重新读取时钟', async
   expect(result.current.todayRows).toHaveLength(2);
   unmount();
   expect(remove).toHaveBeenCalledTimes(1);
+  subscription.mockRestore();
+});
+
+test('累计日增删改与北京时间刷新同步更新天数', async () => {
+  let value = Date.parse('2026-09-05T04:00:00Z');
+  const subscription = jest.spyOn(AppState, 'addEventListener').mockReturnValue({ remove: jest.fn() });
+  const repo = memoryRepository([], [countupFixture('fitness', { title: '健身', startDate: '2026-09-05' })]);
+  const { result, unmount } = mount(repo, { now: () => value });
+  await waitFor(() => expect(result.current.status).toBe('ready'));
+  expect(result.current.countupRows[0].progress).toMatchObject({ phase: 'active', day: 1 });
+
+  value = Date.parse('2026-09-06T04:00:00Z');
+  act(() => result.current.refreshToday());
+  expect(result.current.countupRows[0].progress).toMatchObject({ phase: 'active', day: 2 });
+
+  await act(() =>
+    result.current.saveCountup(
+      { type: 'countup', title: '晨跑', startDate: '2026-09-08', note: '三公里' },
+      'fitness',
+    ),
+  );
+  expect(result.current.notice).toBe('已保存「晨跑」累计日');
+  expect(result.current.countupRows[0].progress).toEqual({ phase: 'upcoming', remaining: 2 });
+
+  await act(() => result.current.removeCountup('fitness'));
+  expect(result.current.countups).toEqual([]);
+  expect(result.current.notice).toBe('累计日已删除');
+  unmount();
   subscription.mockRestore();
 });

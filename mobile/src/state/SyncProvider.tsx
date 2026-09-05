@@ -194,7 +194,7 @@ export function SyncProvider({
         else void refreshMeta();
       },
       async importGuest() {
-        if (!local || !auth.session) throw new Error('请先登录再合并本机生日');
+        if (!local || !auth.session) throw new Error('请先登录再合并本机事项');
         await local.importGuest();
         setRevision((current) => current + 1);
         await syncFor(ownerRef.current);

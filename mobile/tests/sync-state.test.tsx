@@ -6,7 +6,7 @@ import type { AuthService } from '../src/auth/auth';
 import { WebBirthdayRepository } from '../src/data/web';
 import { AuthProvider } from '../src/state/AuthProvider';
 import { SyncProvider, useAccountSync } from '../src/state/SyncProvider';
-import type { RemoteBirthday, RemoteBirthdayGateway, SyncMutation } from '../src/sync/model';
+import type { RemoteBirthdayGateway, RemoteItem, SyncMutation } from '../src/sync/model';
 
 test('登录后切换账号数据范围，访客生日确认上传后才清理', async () => {
   const name = `suisui-sync-state-${Date.now()}`;
@@ -27,7 +27,7 @@ test('登录后切换账号数据范围，访客生日确认上传后才清理',
     startAutoRefresh: jest.fn(),
     stopAutoRefresh: jest.fn(),
   };
-  const remote = new Map<string, RemoteBirthday>();
+  const remote = new Map<string, RemoteItem>();
   const gateway: RemoteBirthdayGateway = {
     list: jest.fn(async () => [...remote.values()]),
     apply: jest.fn(async (mutation: SyncMutation) => {

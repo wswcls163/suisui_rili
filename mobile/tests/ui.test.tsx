@@ -2,14 +2,16 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { BirthdayForm } from '../src/components/BirthdayForm';
+import { CountupForm } from '../src/components/CountupForm';
 import { MonthCalendar } from '../src/components/MonthCalendar';
 import { AppProvider } from '../src/state/AppProvider';
 import Home from '../app/index';
 import NewBirthday from '../app/new';
 import BirthdayDetails from '../app/birthday/[id]';
+import CountupDetails from '../app/countup/[id]';
 import { entriesForMonth } from '../src/core/birthday';
 import { lunarCalendar } from '../src/core/calendar';
-import { fixture, memoryRepository } from './helpers';
+import { countupFixture, fixture, memoryRepository } from './helpers';
 
 jest.mock(
   'react-native-safe-area-context',
@@ -78,6 +80,23 @@ test('编辑回填原始闰月三十，预览调整不改变原始输入', () =>
   expect(screen.getByLabelText('这是闰月生日').props.value).toBe(true);
   expect(screen.getByText('2025.03.28')).toBeTruthy();
   expect(screen.getByText('本月只有二十九天，提前到二十九提醒')).toBeTruthy();
+});
+test('累计日表单预填开始日期，当天为第 1 天并保存通用事项', async () => {
+  const save = jest.fn(async () => {});
+  render(<CountupForm selectedDate="2026-09-04" today="2026-09-04" onSave={save} onCancel={() => {}} />);
+  expect(screen.getByText('第 1 天')).toBeTruthy();
+  expect(screen.getByRole('button', { name: '选择开始日期：2026.09.04' })).toBeTruthy();
+  fireEvent.changeText(screen.getByLabelText('累计事项'), ' 开始健身 ');
+  fireEvent.changeText(screen.getByLabelText('累计日备注'), ' 每天半小时 ');
+  fireEvent.press(screen.getByRole('button', { name: '保存累计日' }));
+  await waitFor(() =>
+    expect(save).toHaveBeenCalledWith({
+      type: 'countup',
+      title: '开始健身',
+      startDate: '2026-09-04',
+      note: '每天半小时',
+    }),
+  );
 });
 test('月历七列、选日回调和多人标记；首尾月份禁止越界', () => {
   const select = jest.fn();
@@ -475,4 +494,35 @@ test('详情删除需要确认，取消不写库；失败保留记录，成功�
   fireEvent.press(screen.getByRole('button', { name: '确认删除' }));
   await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
   expect(repo.remove).toHaveBeenCalledTimes(2);
+});
+
+test('首页展示累计日摘要和列表，详情支持编辑入口与确认删除', async () => {
+  const repo = memoryRepository(
+    [],
+    [countupFixture('a', { title: '开始健身', startDate: '2026-09-04', note: '每天半小时' })],
+  );
+  const home = render(
+    <AppProvider repo={repo} clock={clock}>
+      <Home />
+    </AppProvider>,
+  );
+  await screen.findByRole('button', { name: '查看累计日开始健身' });
+  expect(screen.getByText('第 1 天')).toBeTruthy();
+  fireEvent.press(screen.getByRole('tab', { name: '累计日 1' }));
+  expect(screen.getByText('每天半小时')).toBeTruthy();
+  fireEvent.press(screen.getByRole('button', { name: '查看累计日开始健身，第 1 天' }));
+  expect(router.push).toHaveBeenCalledWith({ pathname: '/countup/[id]', params: { id: 'a' } });
+  home.unmount();
+
+  render(
+    <AppProvider repo={repo} clock={clock}>
+      <CountupDetails />
+    </AppProvider>,
+  );
+  await screen.findByRole('button', { name: '编辑累计日' });
+  expect(screen.getByText('开始日期 · 2026.09.04')).toBeTruthy();
+  fireEvent.press(screen.getByRole('button', { name: '删除累计日' }));
+  expect(screen.getByText('删除后，这项累计记录将不再显示。')).toBeTruthy();
+  fireEvent.press(screen.getByRole('button', { name: '取消' }));
+  expect(repo.removeCountup).not.toHaveBeenCalled();
 });
