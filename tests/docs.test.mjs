@@ -68,3 +68,11 @@ test('账号登录技术方案覆盖认证、同步和安全边界', async () =>
   assert.match(content, /service_role[\s\S]*不得进入/);
   assert.match(content, /邮箱深链接/);
 });
+
+test('AGENTS 记录适度模块化的长期代码准则', async () => {
+  const content = await readFile(join(root, 'AGENTS.md'), 'utf8');
+
+  assert.match(content, /代码采用适度模块化/);
+  assert.match(content, /避免把互不相关的功能堆在一起/);
+  assert.match(content, /避免为了拆分而拆分/);
+});
