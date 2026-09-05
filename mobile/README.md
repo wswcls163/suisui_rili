@@ -14,9 +14,29 @@ npm run web
 
 浏览器打开终端中的地址，默认 `http://localhost:8081`。新建时先在月历选日期，再点「＋」和「生日」；日期会自动预填，也可修改农历月份、日期和闰月标记。生日簿可查看、编辑和删除记录。点击月历标题，可通过年、月、日三列滚轮跳转到 1901—2100 年的具体日期，支持滑动、鼠标滚轮和点选；电脑聚焦滚轮后也可用方向键调整、Page Up / Page Down 快选、Home / End 到首尾。切换年月时自动处理闰年和大小月，取消不改变原先选择。
 
-预览使用当前浏览器的 IndexedDB，刷新、关闭再打开页面后保留数据。不同浏览器、不同端口或不同设备的数据彼此独立，清理网站数据会删除记录。预览不是手机 SQLite 或真机验收的替代品。
+预览使用当前浏览器的 IndexedDB，刷新、关闭再打开页面后保留数据。未登录时，不同浏览器、不同端口或不同设备的数据彼此独立；登录同一个账号后可通过 Supabase 同步。清理网站数据会删除未登录记录和本机缓存，不会删除已经同步的云端生日。预览不是手机 SQLite 或真机验收的替代品。
 
 生日方式可选“只过农历”“只过阳历”“两个都过”。例如编辑已有的农历腊月初九生日，选择“两个都过”并另填阳历 1 月 11 日，两套日期就会独立预览、逐年计算和提醒。同一天重合时只计一次，生日簿仍保留一个人。旧记录升级后保持原有农历规则，不根据姓名猜测阳历日期；阳历 2 月 29 日在平年提前到 28 日，原始日期保持不变。
+
+## 配置邮箱账号与同步
+
+没有云端配置时应用继续本地运行，“账号与同步”页面会明确显示尚未配置。需要联调账号时：
+
+1. 创建 Supabase 开发项目，将 `.env.example` 复制为 `.env`，填写项目 URL 与 publishable key。不要把数据库密码或 `service_role` 放进客户端环境变量。
+2. 使用 Supabase CLI 关联开发项目，执行 `supabase/migrations/` 中的迁移，并部署 `delete-account` Edge Function。
+3. 在 Supabase Auth 的 URL 配置中加入开发网页 `http://localhost:8081/auth/callback`、原生 `suisui://auth/callback`，以及以后实际使用的生产回调地址。
+4. 开发阶段可用 Supabase 测试邮件；正式发布前配置自己的 SMTP、发件域名和中文邮件模板。
+
+示例命令如下，其中项目标识来自自己的 Supabase 项目：
+
+```sh
+copy .env.example .env
+npx supabase link --project-ref <project-ref>
+npx supabase db push
+npx supabase functions deploy delete-account
+```
+
+登录后，生日仍先写入 SQLite 或 IndexedDB，再自动同步；断网修改保留在队列中，恢复前台、定时检查或手动点击时重试。首次登录不会自动搬走访客数据，需在账号页点“合并并同步”；云端确认成功且没有冲突后才清理访客副本。
 
 ## 手机开发与安装包
 
@@ -66,8 +86,10 @@ npx expo-doctor
 | 历法库与核验口径 | `src/core/calendar.ts` |
 | 日期运算、北京时间与前台时钟 | `src/core/dates.ts`、`src/core/clock.ts` |
 | 共享生日状态与手机生命周期 | `src/state/AppProvider.tsx` |
+| 邮箱认证、会话存储与回调 | `src/auth/`、`src/state/AuthProvider.tsx` |
+| 离线队列、云端适配与同步状态 | `src/sync/`、`src/state/SyncProvider.tsx` |
 | SQLite、IndexedDB 和版本迁移 | `src/data/` |
 
-没有服务端、账号、同步或系统通知。新增功能按实际职责扩展，不预先建立空目录、通用事件引擎或多层服务。图标源文件与生成脚本在 `assets/icon.svg`、`scripts/generate-icons.mjs`；修改后运行 `node scripts/generate-icons.mjs`。
+Supabase 数据库迁移与注销函数位于 `supabase/`。仓库不包含任何项目密钥；未配置环境变量时账号功能保持关闭。系统通知尚未实现。新增功能按实际职责扩展，不预先建立空目录、通用事件引擎或多层服务。图标源文件与生成脚本在 `assets/icon.svg`、`scripts/generate-icons.mjs`；修改后运行 `node scripts/generate-icons.mjs`。
 
 遵守根目录 [AGENTS.md](../AGENTS.md)：改动必须更新相关测试，检查通过后创建 Git commit，并在交付说明中给出提交内容。

@@ -7,3 +7,11 @@ jest.mock('@expo/vector-icons/MaterialCommunityIcons', () => {
   };
 });
 jest.mock('../src/data/repository', () => ({ repository: {}, storageDescription: '测试存储' }));
+jest.mock('expo-secure-store', () => {
+  const values = new Map<string, string>();
+  return {
+    getItemAsync: jest.fn(async (key: string) => values.get(key) ?? null),
+    setItemAsync: jest.fn(async (key: string, value: string) => void values.set(key, value)),
+    deleteItemAsync: jest.fn(async (key: string) => void values.delete(key)),
+  };
+});

@@ -9,6 +9,7 @@ import { Dexie } from 'dexie';
 import { migrateDatabase, SqliteBirthdayRepository, type SqlDatabase } from '../src/data/sqlite';
 import { WebBirthdayRepository } from '../src/data/web';
 import type { BirthdayRepository } from '../src/core/birthday';
+import type { SyncBirthdayRepository } from '../src/sync/model';
 
 const dir = mkdtempSync(join(tmpdir(), 'suisui-storage-test-'));
 after(() => {
@@ -106,7 +107,7 @@ test('SQLite: 迁移事务连同版本号回滚，重新打开可以恢复初始
   await db.closeAsync();
   db = sqlite(file);
   await migrateDatabase(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 2);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 3);
   await db.closeAsync();
 });
 test('SQLite: 写入事务失败保留旧记录，数据库约束防止非法原始值', async () => {
@@ -133,7 +134,7 @@ test('SQLite: 更高版本拒绝初始化，已有数据和版本号不变', asy
   const file = join(dir, 'future.db');
   const db = sqlite(file);
   await db.execAsync(
-    "CREATE TABLE future_data(value TEXT); INSERT INTO future_data VALUES ('keep me'); PRAGMA user_version=3;",
+    "CREATE TABLE future_data(value TEXT); INSERT INTO future_data VALUES ('keep me'); PRAGMA user_version=4;",
   );
   const repo = new SqliteBirthdayRepository(
     async () => sqlite(file),
@@ -144,13 +145,13 @@ test('SQLite: 更高版本拒绝初始化，已有数据和版本号不变', asy
     (await db.getFirstAsync<{ value: string }>('SELECT value FROM future_data'))?.value,
     'keep me',
   );
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 3);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 4);
   await db.closeAsync();
 });
 test('IndexedDB: 更高版本拒绝写入，保留已有记录', async () => {
   const name = `suisui-future-${Date.now()}`;
   const future = new Dexie(name);
-  future.version(3).stores({ birthdays: 'id,createdAt', extra: 'id' });
+  future.version(4).stores({ birthdays: 'id,createdAt', extra: 'id' });
   await future.open();
   await future.table('extra').add({ id: 'keep' });
   future.close();
@@ -317,3 +318,96 @@ test('SQLite: 约束拒绝不完整日期、两套都为空及无效阳历月日
   await repo.close();
   await db.closeAsync();
 });
+
+for (const engine of ['SQLite', 'IndexedDB'] as const) {
+  test(`${engine}: 访客数据与账号数据隔离，合并后进入待同步队列`, async () => {
+    const name = engine === 'SQLite' ? join(dir, `scope-${engine}.db`) : `suisui-scope-${Date.now()}`;
+    let sequence = 0;
+    const repo: SyncBirthdayRepository =
+      engine === 'SQLite'
+        ? new SqliteBirthdayRepository(
+            async () => sqlite(name),
+            () => `scope-${++sequence}`,
+          )
+        : new WebBirthdayRepository(name, () => `scope-${++sequence}`);
+    try {
+      const guest = await repo.create(draft);
+      assert.equal(await repo.guestCount(), 1);
+      assert.deepEqual(await repo.pending(), []);
+
+      await repo.setOwner('user:account-a');
+      assert.deepEqual(await repo.list(), []);
+      const transient = await repo.create({ ...draft, name: '临时记录' });
+      await repo.update(transient.id, { ...draft, name: '改过的临时记录' });
+      assert.equal((await repo.pending()).length, 1);
+      assert.equal((await repo.pending())[0].baseVersion, 0);
+      await repo.remove(transient.id);
+      assert.deepEqual(await repo.pending(), []);
+      assert.deepEqual(await repo.list(), []);
+
+      assert.deepEqual(await repo.importGuest(), { imported: 1, skipped: 0 });
+      const [mutation] = await repo.pending();
+      assert.equal(mutation.kind, 'upsert');
+      assert.equal(mutation.payload?.name, guest.name);
+      const remote = { ...mutation.payload!, version: 1, deletedAt: null };
+      await repo.acknowledge(mutation, remote);
+      assert.deepEqual(await repo.pending(), []);
+      assert.equal((await repo.list())[0].name, '妈妈');
+
+      await repo.clearGuest();
+      assert.equal(await repo.guestCount(), 0);
+      assert.equal((await repo.list()).length, 1);
+    } finally {
+      await repo.close();
+      if (engine === 'IndexedDB') await Dexie.delete(name);
+    }
+  });
+
+  test(`${engine}: 远端变更与本机修改冲突时保留两份内容并可逐条解决`, async () => {
+    const name = engine === 'SQLite' ? join(dir, `conflict-${engine}.db`) : `suisui-conflict-${Date.now()}`;
+    let sequence = 0;
+    const repo: SyncBirthdayRepository =
+      engine === 'SQLite'
+        ? new SqliteBirthdayRepository(
+            async () => sqlite(name),
+            () => `conflict-${++sequence}`,
+          )
+        : new WebBirthdayRepository(name, () => `conflict-${++sequence}`);
+    try {
+      await repo.setOwner('user:account-b');
+      const base = {
+        id: 'shared',
+        name: '妈妈',
+        lunar: { month: 2, day: 30, isLeap: false },
+        solar: null,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        version: 1,
+        deletedAt: null,
+      };
+      assert.equal(await repo.mergeRemote([base]), 1);
+      await repo.update(base.id, { ...draft, name: '本机妈妈' });
+      const remote = { ...base, name: '云端妈妈', version: 2, updatedAt: '2026-02-01T00:00:00.000Z' };
+      assert.equal(await repo.mergeRemote([remote]), 1);
+      assert.deepEqual(await repo.pending(), []);
+      assert.equal((await repo.conflicts())[0].local?.name, '本机妈妈');
+      assert.equal((await repo.conflicts())[0].remote.name, '云端妈妈');
+
+      await repo.resolveConflict(base.id, 'remote');
+      assert.deepEqual(await repo.conflicts(), []);
+      assert.equal((await repo.list())[0].name, '云端妈妈');
+
+      await repo.update(base.id, { ...draft, name: '最终保留本机' });
+      const [pending] = await repo.pending();
+      const newer = { ...remote, name: '另一台设备', version: 3 };
+      await repo.recordConflict(pending, newer);
+      await repo.resolveConflict(base.id, 'local');
+      assert.equal((await repo.list())[0].name, '最终保留本机');
+      assert.equal((await repo.pending())[0].baseVersion, 3);
+      assert.equal((await repo.pending())[0].kind, 'upsert');
+    } finally {
+      await repo.close();
+      if (engine === 'IndexedDB') await Dexie.delete(name);
+    }
+  });
+}

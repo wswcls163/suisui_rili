@@ -1,7 +1,17 @@
-import type { Birthday, BirthdayDraft, BirthdayRepository } from '../core/birthday';
+import type { Birthday, BirthdayDraft } from '../core/birthday';
 import { normalizeDraft } from '../core/birthday';
+import {
+  birthdayFingerprint,
+  GUEST_OWNER,
+  isAccountOwner,
+  type RemoteBirthday,
+  type SyncBirthdayRepository,
+  type SyncConflict,
+  type SyncMutation,
+} from '../sync/model';
 
 type Param = string | number | null;
+
 export interface SqlDatabase {
   execAsync(sql: string): Promise<void>;
   runAsync(sql: string, ...params: Param[]): Promise<{ changes: number }>;
@@ -10,7 +20,9 @@ export interface SqlDatabase {
   withExclusiveTransactionAsync(work: (transaction: SqlDatabase) => Promise<void>): Promise<void>;
   closeAsync(): Promise<void>;
 }
+
 type StoredBirthday = {
+  ownerKey: string;
   id: string;
   name: string;
   createdAt: string;
@@ -20,43 +32,109 @@ type StoredBirthday = {
   isLeap: number | null;
   solarMonth: number | null;
   solarDay: number | null;
+  remoteVersion: number;
+  deletedAt: string | null;
 };
+
+type StoredMutation = {
+  ownerKey: string;
+  birthdayId: string;
+  operationId: string;
+  kind: 'upsert' | 'delete';
+  baseVersion: number;
+  payload: string | null;
+  createdAt: string;
+};
+
+type StoredConflict = {
+  ownerKey: string;
+  birthdayId: string;
+  localPayload: string | null;
+  remotePayload: string;
+  createdAt: string;
+};
+
+const birthdayColumns = `ownerKey,id,name,lunarMonth,lunarDay,isLeap,solarMonth,solarDay,
+  createdAt,updatedAt,remoteVersion,deletedAt`;
+
+function birthdayTable(name: string): string {
+  return `CREATE TABLE ${name} (
+    ownerKey TEXT NOT NULL,
+    id TEXT NOT NULL,
+    name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 30),
+    lunarMonth INTEGER,
+    lunarDay INTEGER,
+    isLeap INTEGER,
+    solarMonth INTEGER,
+    solarDay INTEGER,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL,
+    remoteVersion INTEGER NOT NULL DEFAULT 0 CHECK(remoteVersion >= 0),
+    deletedAt TEXT,
+    PRIMARY KEY(ownerKey,id),
+    CHECK((lunarMonth IS NULL AND lunarDay IS NULL AND isLeap IS NULL) OR
+      (lunarMonth IS NOT NULL AND lunarDay IS NOT NULL AND isLeap IS NOT NULL AND
+       lunarMonth BETWEEN 1 AND 12 AND lunarDay BETWEEN 1 AND 30 AND isLeap IN (0,1))),
+    CHECK((solarMonth IS NULL AND solarDay IS NULL) OR
+      (solarMonth IS NOT NULL AND solarDay IS NOT NULL AND solarMonth BETWEEN 1 AND 12 AND
+       solarDay BETWEEN 1 AND CASE WHEN solarMonth=2 THEN 29 WHEN solarMonth IN (4,6,9,11) THEN 30 ELSE 31 END)),
+    CHECK(lunarMonth IS NOT NULL OR solarMonth IS NOT NULL)
+  );`;
+}
+
 export async function migrateDatabase(db: SqlDatabase): Promise<void> {
   const version =
     (await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version ?? 0;
-  if (version > 2) throw new Error('数据来自更新版本，请先升级应用。现有数据未被修改。');
+  if (version > 3) throw new Error('数据来自更新版本，请先升级应用。现有数据未被修改。');
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   if (version < 2)
     await db.withExclusiveTransactionAsync(async (tx) => {
       await tx.execAsync(`CREATE TABLE birthdays_v2 (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 30),
-      lunarMonth INTEGER,
-      lunarDay INTEGER,
-      isLeap INTEGER,
-      solarMonth INTEGER,
-      solarDay INTEGER,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL,
-      CHECK((lunarMonth IS NULL AND lunarDay IS NULL AND isLeap IS NULL) OR
-        (lunarMonth IS NOT NULL AND lunarDay IS NOT NULL AND isLeap IS NOT NULL AND
-         lunarMonth BETWEEN 1 AND 12 AND lunarDay BETWEEN 1 AND 30 AND isLeap IN (0, 1))),
-      CHECK((solarMonth IS NULL AND solarDay IS NULL) OR
-        (solarMonth IS NOT NULL AND solarDay IS NOT NULL AND solarMonth BETWEEN 1 AND 12 AND
-         solarDay BETWEEN 1 AND CASE WHEN solarMonth = 2 THEN 29 WHEN solarMonth IN (4,6,9,11) THEN 30 ELSE 31 END)),
-      CHECK(lunarMonth IS NOT NULL OR solarMonth IS NOT NULL)
-    );`);
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 30),
+        lunarMonth INTEGER,lunarDay INTEGER,isLeap INTEGER,solarMonth INTEGER,solarDay INTEGER,
+        createdAt TEXT NOT NULL,updatedAt TEXT NOT NULL,
+        CHECK((lunarMonth IS NULL AND lunarDay IS NULL AND isLeap IS NULL) OR
+          (lunarMonth IS NOT NULL AND lunarDay IS NOT NULL AND isLeap IS NOT NULL AND
+           lunarMonth BETWEEN 1 AND 12 AND lunarDay BETWEEN 1 AND 30 AND isLeap IN (0,1))),
+        CHECK((solarMonth IS NULL AND solarDay IS NULL) OR
+          (solarMonth IS NOT NULL AND solarDay IS NOT NULL AND solarMonth BETWEEN 1 AND 12 AND
+           solarDay BETWEEN 1 AND CASE WHEN solarMonth=2 THEN 29 WHEN solarMonth IN (4,6,9,11) THEN 30 ELSE 31 END)),
+        CHECK(lunarMonth IS NOT NULL OR solarMonth IS NOT NULL)
+      );`);
       if (version === 1)
-        await tx.execAsync(`
-        INSERT INTO birthdays_v2 (id,name,lunarMonth,lunarDay,isLeap,createdAt,updatedAt)
-        SELECT id,name,month,day,isLeap,createdAt,updatedAt FROM birthdays;
-        DROP TABLE birthdays;`);
+        await tx.execAsync(`INSERT INTO birthdays_v2 (id,name,lunarMonth,lunarDay,isLeap,createdAt,updatedAt)
+          SELECT id,name,month,day,isLeap,createdAt,updatedAt FROM birthdays;
+          DROP TABLE birthdays;`);
       await tx.execAsync(`ALTER TABLE birthdays_v2 RENAME TO birthdays;
-        CREATE INDEX birthdays_created ON birthdays(createdAt, id);
-        PRAGMA user_version = 2;`);
+        CREATE INDEX birthdays_created ON birthdays(createdAt,id);
+        PRAGMA user_version=2;`);
+    });
+  if (version < 3)
+    await db.withExclusiveTransactionAsync(async (tx) => {
+      await tx.execAsync(birthdayTable('birthdays_v3'));
+      await tx.execAsync(`INSERT INTO birthdays_v3
+        (${birthdayColumns})
+        SELECT '${GUEST_OWNER}',id,name,lunarMonth,lunarDay,isLeap,solarMonth,solarDay,
+          createdAt,updatedAt,0,NULL FROM birthdays;
+        DROP TABLE birthdays;
+        ALTER TABLE birthdays_v3 RENAME TO birthdays;
+        CREATE INDEX birthdays_owner_created ON birthdays(ownerKey,createdAt,id);
+        CREATE TABLE sync_outbox (
+          ownerKey TEXT NOT NULL,birthdayId TEXT NOT NULL,operationId TEXT NOT NULL,
+          kind TEXT NOT NULL CHECK(kind IN ('upsert','delete')),baseVersion INTEGER NOT NULL CHECK(baseVersion >= 0),
+          payload TEXT,createdAt TEXT NOT NULL,PRIMARY KEY(ownerKey,birthdayId)
+        );
+        CREATE UNIQUE INDEX sync_outbox_operation ON sync_outbox(ownerKey,operationId);
+        CREATE TABLE sync_conflicts (
+          ownerKey TEXT NOT NULL,birthdayId TEXT NOT NULL,localPayload TEXT,remotePayload TEXT NOT NULL,
+          createdAt TEXT NOT NULL,PRIMARY KEY(ownerKey,birthdayId)
+        );
+        PRAGMA user_version=3;`);
     });
 }
-function fromStored(row: StoredBirthday): Birthday {
+
+function toBirthday(row: StoredBirthday): Birthday {
   if (row.isLeap !== null && row.isLeap !== 0 && row.isLeap !== 1)
     throw new Error('生日数据无效，未对数据库进行修改');
   const draft = normalizeDraft({
@@ -68,14 +146,55 @@ function fromStored(row: StoredBirthday): Birthday {
   return { ...draft, id: row.id, createdAt: row.createdAt, updatedAt: row.updatedAt };
 }
 
-export class SqliteBirthdayRepository implements BirthdayRepository {
+function birthdayParams(ownerKey: string, row: Birthday, remoteVersion = 0, deletedAt: string | null = null) {
+  return [
+    ownerKey,
+    row.id,
+    row.name,
+    row.lunar?.month ?? null,
+    row.lunar?.day ?? null,
+    row.lunar ? Number(row.lunar.isLeap) : null,
+    row.solar?.month ?? null,
+    row.solar?.day ?? null,
+    row.createdAt,
+    row.updatedAt,
+    remoteVersion,
+    deletedAt,
+  ] satisfies Param[];
+}
+
+async function putBirthday(
+  tx: SqlDatabase,
+  ownerKey: string,
+  row: Birthday,
+  remoteVersion = 0,
+  deletedAt: string | null = null,
+) {
+  await tx.runAsync(
+    `INSERT INTO birthdays (${birthdayColumns}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(ownerKey,id) DO UPDATE SET
+      name=excluded.name,lunarMonth=excluded.lunarMonth,lunarDay=excluded.lunarDay,isLeap=excluded.isLeap,
+      solarMonth=excluded.solarMonth,solarDay=excluded.solarDay,createdAt=excluded.createdAt,
+      updatedAt=excluded.updatedAt,remoteVersion=excluded.remoteVersion,deletedAt=excluded.deletedAt`,
+    ...birthdayParams(ownerKey, row, remoteVersion, deletedAt),
+  );
+}
+
+function parseMutation(row: StoredMutation): SyncMutation {
+  return { ...row, payload: row.payload ? (JSON.parse(row.payload) as Birthday) : null };
+}
+
+export class SqliteBirthdayRepository implements SyncBirthdayRepository {
   private database: SqlDatabase | null = null;
   private opening: Promise<void> | null = null;
+  private ownerKey = GUEST_OWNER;
+
   constructor(
     private open: () => Promise<SqlDatabase>,
     private id: () => string,
     private now = () => new Date(),
   ) {}
+
   async initialize(): Promise<void> {
     if (this.database) return;
     if (!this.opening)
@@ -88,20 +207,35 @@ export class SqliteBirthdayRepository implements BirthdayRepository {
           await db.closeAsync();
           throw error;
         }
-      })().finally(() => {
-        this.opening = null;
-      });
+      })().finally(() => (this.opening = null));
     return this.opening;
   }
+
   private async db(): Promise<SqlDatabase> {
     await this.initialize();
     return this.database!;
   }
-  async list(): Promise<Birthday[]> {
-    return (
-      await (await this.db()).getAllAsync<StoredBirthday>('SELECT * FROM birthdays ORDER BY createdAt, id')
-    ).map(fromStored);
+
+  async setOwner(ownerKey: string): Promise<void> {
+    if (ownerKey !== GUEST_OWNER && !isAccountOwner(ownerKey)) throw new Error('账号数据范围无效');
+    await this.initialize();
+    this.ownerKey = ownerKey;
   }
+
+  getOwner(): string {
+    return this.ownerKey;
+  }
+
+  async list(): Promise<Birthday[]> {
+    const rows = await (
+      await this.db()
+    ).getAllAsync<StoredBirthday>(
+      'SELECT * FROM birthdays WHERE ownerKey=? AND deletedAt IS NULL ORDER BY createdAt,id',
+      this.ownerKey,
+    );
+    return rows.map(toBirthday);
+  }
+
   async create(input: BirthdayDraft): Promise<Birthday> {
     const draft = normalizeDraft(input);
     const stamp = this.now().toISOString();
@@ -109,52 +243,317 @@ export class SqliteBirthdayRepository implements BirthdayRepository {
     await (
       await this.db()
     ).withExclusiveTransactionAsync(async (tx) => {
-      await tx.runAsync(
-        'INSERT INTO birthdays (id,name,lunarMonth,lunarDay,isLeap,solarMonth,solarDay,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?)',
-        row.id,
-        row.name,
-        row.lunar?.month ?? null,
-        row.lunar?.day ?? null,
-        row.lunar ? Number(row.lunar.isLeap) : null,
-        row.solar?.month ?? null,
-        row.solar?.day ?? null,
-        row.createdAt,
-        row.updatedAt,
-      );
+      await putBirthday(tx, this.ownerKey, row);
+      if (isAccountOwner(this.ownerKey)) await this.queue(tx, row, 'upsert', 0);
     });
     return row;
   }
+
   async update(id: string, input: BirthdayDraft): Promise<Birthday> {
     const draft = normalizeDraft(input);
     let updated: Birthday | undefined;
     await (
       await this.db()
     ).withExclusiveTransactionAsync(async (tx) => {
-      const previous = await tx.getFirstAsync<StoredBirthday>('SELECT * FROM birthdays WHERE id = ?', id);
-      if (!previous) throw new Error('这条生日已不存在，请返回生日簿刷新');
-      updated = { ...fromStored(previous), ...draft, updatedAt: this.now().toISOString() };
-      await tx.runAsync(
-        'UPDATE birthdays SET name=?,lunarMonth=?,lunarDay=?,isLeap=?,solarMonth=?,solarDay=?,updatedAt=? WHERE id=?',
-        draft.name,
-        draft.lunar?.month ?? null,
-        draft.lunar?.day ?? null,
-        draft.lunar ? Number(draft.lunar.isLeap) : null,
-        draft.solar?.month ?? null,
-        draft.solar?.day ?? null,
-        updated.updatedAt,
+      const previous = await tx.getFirstAsync<StoredBirthday>(
+        'SELECT * FROM birthdays WHERE ownerKey=? AND id=? AND deletedAt IS NULL',
+        this.ownerKey,
         id,
       );
+      if (!previous) throw new Error('这条生日已不存在，请返回生日簿刷新');
+      updated = { ...toBirthday(previous), ...draft, updatedAt: this.now().toISOString() };
+      await putBirthday(tx, this.ownerKey, updated, previous.remoteVersion);
+      if (isAccountOwner(this.ownerKey)) await this.queue(tx, updated, 'upsert', previous.remoteVersion);
     });
     return updated!;
   }
+
   async remove(id: string): Promise<void> {
     await (
       await this.db()
     ).withExclusiveTransactionAsync(async (tx) => {
-      const result = await tx.runAsync('DELETE FROM birthdays WHERE id=?', id);
-      if (result.changes !== 1) throw new Error('这条生日已不存在，请返回生日簿刷新');
+      const previous = await tx.getFirstAsync<StoredBirthday>(
+        'SELECT * FROM birthdays WHERE ownerKey=? AND id=? AND deletedAt IS NULL',
+        this.ownerKey,
+        id,
+      );
+      if (!previous) throw new Error('这条生日已不存在，请返回生日簿刷新');
+      if (!isAccountOwner(this.ownerKey) || previous.remoteVersion === 0) {
+        await tx.runAsync('DELETE FROM sync_outbox WHERE ownerKey=? AND birthdayId=?', this.ownerKey, id);
+        await tx.runAsync('DELETE FROM birthdays WHERE ownerKey=? AND id=?', this.ownerKey, id);
+        return;
+      }
+      const deletedAt = this.now().toISOString();
+      await tx.runAsync(
+        'UPDATE birthdays SET deletedAt=?,updatedAt=? WHERE ownerKey=? AND id=?',
+        deletedAt,
+        deletedAt,
+        this.ownerKey,
+        id,
+      );
+      await this.queue(
+        tx,
+        { ...toBirthday(previous), updatedAt: deletedAt },
+        'delete',
+        previous.remoteVersion,
+      );
     });
   }
+
+  private async queue(tx: SqlDatabase, row: Birthday, kind: SyncMutation['kind'], baseVersion: number) {
+    const existing = await tx.getFirstAsync<StoredMutation>(
+      'SELECT * FROM sync_outbox WHERE ownerKey=? AND birthdayId=?',
+      this.ownerKey,
+      row.id,
+    );
+    await tx.runAsync(
+      `INSERT INTO sync_outbox (ownerKey,birthdayId,operationId,kind,baseVersion,payload,createdAt)
+       VALUES (?,?,?,?,?,?,?) ON CONFLICT(ownerKey,birthdayId) DO UPDATE SET
+       operationId=excluded.operationId,kind=excluded.kind,baseVersion=excluded.baseVersion,
+       payload=excluded.payload,createdAt=excluded.createdAt`,
+      this.ownerKey,
+      row.id,
+      this.id(),
+      kind,
+      existing?.baseVersion ?? baseVersion,
+      kind === 'upsert' ? JSON.stringify(row) : null,
+      this.now().toISOString(),
+    );
+  }
+
+  async pending(): Promise<SyncMutation[]> {
+    return (
+      await (
+        await this.db()
+      ).getAllAsync<StoredMutation>(
+        'SELECT * FROM sync_outbox WHERE ownerKey=? ORDER BY createdAt,birthdayId',
+        this.ownerKey,
+      )
+    ).map(parseMutation);
+  }
+
+  async acknowledge(mutation: SyncMutation, remote: RemoteBirthday): Promise<void> {
+    await (
+      await this.db()
+    ).withExclusiveTransactionAsync(async (tx) => {
+      const current = await tx.getFirstAsync<StoredMutation>(
+        'SELECT * FROM sync_outbox WHERE ownerKey=? AND birthdayId=?',
+        mutation.ownerKey,
+        mutation.birthdayId,
+      );
+      if (!current) return;
+      if (current.operationId === mutation.operationId) {
+        await putBirthday(tx, mutation.ownerKey, remote, remote.version, remote.deletedAt);
+        await tx.runAsync(
+          'DELETE FROM sync_outbox WHERE ownerKey=? AND birthdayId=?',
+          mutation.ownerKey,
+          mutation.birthdayId,
+        );
+      } else {
+        await tx.runAsync(
+          'UPDATE birthdays SET remoteVersion=? WHERE ownerKey=? AND id=?',
+          remote.version,
+          mutation.ownerKey,
+          mutation.birthdayId,
+        );
+        await tx.runAsync(
+          'UPDATE sync_outbox SET baseVersion=? WHERE ownerKey=? AND birthdayId=?',
+          remote.version,
+          mutation.ownerKey,
+          mutation.birthdayId,
+        );
+      }
+    });
+  }
+
+  async mergeRemote(records: RemoteBirthday[]): Promise<number> {
+    let changed = 0;
+    await (
+      await this.db()
+    ).withExclusiveTransactionAsync(async (tx) => {
+      for (const remote of records) {
+        const local = await tx.getFirstAsync<StoredBirthday>(
+          'SELECT * FROM birthdays WHERE ownerKey=? AND id=?',
+          this.ownerKey,
+          remote.id,
+        );
+        const pending = await tx.getFirstAsync<StoredMutation>(
+          'SELECT * FROM sync_outbox WHERE ownerKey=? AND birthdayId=?',
+          this.ownerKey,
+          remote.id,
+        );
+        if (pending) {
+          if (remote.version > pending.baseVersion) {
+            await this.storeConflict(tx, pending, remote, local);
+            changed++;
+          }
+          continue;
+        }
+        if (!local || local.remoteVersion !== remote.version) {
+          await putBirthday(tx, this.ownerKey, remote, remote.version, remote.deletedAt);
+          changed++;
+        }
+      }
+    });
+    return changed;
+  }
+
+  async recordConflict(mutation: SyncMutation, remote: RemoteBirthday): Promise<void> {
+    await (
+      await this.db()
+    ).withExclusiveTransactionAsync(async (tx) => {
+      const stored = await tx.getFirstAsync<StoredMutation>(
+        'SELECT * FROM sync_outbox WHERE ownerKey=? AND birthdayId=? AND operationId=?',
+        mutation.ownerKey,
+        mutation.birthdayId,
+        mutation.operationId,
+      );
+      if (!stored) return;
+      const local = await tx.getFirstAsync<StoredBirthday>(
+        'SELECT * FROM birthdays WHERE ownerKey=? AND id=?',
+        mutation.ownerKey,
+        mutation.birthdayId,
+      );
+      await this.storeConflict(tx, stored, remote, local);
+    });
+  }
+
+  private async storeConflict(
+    tx: SqlDatabase,
+    mutation: StoredMutation,
+    remote: RemoteBirthday,
+    local: StoredBirthday | null,
+  ) {
+    await tx.runAsync(
+      `INSERT INTO sync_conflicts (ownerKey,birthdayId,localPayload,remotePayload,createdAt)
+       VALUES (?,?,?,?,?) ON CONFLICT(ownerKey,birthdayId) DO UPDATE SET
+       localPayload=excluded.localPayload,remotePayload=excluded.remotePayload,createdAt=excluded.createdAt`,
+      mutation.ownerKey,
+      mutation.birthdayId,
+      local && !local.deletedAt ? JSON.stringify(toBirthday(local)) : null,
+      JSON.stringify(remote),
+      this.now().toISOString(),
+    );
+    await tx.runAsync(
+      'DELETE FROM sync_outbox WHERE ownerKey=? AND birthdayId=?',
+      mutation.ownerKey,
+      mutation.birthdayId,
+    );
+  }
+
+  async conflicts(): Promise<SyncConflict[]> {
+    return (
+      await (
+        await this.db()
+      ).getAllAsync<StoredConflict>(
+        'SELECT * FROM sync_conflicts WHERE ownerKey=? ORDER BY createdAt,birthdayId',
+        this.ownerKey,
+      )
+    ).map((row) => ({
+      ownerKey: row.ownerKey,
+      birthdayId: row.birthdayId,
+      local: row.localPayload ? (JSON.parse(row.localPayload) as Birthday) : null,
+      remote: JSON.parse(row.remotePayload) as RemoteBirthday,
+      createdAt: row.createdAt,
+    }));
+  }
+
+  async resolveConflict(birthdayId: string, choice: 'local' | 'remote'): Promise<void> {
+    await (
+      await this.db()
+    ).withExclusiveTransactionAsync(async (tx) => {
+      const conflict = await tx.getFirstAsync<StoredConflict>(
+        'SELECT * FROM sync_conflicts WHERE ownerKey=? AND birthdayId=?',
+        this.ownerKey,
+        birthdayId,
+      );
+      if (!conflict) throw new Error('这条同步冲突已不存在');
+      const remote = JSON.parse(conflict.remotePayload) as RemoteBirthday;
+      if (choice === 'remote') {
+        await putBirthday(tx, this.ownerKey, remote, remote.version, remote.deletedAt);
+      } else {
+        const local = conflict.localPayload ? (JSON.parse(conflict.localPayload) as Birthday) : null;
+        const value = local ?? remote;
+        await putBirthday(tx, this.ownerKey, value, remote.version, local ? null : this.now().toISOString());
+        await this.queue(tx, value, local ? 'upsert' : 'delete', remote.version);
+      }
+      await tx.runAsync(
+        'DELETE FROM sync_conflicts WHERE ownerKey=? AND birthdayId=?',
+        this.ownerKey,
+        birthdayId,
+      );
+    });
+  }
+
+  async guestCount(): Promise<number> {
+    return (
+      (
+        await (
+          await this.db()
+        ).getFirstAsync<{ count: number }>(
+          'SELECT count(*) AS count FROM birthdays WHERE ownerKey=? AND deletedAt IS NULL',
+          GUEST_OWNER,
+        )
+      )?.count ?? 0
+    );
+  }
+
+  async importGuest(): Promise<{ imported: number; skipped: number }> {
+    if (!isAccountOwner(this.ownerKey)) throw new Error('请先登录再合并本机生日');
+    let imported = 0;
+    let skipped = 0;
+    await (
+      await this.db()
+    ).withExclusiveTransactionAsync(async (tx) => {
+      const guests = await tx.getAllAsync<StoredBirthday>(
+        'SELECT * FROM birthdays WHERE ownerKey=? AND deletedAt IS NULL ORDER BY createdAt,id',
+        GUEST_OWNER,
+      );
+      const accountRows = await tx.getAllAsync<StoredBirthday>(
+        'SELECT * FROM birthdays WHERE ownerKey=? AND deletedAt IS NULL',
+        this.ownerKey,
+      );
+      const fingerprints = new Set(accountRows.map((row) => birthdayFingerprint(toBirthday(row))));
+      const ids = new Set(accountRows.map((row) => row.id));
+      for (const guest of guests) {
+        const source = toBirthday(guest);
+        const fingerprint = birthdayFingerprint(source);
+        if (fingerprints.has(fingerprint)) {
+          skipped++;
+          continue;
+        }
+        const row = { ...source, id: ids.has(source.id) ? this.id() : source.id };
+        await putBirthday(tx, this.ownerKey, row);
+        await this.queue(tx, row, 'upsert', 0);
+        ids.add(row.id);
+        fingerprints.add(fingerprint);
+        imported++;
+      }
+    });
+    return { imported, skipped };
+  }
+
+  async clearGuest(): Promise<void> {
+    await (
+      await this.db()
+    ).withExclusiveTransactionAsync(async (tx) => {
+      await tx.runAsync('DELETE FROM birthdays WHERE ownerKey=?', GUEST_OWNER);
+      await tx.runAsync('DELETE FROM sync_outbox WHERE ownerKey=?', GUEST_OWNER);
+      await tx.runAsync('DELETE FROM sync_conflicts WHERE ownerKey=?', GUEST_OWNER);
+    });
+  }
+
+  async clearOwner(ownerKey: string): Promise<void> {
+    if (!isAccountOwner(ownerKey)) throw new Error('只能清理账号缓存');
+    await (
+      await this.db()
+    ).withExclusiveTransactionAsync(async (tx) => {
+      await tx.runAsync('DELETE FROM birthdays WHERE ownerKey=?', ownerKey);
+      await tx.runAsync('DELETE FROM sync_outbox WHERE ownerKey=?', ownerKey);
+      await tx.runAsync('DELETE FROM sync_conflicts WHERE ownerKey=?', ownerKey);
+    });
+  }
+
   async close(): Promise<void> {
     await this.opening;
     await this.database?.closeAsync();

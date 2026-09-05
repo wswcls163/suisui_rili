@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -26,6 +25,8 @@ import { supported } from '../src/core/dates';
 import { MonthCalendar } from '../src/components/MonthCalendar';
 import { Avatar, Button, colors, common, Icon } from '../src/components/ui';
 import { storageDescription } from '../src/data/repository';
+import { useAuth } from '../src/state/AuthProvider';
+import { useAccountSync } from '../src/state/SyncProvider';
 
 function PersonRow({ row }: { row: BirthdayRow }) {
   return (
@@ -53,6 +54,8 @@ function PersonRow({ row }: { row: BirthdayRow }) {
 }
 export default function Home() {
   const state = useBirthdays();
+  const auth = useAuth();
+  const sync = useAccountSync();
   const { width } = useWindowDimensions();
   const wide = width >= 900;
   const [tab, setTab] = useState<'calendar' | 'book'>('calendar');
@@ -78,12 +81,31 @@ export default function Home() {
               <Text style={[common.eyebrow, { fontSize: 8, marginTop: 4 }]}>SUISUI CALENDAR</Text>
             </View>
           </View>
-          <View style={styles.localChip}>
-            <Icon name="shield-checkmark-outline" size={13} color={colors.green} />
-            <Text style={{ fontSize: 11, color: colors.green }}>
-              {Platform.OS === 'web' ? '电脑预览' : '本地保存'}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="账号与同步"
+            onPress={() => router.push('/account')}
+            style={({ pressed }) => [styles.localChip, pressed && { opacity: 0.68 }]}
+          >
+            <Icon
+              name={auth.session ? 'cloud-done-outline' : 'person-outline'}
+              size={15}
+              color={sync.status === 'error' ? colors.error : colors.green}
+            />
+            <Text style={{ fontSize: 11, color: sync.status === 'error' ? colors.error : colors.green }}>
+              {auth.status === 'unconfigured'
+                ? '本地使用'
+                : !auth.session
+                  ? '登录'
+                  : sync.status === 'syncing'
+                    ? '同步中'
+                    : sync.status === 'error'
+                      ? '同步失败'
+                      : sync.status === 'conflict'
+                        ? '待处理'
+                        : '已登录'}
             </Text>
-          </View>
+          </Pressable>
         </View>
         <View style={[common.between, { flexWrap: 'wrap', gap: 20 }]}>
           <View>

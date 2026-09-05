@@ -33,6 +33,7 @@
     "plugins": [
       "expo-router",
       "expo-sqlite",
+      "expo-secure-store",
       [
         "expo-splash-screen",
         { "backgroundColor": "#F5F4F0", "image": "./assets/splash-icon.png", "imageWidth": 120 }

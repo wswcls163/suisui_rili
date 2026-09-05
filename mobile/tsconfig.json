@@ -3,5 +3,6 @@
   "compilerOptions": {
     "strict": true,
     "types": ["react", "react-native", "node", "jest"]
-  }
+  },
+  "exclude": ["supabase/functions"]
 }
