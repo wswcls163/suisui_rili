@@ -76,6 +76,7 @@ export function SyncProvider({
   const [revision, setRevision] = useState(0);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const retryAttempt = useRef(0);
+  const ownerSwitches = useRef<Promise<void>>(Promise.resolve());
 
   const refreshMeta = useCallback(async () => {
     if (!local) return { pending: 0, conflicts: 0 };
@@ -122,22 +123,31 @@ export function SyncProvider({
     if (!local) return;
     let active = true;
     const nextOwner = auth.session ? accountOwner(auth.session.userId) : GUEST_OWNER;
-    void (async () => {
-      try {
-        await local.setOwner(nextOwner);
-        if (!active) return;
-        ownerRef.current = nextOwner;
-        setOwnerKey(nextOwner);
-        setRevision((value) => value + 1);
-        await refreshMeta();
-        if (auth.session) await syncFor(nextOwner);
+    const switchOwner = ownerSwitches.current.then(async () => {
+      if (!active) return false;
+      await local.setOwner(nextOwner);
+      if (!active) return false;
+      ownerRef.current = nextOwner;
+      setOwnerKey(nextOwner);
+      setRevision((value) => value + 1);
+      await refreshMeta();
+      return active;
+    });
+    ownerSwitches.current = switchOwner.then(
+      () => undefined,
+      () => undefined,
+    );
+    void switchOwner
+      .then(async (switched) => {
+        if (!switched || !active) return;
+        if (auth.session) await syncFor(nextOwner).catch(() => {});
         else setStatus('local');
-      } catch (reason) {
+      })
+      .catch((reason) => {
         if (!active) return;
         setError(reason instanceof Error ? reason.message : '无法切换账号数据');
         setStatus('error');
-      }
-    })();
+      });
     return () => {
       active = false;
     };

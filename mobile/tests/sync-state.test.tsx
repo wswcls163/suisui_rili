@@ -63,3 +63,45 @@ test('登录后切换账号数据范围，访客生日确认上传后才清理',
     await Dexie.delete(name);
   }
 });
+
+test('登录后网络同步失败时保留账号数据范围并显示同步错误', async () => {
+  const name = `suisui-sync-network-error-${Date.now()}`;
+  const repo = new WebBirthdayRepository(name);
+  const session = { userId: 'account', email: 'user@example.com' };
+  const service: AuthService = {
+    getSession: jest.fn(async () => session),
+    subscribe: jest.fn(() => jest.fn()),
+    signUp: jest.fn(),
+    signIn: jest.fn(),
+    requestPasswordReset: jest.fn(),
+    updatePassword: jest.fn(),
+    handleCallback: jest.fn(),
+    signOut: jest.fn(),
+    deleteAccount: jest.fn(),
+    startAutoRefresh: jest.fn(),
+    stopAutoRefresh: jest.fn(),
+  };
+  const gateway: RemoteBirthdayGateway = {
+    list: jest.fn(async () => Promise.reject({ message: 'Failed to fetch' })),
+    apply: jest.fn(),
+  };
+  const { result, unmount } = renderHook(useAccountSync, {
+    wrapper: ({ children }) => (
+      <AuthProvider service={service}>
+        <SyncProvider repo={repo} gateway={gateway}>
+          {children}
+        </SyncProvider>
+      </AuthProvider>
+    ),
+  });
+  try {
+    await waitFor(() => expect(result.current.ownerKey).toBe('user:account'));
+    await waitFor(() => expect(gateway.list).toHaveBeenCalled());
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.error).toBe('暂时无法同步，请稍后重试');
+  } finally {
+    unmount();
+    await repo.close();
+    await Dexie.delete(name);
+  }
+});
