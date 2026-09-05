@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { birthdayTitle, occurrenceLabel, type BirthdayEntry } from '../core/birthday';
 import { DAY_NAMES, MONTH_NAMES, lunarCalendar, lunarLabel } from '../core/calendar';
 import { festivalsOn } from '../core/festivals';
@@ -127,14 +128,23 @@ export function MonthCalendar({
                 <View style={styles.birthday}>
                   {birthdays.length > 0 && (
                     <>
-                      <Text
-                        numberOfLines={1}
-                        ellipsizeMode="tail"
-                        style={[styles.event, isSelected && styles.white]}
-                      >
-                        {birthdayTitle(birthdays[0].person.name)}
-                        {birthdays.length > 1 ? ` +${birthdays.length - 1}` : ''}
-                      </Text>
+                      <View style={styles.birthdayName}>
+                        <MaterialCommunityIcons
+                          name="cake-variant"
+                          size={14}
+                          color={isSelected ? '#FFE2AF' : '#B8523E'}
+                          accessible={false}
+                          testID="birthday-cake"
+                        />
+                        <Text
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                          style={[styles.event, isSelected && styles.white]}
+                        >
+                          {birthdayTitle(birthdays[0].person.name)}
+                          {birthdays.length > 1 ? ` +${birthdays.length - 1}` : ''}
+                        </Text>
+                      </View>
                       <View style={styles.birthdayKinds}>
                         {birthdays[0].occurrence.kinds.map((kind) => (
                           <Text key={kind} style={[styles.birthdayKind, isSelected && styles.white]}>
@@ -151,7 +161,10 @@ export function MonthCalendar({
         </View>
       ))}
       <View style={[common.between, { paddingTop: 18, paddingHorizontal: 8, flexWrap: 'wrap' }]}>
-        <Text style={common.muted}>● 有生日　◯ 今天</Text>
+        <View style={common.row}>
+          <MaterialCommunityIcons name="cake-variant" size={16} color={colors.accent} accessible={false} />
+          <Text style={common.muted}>有生日　◯ 今天</Text>
+        </View>
         <Text style={common.muted}>选中日期，再点「＋」新建</Text>
       </View>
       {jump && (
@@ -188,7 +201,8 @@ const styles = StyleSheet.create({
   labelCount: { fontSize: 8, color: colors.accent },
   festival: { color: colors.accent, fontWeight: '600' },
   birthday: { width: '100%', minHeight: 40, marginTop: 4, alignItems: 'center' },
-  event: { fontSize: 10, lineHeight: 13, color: colors.accent, fontWeight: '500', maxWidth: '100%' },
+  birthdayName: { flexDirection: 'row', alignItems: 'center', gap: 2, maxWidth: '100%' },
+  event: { fontSize: 10, lineHeight: 13, color: colors.accent, fontWeight: '500', flexShrink: 1 },
   birthdayKinds: {
     flexDirection: 'row',
     flexWrap: 'wrap',

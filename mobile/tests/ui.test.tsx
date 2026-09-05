@@ -166,6 +166,10 @@ test('节日同日保留生日姓名与完整无障碍日期，选择后显示�
   expect(within(date).getByText('中秋节')).toBeTruthy();
   expect(within(date).getByText('+1')).toBeTruthy();
   expect(within(date).getByText('团圆的生日')).toBeTruthy();
+  expect(within(date).getAllByTestId('birthday-cake')).toHaveLength(1);
+  expect(
+    within(screen.getByRole('button', { name: /2020-10-02，/ })).queryByTestId('birthday-cake'),
+  ).toBeNull();
   fireEvent.press(date);
   expect(screen.getAllByText('中秋节', { exact: true })).toHaveLength(2);
   expect(screen.getByText('国庆节', { exact: true })).toBeTruthy();
@@ -358,6 +362,8 @@ test('同一个人的月历生日按本次发生类型标明阳历和农历，�
   const lunar = screen.getByRole('button', { name: /2027-01-16.*农历生日/ });
   expect(within(solar).getByText('我的生日').props.ellipsizeMode).toBe('tail');
   expect(within(solar).getByText('阳历')).toHaveStyle({ color: '#FFF', fontSize: 10 });
+  expect(within(solar).getByTestId('birthday-cake')).toHaveStyle({ color: '#FFE2AF' });
+  expect(within(lunar).getByTestId('birthday-cake')).toHaveStyle({ color: '#B8523E' });
   expect(within(solar).queryByText('农历')).toBeNull();
   expect(within(lunar).getByText('我的生日')).toBeTruthy();
   expect(within(lunar).getByText('农历')).toBeTruthy();
@@ -394,6 +400,7 @@ test('双生日同一天在提醒、月历和事项中只算一人，生日簿�
   await screen.findByText('今天有 1 位亲友过生日');
   const day = screen.getByRole('button', { name: /2026-09-04.*1 位生日.*农历与阳历生日/ });
   expect(within(day).queryByText(/\+1/)).toBeNull();
+  expect(within(day).getAllByTestId('birthday-cake')).toHaveLength(1);
   expect(within(day).getByText('农历')).toBeTruthy();
   expect(within(day).getByText('阳历')).toBeTruthy();
   expect(screen.getAllByRole('button', { name: '查看亲友a的生日详情' })).toHaveLength(1);
