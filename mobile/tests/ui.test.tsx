@@ -605,6 +605,33 @@ test('首页展示时光记摘要和列表，详情支持编辑入口与确认�
   expect(repo.removeCountup).not.toHaveBeenCalled();
 });
 
+test('首页最多展示三条时光记摘要，并可切换到完整列表', async () => {
+  const repo = memoryRepository(
+    [],
+    [
+      countupFixture('a', { title: '最早的记录', createdAt: '2026-01-01T00:00:00Z' }),
+      countupFixture('b', { title: '第二条记录', createdAt: '2026-02-01T00:00:00Z' }),
+      countupFixture('c', { title: '第三条记录', createdAt: '2026-03-01T00:00:00Z' }),
+      countupFixture('d', { title: '最新的记录', createdAt: '2026-04-01T00:00:00Z' }),
+    ],
+  );
+  render(
+    <AppProvider repo={repo} clock={clock}>
+      <Home />
+    </AppProvider>,
+  );
+  await screen.findByRole('button', { name: '查看时光记最新的记录' });
+  expect(screen.getByRole('button', { name: '查看时光记第三条记录' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: '查看时光记第二条记录' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '查看时光记最早的记录' })).toBeNull();
+
+  fireEvent.press(screen.getByRole('button', { name: '查看全部 4 条时光记' }));
+  expect(screen.getByRole('tab', { name: '时光记 4' }).props.accessibilityState).toEqual({
+    selected: true,
+  });
+  expect(screen.getByRole('button', { name: '查看时光记最早的记录，第 1 天' })).toBeTruthy();
+});
+
 test('每年纪念详情同时展示周年、下一次纪念日和总天数', async () => {
   const repo = memoryRepository(
     [],

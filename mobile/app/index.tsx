@@ -30,6 +30,8 @@ import { storageDescription } from '../src/data/repository';
 import { useAuth } from '../src/state/AuthProvider';
 import { useAccountSync } from '../src/state/SyncProvider';
 
+const COUNTUP_PREVIEW_LIMIT = 3;
+
 function PersonRow({ row }: { row: BirthdayRow }) {
   return (
     <Pressable
@@ -92,6 +94,31 @@ function CountupRow({ item, today }: { item: Countup; today: string }) {
     </Pressable>
   );
 }
+
+function CountupHero({ item, today }: { item: Countup; today: string }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`查看时光记${item.title}`}
+      onPress={() => router.push({ pathname: '/countup/[id]', params: { id: item.id } })}
+      style={({ pressed }) => [styles.countupHero, pressed && { opacity: 0.78 }]}
+    >
+      <View style={styles.countupHeroIcon}>
+        <Icon name="sparkles-outline" size={24} color="#FFF" />
+      </View>
+      <View style={{ flex: 1, gap: 5 }}>
+        <Text style={[common.eyebrow, { color: '#E5D9C9' }]}>
+          {item.displayMode === 'anniversary' ? '值得纪念' : '每天都算数'}
+        </Text>
+        <Text style={[common.heading, { color: '#FFF' }]}>{item.title}</Text>
+        <Text style={{ color: '#E5D9C9', fontSize: 12 }}>从 {item.startDate.replaceAll('-', '.')} 开始</Text>
+      </View>
+      <Text style={styles.countupHeroNumber}>{timeNoteProgressText(item, today)}</Text>
+      <Icon name="chevron-forward" size={18} color="#E5D9C9" />
+    </Pressable>
+  );
+}
+
 export default function Home() {
   const state = useBirthdays();
   const auth = useAuth();
@@ -108,7 +135,7 @@ export default function Home() {
   const selected = entries.filter((entry) => entry.occurrence.solar === state.selectedDate);
   const selectedLunar = lunarCalendar.lunarOn(state.selectedDate);
   const selectedFestivals = festivalsOn(state.selectedDate);
-  const leadingCountup = state.countupRows[0];
+  const countupPreviews = state.countupRows.slice(0, COUNTUP_PREVIEW_LIMIT);
   const create = () => router.push('/new');
   return (
     <SafeAreaView style={common.page}>
@@ -279,32 +306,29 @@ export default function Home() {
                 )}
               </View>
             </View>
-            {leadingCountup && (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`查看时光记${leadingCountup.item.title}`}
-                onPress={() =>
-                  router.push({ pathname: '/countup/[id]', params: { id: leadingCountup.item.id } })
-                }
-                style={({ pressed }) => [styles.countupHero, pressed && { opacity: 0.78 }]}
+            {countupPreviews.length > 0 && (
+              <View
+                accessibilityLabel={`时光记摘要，共 ${state.countupRows.length} 条`}
+                style={styles.countupPreview}
               >
-                <View style={styles.countupHeroIcon}>
-                  <Icon name="sparkles-outline" size={24} color="#FFF" />
-                </View>
-                <View style={{ flex: 1, gap: 5 }}>
-                  <Text style={[common.eyebrow, { color: '#E5D9C9' }]}>
-                    {leadingCountup.item.displayMode === 'anniversary' ? '值得纪念' : '每天都算数'}
-                  </Text>
-                  <Text style={[common.heading, { color: '#FFF' }]}>{leadingCountup.item.title}</Text>
-                  <Text style={{ color: '#E5D9C9', fontSize: 12 }}>
-                    从 {leadingCountup.item.startDate.replaceAll('-', '.')} 开始
-                  </Text>
-                </View>
-                <Text style={styles.countupHeroNumber}>
-                  {timeNoteProgressText(leadingCountup.item, state.today)}
-                </Text>
-                <Icon name="chevron-forward" size={18} color="#E5D9C9" />
-              </Pressable>
+                {state.countupRows.length > 1 && (
+                  <View style={common.between}>
+                    <Text style={common.eyebrow}>时光记 · {state.countupRows.length} 条</Text>
+                    <Button
+                      label={`查看全部 ${state.countupRows.length} 条时光记`}
+                      variant="quiet"
+                      icon="arrow-forward"
+                      onPress={() => {
+                        setTab('countup');
+                        state.refreshToday();
+                      }}
+                    />
+                  </View>
+                )}
+                {countupPreviews.map(({ item }) => (
+                  <CountupHero key={item.id} item={item} today={state.today} />
+                ))}
+              </View>
             )}
             {tab === 'calendar' ? (
               <View style={[styles.workspace, { flexDirection: wide ? 'row' : 'column' }]}>
@@ -530,6 +554,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
   },
+  countupPreview: { gap: 12 },
   countupHeroIcon: {
     width: 48,
     height: 48,
