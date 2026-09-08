@@ -10,9 +10,9 @@ function numericPart(value: string, length: number): string {
 }
 
 function equivalentYears(days: number): string {
-  if (days === 0) return '折合 0 年';
+  if (days === 0) return '0 年';
   const years = Math.abs(days) / AVERAGE_GREGORIAN_YEAR_DAYS;
-  return years < 0.01 ? '折合不足 0.01 年' : `折合约 ${years.toFixed(2)} 年`;
+  return years < 0.01 ? '不足 0.01 年' : `约 ${years.toFixed(2)} 年`;
 }
 
 function readableDate(date: string): string {

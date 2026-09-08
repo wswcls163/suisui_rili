@@ -133,7 +133,7 @@ test('日期计算的月份和日期无需前导零，并立即计算到今天�
   expect(screen.getByLabelText('日期').props.value).toBe('1');
   expect(screen.getByText('2016年7月1日 距今天')).toBeTruthy();
   expect(screen.getByText('已经过去 3721 天')).toBeTruthy();
-  expect(screen.getByText('折合约 10.19 年')).toBeTruthy();
+  expect(screen.getByText('约 10.19 年')).toBeTruthy();
   expect(screen.getByText('仅用于本次查询，不会保存，也不会参与同步。')).toBeTruthy();
   fireEvent.press(screen.getByRole('button', { name: '完成' }));
   expect(close).toHaveBeenCalledTimes(1);
@@ -157,10 +157,10 @@ test('日期计算校验无效日期，并能识别今天和未来日期', () =>
   expect(screen.queryByText(/已经过去/)).toBeNull();
   enterCalculatorDate('2026', '9', '8');
   expect(screen.getByText('就是今天')).toBeTruthy();
-  expect(screen.getByText('折合 0 年')).toBeTruthy();
+  expect(screen.getByText('0 年')).toBeTruthy();
   enterCalculatorDate('2026', '9', '18');
   expect(screen.getByText('距离那天还有 10 天')).toBeTruthy();
-  expect(screen.getByText('折合约 0.03 年')).toBeTruthy();
+  expect(screen.getByText('约 0.03 年')).toBeTruthy();
 });
 test('月历七列、选日回调和多人标记；首尾月份禁止越界', () => {
   const select = jest.fn();
