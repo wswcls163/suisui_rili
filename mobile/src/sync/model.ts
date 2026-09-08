@@ -89,6 +89,7 @@ export function itemFingerprint(value: CalendarItem): string {
         type: 'countup',
         title: (value as Countup).title.trim(),
         startDate: (value as Countup).startDate,
+        displayMode: (value as Countup).displayMode,
       })
     : JSON.stringify({
         type: 'birthday',

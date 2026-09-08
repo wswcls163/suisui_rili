@@ -99,7 +99,7 @@ for (const engine of ['SQLite', 'IndexedDB'] as const) {
   });
 }
 for (const engine of ['SQLite', 'IndexedDB'] as const) {
-  test(`${engine}: 累计日 CRUD、关闭重开与类型隔离`, async () => {
+  test(`${engine}: 时光记 CRUD、展示方式持久化与类型隔离`, async () => {
     const name = engine === 'SQLite' ? join(dir, `countups-${engine}.db`) : `suisui-countups-${Date.now()}`;
     let sequence = 0;
     const make = () =>
@@ -116,9 +116,11 @@ for (const engine of ['SQLite', 'IndexedDB'] as const) {
         title: ' 开始健身 ',
         startDate: '2026-09-05',
         note: ' 每天半小时 ',
+        displayMode: 'anniversary',
       });
       assert.equal(created.title, '开始健身');
       assert.equal(created.note, '每天半小时');
+      assert.equal(created.displayMode, 'anniversary');
       assert.deepEqual(await repo.list(), []);
       await repo.close();
       repo = make();
@@ -128,12 +130,19 @@ for (const engine of ['SQLite', 'IndexedDB'] as const) {
         title: '坚持健身',
         startDate: '2026-09-06',
         note: '',
+        displayMode: 'days',
       });
       assert.equal(updated.createdAt, created.createdAt);
       assert.equal((await repo.listCountups())[0].title, '坚持健身');
       await assert.rejects(
-        repo.createCountup({ type: 'countup', title: '', startDate: '2026-09-05', note: '' }),
-        /累计事项/,
+        repo.createCountup({
+          type: 'countup',
+          title: '',
+          startDate: '2026-09-05',
+          note: '',
+          displayMode: 'days',
+        }),
+        /记录名称/,
       );
       await repo.removeCountup(created.id);
       assert.deepEqual(await repo.listCountups(), []);
@@ -143,6 +152,66 @@ for (const engine of ['SQLite', 'IndexedDB'] as const) {
     }
   });
 }
+
+for (const engine of ['SQLite', 'IndexedDB'] as const) {
+  test(`${engine}: v4 累计日升级为时光记后默认记录天数`, async () => {
+    const name =
+      engine === 'SQLite' ? join(dir, `time-note-upgrade-${engine}.db`) : `suisui-time-note-${Date.now()}`;
+    if (engine === 'SQLite') {
+      const old = sqlite(name);
+      await old.execAsync(`CREATE TABLE birthdays (
+        ownerKey TEXT NOT NULL,id TEXT NOT NULL,itemType TEXT NOT NULL,name TEXT NOT NULL,
+        lunarMonth INTEGER,lunarDay INTEGER,isLeap INTEGER,solarMonth INTEGER,solarDay INTEGER,
+        startDate TEXT,note TEXT NOT NULL,createdAt TEXT NOT NULL,updatedAt TEXT NOT NULL,
+        remoteVersion INTEGER NOT NULL,deletedAt TEXT,PRIMARY KEY(ownerKey,id));
+        INSERT INTO birthdays VALUES (
+          'guest','legacy-time','countup','开始健身',NULL,NULL,NULL,NULL,NULL,
+          '2026-09-05','每天半小时','2026-09-05T00:00:00Z','2026-09-05T00:00:00Z',0,NULL);
+        PRAGMA user_version=4;`);
+      await old.closeAsync();
+    } else {
+      const old = new Dexie(name);
+      old.version(4).stores({
+        birthdays: 'id,ownerKey,itemType,[ownerKey+birthdayId],[ownerKey+createdAt]',
+        sync_outbox: 'storageKey,ownerKey,itemType,operationId,createdAt',
+        sync_conflicts: 'storageKey,ownerKey,itemType,createdAt',
+      });
+      await old.table('birthdays').add({
+        id: 'guest\0legacy-time',
+        birthdayId: 'legacy-time',
+        ownerKey: 'guest',
+        itemType: 'countup',
+        title: '开始健身',
+        startDate: '2026-09-05',
+        note: '每天半小时',
+        createdAt: '2026-09-05T00:00:00Z',
+        updatedAt: '2026-09-05T00:00:00Z',
+        remoteVersion: 0,
+        deletedAt: null,
+      });
+      old.close();
+    }
+
+    const repo =
+      engine === 'SQLite'
+        ? new SqliteBirthdayRepository(
+            async () => sqlite(name),
+            () => 'new',
+          )
+        : new WebBirthdayRepository(name, () => 'new');
+    try {
+      const [record] = await repo.listCountups();
+      assert.equal(record.title, '开始健身');
+      assert.equal(record.startDate, '2026-09-05');
+      assert.equal(record.displayMode, 'days');
+      assert.equal(record.createdAt, '2026-09-05T00:00:00Z');
+    } finally {
+      await repo.close();
+      if (engine === 'IndexedDB') await Dexie.delete(name);
+    }
+  });
+}
+
 test('SQLite: 迁移事务连同版本号回滚，重新打开可以恢复初始化', async () => {
   const file = join(dir, 'migration.db');
   let db = sqlite(file, 'CREATE INDEX');
@@ -152,7 +221,7 @@ test('SQLite: 迁移事务连同版本号回滚，重新打开可以恢复初始
   await db.closeAsync();
   db = sqlite(file);
   await migrateDatabase(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 4);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 5);
   await db.closeAsync();
 });
 test('SQLite: 写入事务失败保留旧记录，数据库约束防止非法原始值', async () => {
@@ -179,7 +248,7 @@ test('SQLite: 更高版本拒绝初始化，已有数据和版本号不变', asy
   const file = join(dir, 'future.db');
   const db = sqlite(file);
   await db.execAsync(
-    "CREATE TABLE future_data(value TEXT); INSERT INTO future_data VALUES ('keep me'); PRAGMA user_version=5;",
+    "CREATE TABLE future_data(value TEXT); INSERT INTO future_data VALUES ('keep me'); PRAGMA user_version=6;",
   );
   const repo = new SqliteBirthdayRepository(
     async () => sqlite(file),
@@ -190,13 +259,13 @@ test('SQLite: 更高版本拒绝初始化，已有数据和版本号不变', asy
     (await db.getFirstAsync<{ value: string }>('SELECT value FROM future_data'))?.value,
     'keep me',
   );
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 5);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 6);
   await db.closeAsync();
 });
 test('IndexedDB: 更高版本拒绝写入，保留已有记录', async () => {
   const name = `suisui-future-${Date.now()}`;
   const future = new Dexie(name);
-  future.version(5).stores({ birthdays: 'id,createdAt', extra: 'id' });
+  future.version(6).stores({ birthdays: 'id,createdAt', extra: 'id' });
   await future.open();
   await future.table('extra').add({ id: 'keep' });
   future.close();

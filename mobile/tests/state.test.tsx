@@ -146,7 +146,7 @@ test('后台恢复、首页刷新和成功写入都会重新读取时钟', async
   subscription.mockRestore();
 });
 
-test('累计日增删改与北京时间刷新同步更新天数', async () => {
+test('时光记增删改与北京时间刷新同步更新天数', async () => {
   let value = Date.parse('2026-09-05T04:00:00Z');
   const subscription = jest.spyOn(AppState, 'addEventListener').mockReturnValue({ remove: jest.fn() });
   const repo = memoryRepository([], [countupFixture('fitness', { title: '健身', startDate: '2026-09-05' })]);
@@ -160,16 +160,16 @@ test('累计日增删改与北京时间刷新同步更新天数', async () => {
 
   await act(() =>
     result.current.saveCountup(
-      { type: 'countup', title: '晨跑', startDate: '2026-09-08', note: '三公里' },
+      { type: 'countup', title: '晨跑', startDate: '2026-09-08', note: '三公里', displayMode: 'days' },
       'fitness',
     ),
   );
-  expect(result.current.notice).toBe('已保存「晨跑」累计日');
+  expect(result.current.notice).toBe('已保存时光记「晨跑」');
   expect(result.current.countupRows[0].progress).toEqual({ phase: 'upcoming', remaining: 2 });
 
   await act(() => result.current.removeCountup('fitness'));
   expect(result.current.countups).toEqual([]);
-  expect(result.current.notice).toBe('累计日已删除');
+  expect(result.current.notice).toBe('时光记已删除');
   unmount();
   subscription.mockRestore();
 });

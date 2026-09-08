@@ -22,6 +22,7 @@ type BirthdayRow = {
   solar_day: number | null;
   start_date?: string | null;
   note?: string | null;
+  display_mode?: 'days' | 'anniversary';
   created_at: string;
   updated_at: string;
   version: number;
@@ -36,6 +37,7 @@ function fromRow(row: BirthdayRow): RemoteItem {
           title: row.name,
           startDate: row.start_date,
           note: row.note ?? '',
+          displayMode: row.display_mode ?? 'days',
         })
       : normalizeDraft({
           name: row.name,
@@ -66,6 +68,7 @@ function payload(mutation: SyncMutation) {
       name: countup.title,
       start_date: countup.startDate,
       note: countup.note,
+      display_mode: countup.displayMode,
       lunar_month: null,
       lunar_day: null,
       is_leap: null,
@@ -84,11 +87,20 @@ function payload(mutation: SyncMutation) {
     solar_day: birthday.solar?.day ?? null,
     start_date: null,
     note: '',
+    display_mode: 'days',
   };
 }
 
 export class SupabaseBirthdayGateway implements RemoteBirthdayGateway {
   constructor(private client: SupabaseClient) {}
+
+  private async requireTimeNoteModes(): Promise<void> {
+    const { error } = await this.client.from('birthdays').select('display_mode').limit(1);
+    if (!error) return;
+    if (error.code === '42703' || error.code === 'PGRST204')
+      throw new Error('云端尚未支持“每年纪念”，请先应用最新数据库迁移');
+    throw error;
+  }
 
   async list(): Promise<RemoteItem[]> {
     const { data, error } = await this.client.from('birthdays').select('*').order('created_at');
@@ -97,6 +109,12 @@ export class SupabaseBirthdayGateway implements RemoteBirthdayGateway {
   }
 
   async apply(mutation: SyncMutation): Promise<ApplyMutationResult> {
+    if (
+      mutation.payload &&
+      itemType(mutation.payload) === 'countup' &&
+      (mutation.payload as Countup).displayMode === 'anniversary'
+    )
+      await this.requireTimeNoteModes();
     const { data, error } = await this.client.rpc('apply_birthday_mutation', {
       p_operation_id: mutation.operationId,
       p_birthday_id: mutation.birthdayId,
@@ -108,6 +126,14 @@ export class SupabaseBirthdayGateway implements RemoteBirthdayGateway {
     const result = data as { status?: string; record?: BirthdayRow } | null;
     if (!result?.record || (result.status !== 'applied' && result.status !== 'conflict'))
       throw new Error('云端没有返回有效的同步结果');
+    if (
+      result.status === 'applied' &&
+      mutation.payload &&
+      itemType(mutation.payload) === 'countup' &&
+      (mutation.payload as Countup).displayMode === 'anniversary' &&
+      result.record.display_mode !== 'anniversary'
+    )
+      throw new Error('云端尚未支持“每年纪念”，请先应用最新数据库迁移');
     return { status: result.status, record: fromRow(result.record) };
   }
 }

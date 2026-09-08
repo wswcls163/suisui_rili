@@ -90,7 +90,7 @@ test('访客范围不会访问云端', async () => {
   }
 });
 
-test('累计日通过同一离线队列上传并拉取', async () => {
+test('时光记的展示方式通过同一离线队列上传并拉取', async () => {
   const name = `suisui-sync-countup-${Date.now()}`;
   let sequence = 0;
   const repo = new WebBirthdayRepository(name, () => `countup-sync-${++sequence}`);
@@ -102,6 +102,7 @@ test('累计日通过同一离线队列上传并拉取', async () => {
       title: '坚持健身',
       startDate: '2026-09-05',
       note: '每天半小时',
+      displayMode: 'anniversary',
     });
     assert.equal((await repo.pending())[0].itemType, 'countup');
     assert.deepEqual(await new SyncCoordinator(repo, gateway).sync('user:countup'), {
@@ -112,6 +113,7 @@ test('累计日通过同一离线队列上传并拉取', async () => {
     const remote = gateway.records.get(local.id);
     assert.ok(remote && 'title' in remote);
     assert.equal(remote.title, '坚持健身');
+    assert.equal(remote.displayMode, 'anniversary');
     assert.equal((await repo.listCountups())[0].startDate, '2026-09-05');
     assert.deepEqual(await repo.list(), []);
   } finally {

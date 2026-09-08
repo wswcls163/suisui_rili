@@ -14,9 +14,10 @@ export const fixture = (id: string, values: Partial<Birthday> = {}): Birthday =>
 export const countupFixture = (id: string, values: Partial<Countup> = {}): Countup => ({
   id,
   type: 'countup',
-  title: `累计事项${id}`,
+  title: `时光记录${id}`,
   startDate: '2026-09-04',
   note: '',
+  displayMode: 'days',
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
   ...values,

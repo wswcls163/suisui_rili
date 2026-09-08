@@ -1,7 +1,7 @@
 import { Dexie, type Table } from 'dexie';
 import type { Birthday, BirthdayDraft } from '../core/birthday';
 import { normalizeDraft } from '../core/birthday';
-import type { Countup, CountupDraft } from '../core/countup';
+import type { Countup, CountupDisplayMode, CountupDraft } from '../core/countup';
 import { normalizeCountupDraft } from '../core/countup';
 import {
   GUEST_OWNER,
@@ -27,6 +27,7 @@ type StoredItem = {
   title?: string;
   startDate?: string;
   note?: string;
+  displayMode?: CountupDisplayMode;
   createdAt: string;
   updatedAt: string;
   remoteVersion: number;
@@ -48,6 +49,7 @@ function toItem(row: StoredItem): CalendarItem {
           title: row.title,
           startDate: row.startDate,
           note: row.note ?? '',
+          displayMode: row.displayMode ?? 'days',
         })
       : normalizeDraft(row);
   return { ...draft, id: row.birthdayId, createdAt: row.createdAt, updatedAt: row.updatedAt };
@@ -135,6 +137,22 @@ export class WebBirthdayRepository implements SyncBirthdayRepository {
             row.itemType = 'birthday';
           }),
       );
+    this.db
+      .version(5)
+      .stores({
+        birthdays: 'id,ownerKey,itemType,[ownerKey+birthdayId],[ownerKey+createdAt]',
+        sync_outbox: 'storageKey,ownerKey,itemType,operationId,createdAt',
+        sync_conflicts: 'storageKey,ownerKey,itemType,createdAt',
+      })
+      .upgrade((tx) =>
+        tx
+          .table('birthdays')
+          .where('itemType')
+          .equals('countup')
+          .modify((row) => {
+            row.displayMode = 'days';
+          }),
+      );
     this.birthdays = this.db.table('birthdays');
     this.outbox = this.db.table('sync_outbox');
     this.conflictTable = this.db.table('sync_conflicts');
@@ -142,7 +160,7 @@ export class WebBirthdayRepository implements SyncBirthdayRepository {
 
   async initialize(): Promise<void> {
     await this.db.open();
-    if (this.db.backendDB().version > 40) {
+    if (this.db.backendDB().version > 50) {
       this.db.close();
       throw new Error('数据来自更新版本，请先升级应用。现有数据未被修改。');
     }
@@ -239,7 +257,7 @@ export class WebBirthdayRepository implements SyncBirthdayRepository {
     return this.db.transaction('rw', this.birthdays, this.outbox, async () => {
       const old = await this.row(id);
       if (!old || old.deletedAt || old.itemType !== 'countup')
-        throw new Error('这条累计日已不存在，请返回累计日列表刷新');
+        throw new Error('这条时光记已不存在，请返回时光记列表刷新');
       const row = { ...(toItem(old) as Countup), ...draft, updatedAt: this.now().toISOString() };
       await this.birthdays.put(stored(this.ownerKey, row, old.remoteVersion));
       if (isAccountOwner(this.ownerKey)) await this.queue(row, 'upsert', old.remoteVersion);
@@ -252,7 +270,7 @@ export class WebBirthdayRepository implements SyncBirthdayRepository {
     await this.db.transaction('rw', this.birthdays, this.outbox, async () => {
       const old = await this.row(id);
       if (!old || old.deletedAt || old.itemType !== 'countup')
-        throw new Error('这条累计日已不存在，请返回累计日列表刷新');
+        throw new Error('这条时光记已不存在，请返回时光记列表刷新');
       if (!isAccountOwner(this.ownerKey) || old.remoteVersion === 0) {
         await this.outbox.delete(key(this.ownerKey, id));
         await this.birthdays.delete(old.id);

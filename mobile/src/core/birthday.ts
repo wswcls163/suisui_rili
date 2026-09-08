@@ -45,8 +45,7 @@ export function normalizeDraft(value: unknown): BirthdayDraft {
 export const EVENT_TYPES = [
   { id: 'birthday', label: '生日', available: true },
   { id: 'schedule', label: '普通日程', available: false },
-  { id: 'countup', label: '累计日', available: true },
-  { id: 'anniversary', label: '纪念日', available: false },
+  { id: 'countup', label: '时光记', available: true },
   { id: 'countdown', label: '倒数日', available: false },
 ] as const;
 export function requireBirthdayType(type: string): void {

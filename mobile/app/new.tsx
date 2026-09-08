@@ -24,7 +24,7 @@ export default function NewBirthday() {
             <Text accessibilityRole="header" style={common.title}>
               新建事项
             </Text>
-            <Text style={common.muted}>记生日，也记录一件事从哪一天开始。</Text>
+            <Text style={common.muted}>记生日，也用时光记留下一件事的开始。</Text>
           </View>
           <View style={common.card}>
             {state.status === 'error' ? (

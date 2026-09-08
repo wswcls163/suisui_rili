@@ -25,7 +25,13 @@ import {
   untilMidnight,
 } from '../src/core/dates';
 import { TodayWatcher } from '../src/core/clock';
-import { countupProgress, countupProgressText, normalizeCountupDraft } from '../src/core/countup';
+import {
+  anniversaryProgress,
+  countupProgress,
+  countupProgressText,
+  normalizeCountupDraft,
+  timeNoteProgressText,
+} from '../src/core/countup';
 
 const draft: BirthdayDraft = { name: '妈妈', lunar: { month: 2, day: 1, isLeap: false }, solar: null };
 const person = (id: string, value = draft): Birthday => ({
@@ -35,7 +41,7 @@ const person = (id: string, value = draft): Birthday => ({
   updatedAt: '2026-01-01T00:00:00Z',
 });
 
-describe('累计日规则', () => {
+describe('时光记规则', () => {
   test('开始当天为第 1 天，跨月和跨年按自然日每天递增', () => {
     expect(countupProgress('2026-09-05', '2026-09-05')).toEqual({
       phase: 'active',
@@ -62,6 +68,7 @@ describe('累计日规则', () => {
       title: '开始健身',
       startDate: '2026-09-08',
       note: '每天半小时',
+      displayMode: 'days',
     });
     expect(countupProgressText(item, '2026-09-05')).toBe('3 天后开始');
     expect(countupProgressText(item, '2026-09-08')).toBe('第 1 天');
@@ -70,7 +77,7 @@ describe('累计日规则', () => {
   test('拒绝空标题、越界日期和过长备注', () => {
     expect(() =>
       normalizeCountupDraft({ type: 'countup', title: ' ', startDate: '2026-09-05', note: '' }),
-    ).toThrow('累计事项');
+    ).toThrow('记录名称');
     expect(() =>
       normalizeCountupDraft({ type: 'countup', title: '健身', startDate: '2101-01-01', note: '' }),
     ).toThrow('1901—2100');
@@ -82,6 +89,47 @@ describe('累计日规则', () => {
         note: '记'.repeat(121),
       }),
     ).toThrow('120');
+  });
+
+  test('每年纪念显示周年和下一次纪念日倒计时', () => {
+    const item = normalizeCountupDraft({
+      type: 'countup',
+      title: '我们在一起',
+      startDate: '2025-09-05',
+      note: '',
+      displayMode: 'anniversary',
+    });
+    expect(timeNoteProgressText(item, '2026-09-04')).toBe('距 1 周年 1 天');
+    expect(timeNoteProgressText(item, '2026-09-05')).toBe('1 周年');
+    expect(anniversaryProgress(item.startDate, '2026-09-05')).toEqual({
+      phase: 'active',
+      years: 1,
+      isAnniversary: true,
+      nextYears: 2,
+      nextDate: '2027-09-05',
+      remaining: 365,
+    });
+    expect(timeNoteProgressText(item, '2026-09-06')).toBe('距 2 周年 364 天');
+  });
+
+  test('2 月 29 日在平年按 2 月 28 日纪念，开始当天不显示零周年', () => {
+    expect(anniversaryProgress('2024-02-29', '2025-02-28')).toMatchObject({
+      phase: 'active',
+      years: 1,
+      isAnniversary: true,
+    });
+    expect(
+      timeNoteProgressText(
+        {
+          type: 'countup',
+          title: '特别的一天',
+          startDate: '2024-02-29',
+          note: '',
+          displayMode: 'anniversary',
+        },
+        '2024-02-29',
+      ),
+    ).toBe('今天开始');
   });
 });
 

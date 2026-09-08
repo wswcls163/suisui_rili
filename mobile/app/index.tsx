@@ -22,7 +22,7 @@ import {
 import { lunarCalendar, lunarLabel } from '../src/core/calendar';
 import { festivalsOn } from '../src/core/festivals';
 import { supported } from '../src/core/dates';
-import type { Countup, CountupProgress } from '../src/core/countup';
+import { anniversaryProgress, timeNoteProgressText, type Countup } from '../src/core/countup';
 import { MonthCalendar } from '../src/components/MonthCalendar';
 import { Avatar, Button, colors, common, Icon } from '../src/components/ui';
 import { storageDescription } from '../src/data/repository';
@@ -54,13 +54,20 @@ function PersonRow({ row }: { row: BirthdayRow }) {
   );
 }
 
-function CountupRow({ item, progress }: { item: Countup; progress: CountupProgress }) {
+function CountupRow({ item, today }: { item: Countup; today: string }) {
+  const progressText = timeNoteProgressText(item, today);
+  const anniversary = item.displayMode === 'anniversary' ? anniversaryProgress(item.startDate, today) : null;
+  const listText =
+    anniversary?.phase === 'active' &&
+    !anniversary.isAnniversary &&
+    anniversary.nextYears !== null &&
+    anniversary.remaining !== null
+      ? `距 ${anniversary.nextYears} 周年\n${anniversary.remaining} 天`
+      : progressText;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`查看累计日${item.title}，${
-        progress.phase === 'active' ? `第 ${progress.day} 天` : `${progress.remaining} 天后开始`
-      }`}
+      accessibilityLabel={`查看时光记${item.title}，${progressText}`}
       onPress={() => router.push({ pathname: '/countup/[id]', params: { id: item.id } })}
       style={({ pressed }) => [styles.person, pressed && { backgroundColor: '#FAF8F4' }]}
     >
@@ -69,16 +76,17 @@ function CountupRow({ item, progress }: { item: Countup; progress: CountupProgre
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
         <Text style={styles.personName}>{item.title}</Text>
-        <Text style={common.muted}>从 {item.startDate.replaceAll('-', '.')} 开始</Text>
+        <Text style={common.muted}>
+          {item.displayMode === 'anniversary' ? '每年纪念' : '记录天数'} · 从{' '}
+          {item.startDate.replaceAll('-', '.')} 开始
+        </Text>
         {!!item.note && (
           <Text numberOfLines={1} style={common.muted}>
             {item.note}
           </Text>
         )}
       </View>
-      <Text style={[styles.countupNumber, progress.phase === 'upcoming' && { color: colors.green }]}>
-        {progress.phase === 'active' ? `第 ${progress.day} 天` : `${progress.remaining} 天后`}
-      </Text>
+      <Text style={styles.countupNumber}>{listText}</Text>
       <Icon name="chevron-forward" size={16} color="#9BA19B" />
     </Pressable>
   );
@@ -149,7 +157,7 @@ export default function Home() {
               [
                 { key: 'calendar', label: '日历', icon: 'calendar-outline' },
                 { key: 'book', label: `生日簿 ${state.people.length}`, icon: 'book-outline' },
-                { key: 'countup', label: `累计日 ${state.countups.length}`, icon: 'sparkles-outline' },
+                { key: 'countup', label: `时光记 ${state.countups.length}`, icon: 'sparkles-outline' },
               ] as const
             ).map((item) => (
               <Pressable
@@ -264,7 +272,7 @@ export default function Home() {
             {leadingCountup && (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`查看累计日${leadingCountup.item.title}`}
+                accessibilityLabel={`查看时光记${leadingCountup.item.title}`}
                 onPress={() =>
                   router.push({ pathname: '/countup/[id]', params: { id: leadingCountup.item.id } })
                 }
@@ -274,16 +282,16 @@ export default function Home() {
                   <Icon name="sparkles-outline" size={24} color="#FFF" />
                 </View>
                 <View style={{ flex: 1, gap: 5 }}>
-                  <Text style={[common.eyebrow, { color: '#E5D9C9' }]}>每天都算数</Text>
+                  <Text style={[common.eyebrow, { color: '#E5D9C9' }]}>
+                    {leadingCountup.item.displayMode === 'anniversary' ? '值得纪念' : '每天都算数'}
+                  </Text>
                   <Text style={[common.heading, { color: '#FFF' }]}>{leadingCountup.item.title}</Text>
                   <Text style={{ color: '#E5D9C9', fontSize: 12 }}>
                     从 {leadingCountup.item.startDate.replaceAll('-', '.')} 开始
                   </Text>
                 </View>
                 <Text style={styles.countupHeroNumber}>
-                  {leadingCountup.progress.phase === 'active'
-                    ? `第 ${leadingCountup.progress.day} 天`
-                    : `${leadingCountup.progress.remaining} 天后开始`}
+                  {timeNoteProgressText(leadingCountup.item, state.today)}
                 </Text>
                 <Icon name="chevron-forward" size={18} color="#E5D9C9" />
               </Pressable>
@@ -414,26 +422,26 @@ export default function Home() {
             ) : (
               <View style={{ gap: 16 }}>
                 <View style={common.between}>
-                  <Text style={common.muted}>开始当天为第 1 天，每天自动更新</Text>
-                  <Button label="新建累计日" icon="add" onPress={create} />
+                  <Text style={common.muted}>记录天数或周年，时间会自动更新</Text>
+                  <Button label="新建时光记" icon="add" onPress={create} />
                 </View>
                 <View style={[common.card, { padding: state.countups.length ? 4 : 28 }]}>
                   {state.countupRows.length ? (
-                    state.countupRows.map(({ item, progress }) => (
-                      <CountupRow key={item.id} item={item} progress={progress} />
+                    state.countupRows.map(({ item }) => (
+                      <CountupRow key={item.id} item={item} today={state.today} />
                     ))
                   ) : (
                     <View style={[styles.emptyDay, { gap: 15 }]}>
                       <Icon name="sparkles-outline" size={40} color={colors.accent} />
-                      <Text style={common.heading}>还没有累计日</Text>
+                      <Text style={common.heading}>还没有时光记</Text>
                       <Text style={[common.muted, { textAlign: 'center' }]}>
-                        记录一件正在坚持的事，{`\n`}看时间慢慢长大。
+                        记录一件正在发生的事，{`\n`}看时光慢慢留下痕迹。
                       </Text>
-                      <Button label="添加第一个累计日" icon="add" onPress={create} />
+                      <Button label="添加第一条时光记" icon="add" onPress={create} />
                     </View>
                   )}
                 </View>
-                <Text style={common.muted}>适合健身、学习、戒烟、恋爱或任何值得累计的开始。</Text>
+                <Text style={common.muted}>适合健身、学习、恋爱、结婚或任何值得记住的开始。</Text>
               </View>
             )}
           </>
@@ -517,7 +525,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  countupHeroNumber: { color: '#FFF', fontSize: 21, fontWeight: '700' },
+  countupHeroNumber: { color: '#FFF', fontSize: 21, fontWeight: '700', flexShrink: 1, textAlign: 'right' },
   countupIcon: {
     width: 44,
     height: 44,
@@ -526,7 +534,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  countupNumber: { fontSize: 16, fontWeight: '700', color: colors.accent },
+  countupNumber: {
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '700',
+    color: colors.accent,
+    textAlign: 'right',
+  },
   workspace: { gap: 22, alignItems: 'stretch' },
   add: {
     width: 46,

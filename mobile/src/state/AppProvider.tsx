@@ -132,7 +132,7 @@ function useAppState(repo: AppRepository, clock: Clock, syncRevision: number, sc
           id ? current.map((item) => (item.id === id ? row : item)) : [...current, row],
         );
         refreshToday();
-        setNotice(`已保存「${row.title}」累计日`);
+        setNotice(`已保存时光记「${row.title}」`);
         scheduleSync();
       } finally {
         writing.current = false;
@@ -150,7 +150,7 @@ function useAppState(repo: AppRepository, clock: Clock, syncRevision: number, sc
         await repo.removeCountup(id);
         setCountups((current) => current.filter((item) => item.id !== id));
         refreshToday();
-        setNotice('累计日已删除');
+        setNotice('时光记已删除');
         scheduleSync();
       } finally {
         writing.current = false;

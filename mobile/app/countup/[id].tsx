@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { CountupForm } from '../../src/components/CountupForm';
 import { Button, colors, common, Dialog, Icon } from '../../src/components/ui';
-import { countupProgress } from '../../src/core/countup';
+import { anniversaryProgress, countupProgress, timeNoteProgressText } from '../../src/core/countup';
 import { useBirthdays } from '../../src/state/AppProvider';
 
 export default function CountupDetails() {
@@ -17,6 +17,8 @@ export default function CountupDetails() {
   useFocusEffect(state.refreshToday);
   const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
   const progress = item ? countupProgress(item.startDate, state.today) : null;
+  const anniversary =
+    item?.displayMode === 'anniversary' ? anniversaryProgress(item.startDate, state.today) : null;
   return (
     <SafeAreaView style={common.page}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -35,7 +37,7 @@ export default function CountupDetails() {
             <Text style={common.eyebrow}>岁岁日历</Text>
           </View>
           <Text accessibilityRole="header" style={common.title}>
-            {editing ? '编辑累计日' : '累计日详情'}
+            {editing ? '编辑时光记' : '时光记详情'}
           </Text>
           {state.status === 'loading' ? (
             <ActivityIndicator color={colors.accent} />
@@ -48,7 +50,7 @@ export default function CountupDetails() {
             </View>
           ) : !item || !progress ? (
             <View style={[common.card, { gap: 16 }]}>
-              <Text style={common.body}>这条累计日已不存在。</Text>
+              <Text style={common.body}>这条时光记已不存在。</Text>
               <Button label="回到日历" onPress={() => router.replace('/')} />
             </View>
           ) : editing ? (
@@ -80,10 +82,24 @@ export default function CountupDetails() {
                 >
                   <Icon name="sparkles-outline" color={colors.accent} size={32} />
                 </View>
+                <Text style={[common.eyebrow, { color: colors.accent }]}>
+                  {item.displayMode === 'anniversary' ? '每年纪念' : '记录天数'}
+                </Text>
                 <Text style={common.title}>{item.title}</Text>
                 <Text style={[common.title, { color: colors.accent, fontSize: 36 }]}>
-                  {progress.phase === 'active' ? `第 ${progress.day} 天` : `${progress.remaining} 天后开始`}
+                  {timeNoteProgressText(item, state.today)}
                 </Text>
+                {anniversary?.phase === 'active' && anniversary.isAnniversary && anniversary.nextDate && (
+                  <Text style={common.muted}>
+                    下一次 · {anniversary.nextDate.replaceAll('-', '.')} · {anniversary.remaining} 天后
+                  </Text>
+                )}
+                {anniversary?.phase === 'active' && !anniversary.isAnniversary && anniversary.years > 0 && (
+                  <Text style={common.muted}>已经走过 {anniversary.years} 年</Text>
+                )}
+                {item.displayMode === 'anniversary' && progress.phase === 'active' && (
+                  <Text style={common.muted}>从开始至今 · 第 {progress.day} 天</Text>
+                )}
                 <Text style={common.muted}>开始日期 · {item.startDate.replaceAll('-', '.')}</Text>
               </View>
               {!!item.note && (
@@ -94,7 +110,7 @@ export default function CountupDetails() {
               )}
               <View style={common.between}>
                 <Button
-                  label="删除累计日"
+                  label="删除时光记"
                   variant="quiet"
                   icon="trash-outline"
                   onPress={() => {
@@ -102,7 +118,7 @@ export default function CountupDetails() {
                     setConfirming(true);
                   }}
                 />
-                <Button label="编辑累计日" icon="create-outline" onPress={() => setEditing(true)} />
+                <Button label="编辑时光记" icon="create-outline" onPress={() => setEditing(true)} />
               </View>
               <Dialog
                 title={`删除「${item.title}」？`}
@@ -111,7 +127,7 @@ export default function CountupDetails() {
                   if (!state.busy) setConfirming(false);
                 }}
               >
-                <Text style={[common.body, { marginBottom: 20 }]}>删除后，这项累计记录将不再显示。</Text>
+                <Text style={[common.body, { marginBottom: 20 }]}>删除后，这条时光记将不再显示。</Text>
                 {!!error && (
                   <Text accessibilityRole="alert" style={[common.error, { marginBottom: 15 }]}>
                     {error}

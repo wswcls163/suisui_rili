@@ -12,6 +12,10 @@ const countupMigration = readFileSync(
   join(root, 'supabase', 'migrations', '202609050002_countups.sql'),
   'utf8',
 );
+const timeNoteMigration = readFileSync(
+  join(root, 'supabase', 'migrations', '202609050003_time_notes.sql'),
+  'utf8',
+);
 const deletionFunction = readFileSync(
   join(root, 'supabase', 'functions', 'delete-account', 'index.ts'),
   'utf8',
@@ -38,7 +42,7 @@ test('同步 RPC 同时校验版本、幂等操作号并串行处理同一生日
   assert.match(migration, /'status', 'applied'/i);
 });
 
-test('累计日迁移保留账号隔离，并由同一幂等 RPC 校验类型数据', () => {
+test('时光记基础迁移保留账号隔离，并由同一幂等 RPC 校验类型数据', () => {
   assert.match(countupMigration, /add column if not exists item_type/i);
   assert.match(countupMigration, /item_type in \('birthday', 'countup'\)/i);
   assert.match(countupMigration, /item_type = 'countup' and start_date is not null/i);
@@ -46,6 +50,16 @@ test('累计日迁移保留账号隔离，并由同一幂等 RPC 校验类型数
   assert.match(countupMigration, /where user_id = v_user and id = p_birthday_id/i);
   assert.match(countupMigration, /sync_operations/i);
   assert.match(countupMigration, /grant execute[\s\S]+to authenticated/i);
+});
+
+test('时光记展示方式迁移只允许记录天数或每年纪念，并进入幂等 RPC', () => {
+  assert.match(timeNoteMigration, /add column if not exists display_mode/i);
+  assert.match(timeNoteMigration, /display_mode in \('days', 'anniversary'\)/i);
+  assert.match(timeNoteMigration, /item_type = 'birthday' and display_mode = 'days'/i);
+  assert.match(timeNoteMigration, /coalesce\(p_payload->>'display_mode', 'days'\)/i);
+  assert.match(timeNoteMigration, /display_mode = excluded\.display_mode/i);
+  assert.match(timeNoteMigration, /where user_id = v_user and id = p_birthday_id/i);
+  assert.match(timeNoteMigration, /grant execute[\s\S]+to authenticated/i);
 });
 
 test('注销函数先验证当前会话，服务端密钥只用于删除该用户', () => {

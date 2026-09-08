@@ -81,20 +81,39 @@ test('编辑回填原始闰月三十，预览调整不改变原始输入', () =>
   expect(screen.getByText('2025.03.28')).toBeTruthy();
   expect(screen.getByText('本月只有二十九天，提前到二十九提醒')).toBeTruthy();
 });
-test('累计日表单预填开始日期，当天为第 1 天并保存通用事项', async () => {
+test('时光记默认记录天数，预填开始日期并保存', async () => {
   const save = jest.fn(async () => {});
   render(<CountupForm selectedDate="2026-09-04" today="2026-09-04" onSave={save} onCancel={() => {}} />);
   expect(screen.getByText('第 1 天')).toBeTruthy();
   expect(screen.getByRole('button', { name: '选择开始日期：2026.09.04' })).toBeTruthy();
-  fireEvent.changeText(screen.getByLabelText('累计事项'), ' 开始健身 ');
-  fireEvent.changeText(screen.getByLabelText('累计日备注'), ' 每天半小时 ');
-  fireEvent.press(screen.getByRole('button', { name: '保存累计日' }));
+  fireEvent.changeText(screen.getByLabelText('记录名称'), ' 开始健身 ');
+  fireEvent.changeText(screen.getByLabelText('时光记备注'), ' 每天半小时 ');
+  fireEvent.press(screen.getByRole('button', { name: '保存时光记' }));
   await waitFor(() =>
     expect(save).toHaveBeenCalledWith({
       type: 'countup',
       title: '开始健身',
       startDate: '2026-09-04',
       note: '每天半小时',
+      displayMode: 'days',
+    }),
+  );
+});
+
+test('时光记可切换为每年纪念并预览周年', async () => {
+  const save = jest.fn(async () => {});
+  render(<CountupForm selectedDate="2025-09-04" today="2026-09-04" onSave={save} onCancel={() => {}} />);
+  fireEvent.press(screen.getByRole('button', { name: '每年纪念' }));
+  expect(screen.getByText('1 周年')).toBeTruthy();
+  fireEvent.changeText(screen.getByLabelText('记录名称'), ' 我们在一起 ');
+  fireEvent.press(screen.getByRole('button', { name: '保存时光记' }));
+  await waitFor(() =>
+    expect(save).toHaveBeenCalledWith({
+      type: 'countup',
+      title: '我们在一起',
+      startDate: '2025-09-04',
+      note: '',
+      displayMode: 'anniversary',
     }),
   );
 });
@@ -496,7 +515,7 @@ test('详情删除需要确认，取消不写库；失败保留记录，成功�
   expect(repo.remove).toHaveBeenCalledTimes(2);
 });
 
-test('首页展示累计日摘要和列表，详情支持编辑入口与确认删除', async () => {
+test('首页展示时光记摘要和列表，详情支持编辑入口与确认删除', async () => {
   const repo = memoryRepository(
     [],
     [countupFixture('a', { title: '开始健身', startDate: '2026-09-04', note: '每天半小时' })],
@@ -506,11 +525,11 @@ test('首页展示累计日摘要和列表，详情支持编辑入口与确认�
       <Home />
     </AppProvider>,
   );
-  await screen.findByRole('button', { name: '查看累计日开始健身' });
+  await screen.findByRole('button', { name: '查看时光记开始健身' });
   expect(screen.getByText('第 1 天')).toBeTruthy();
-  fireEvent.press(screen.getByRole('tab', { name: '累计日 1' }));
+  fireEvent.press(screen.getByRole('tab', { name: '时光记 1' }));
   expect(screen.getByText('每天半小时')).toBeTruthy();
-  fireEvent.press(screen.getByRole('button', { name: '查看累计日开始健身，第 1 天' }));
+  fireEvent.press(screen.getByRole('button', { name: '查看时光记开始健身，第 1 天' }));
   expect(router.push).toHaveBeenCalledWith({ pathname: '/countup/[id]', params: { id: 'a' } });
   home.unmount();
 
@@ -519,10 +538,25 @@ test('首页展示累计日摘要和列表，详情支持编辑入口与确认�
       <CountupDetails />
     </AppProvider>,
   );
-  await screen.findByRole('button', { name: '编辑累计日' });
+  await screen.findByRole('button', { name: '编辑时光记' });
   expect(screen.getByText('开始日期 · 2026.09.04')).toBeTruthy();
-  fireEvent.press(screen.getByRole('button', { name: '删除累计日' }));
-  expect(screen.getByText('删除后，这项累计记录将不再显示。')).toBeTruthy();
+  fireEvent.press(screen.getByRole('button', { name: '删除时光记' }));
+  expect(screen.getByText('删除后，这条时光记将不再显示。')).toBeTruthy();
   fireEvent.press(screen.getByRole('button', { name: '取消' }));
   expect(repo.removeCountup).not.toHaveBeenCalled();
+});
+
+test('每年纪念详情同时展示周年、下一次纪念日和总天数', async () => {
+  const repo = memoryRepository(
+    [],
+    [countupFixture('a', { title: '我们在一起', startDate: '2025-09-04', displayMode: 'anniversary' })],
+  );
+  render(
+    <AppProvider repo={repo} clock={clock}>
+      <CountupDetails />
+    </AppProvider>,
+  );
+  expect(await screen.findByText('1 周年')).toBeTruthy();
+  expect(screen.getByText('下一次 · 2027.09.04 · 365 天后')).toBeTruthy();
+  expect(screen.getByText('从开始至今 · 第 366 天')).toBeTruthy();
 });
