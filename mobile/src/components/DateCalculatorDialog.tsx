@@ -3,8 +3,16 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { dayNumber, supported } from '../core/dates';
 import { Button, colors, common, Dialog, Icon } from './ui';
 
+const AVERAGE_GREGORIAN_YEAR_DAYS = 365.2425;
+
 function numericPart(value: string, length: number): string {
   return value.replace(/\D/g, '').slice(0, length);
+}
+
+function equivalentYears(days: number): string {
+  if (days === 0) return '折合 0 年';
+  const years = Math.abs(days) / AVERAGE_GREGORIAN_YEAR_DAYS;
+  return years < 0.01 ? '折合不足 0.01 年' : `折合约 ${years.toFixed(2)} 年`;
 }
 
 function readableDate(date: string): string {
@@ -94,6 +102,7 @@ export function DateCalculatorDialog({ today, onClose }: { today: string; onClos
         <View accessibilityLiveRegion="polite" style={styles.result}>
           <Text style={common.eyebrow}>{readableDate(input)} 距今天</Text>
           <Text style={styles.resultNumber}>{result}</Text>
+          <Text style={styles.resultYears}>{equivalentYears(difference)}</Text>
           <Text style={common.muted}>按自然日计算 · 今天是 {today.replaceAll('-', '.')}</Text>
         </View>
       )}
@@ -128,4 +137,5 @@ const styles = StyleSheet.create({
   label: { fontSize: 15, fontWeight: '600', color: colors.ink },
   result: { gap: 8, padding: 20, marginVertical: 18, borderRadius: 16, backgroundColor: '#F5F7F2' },
   resultNumber: { fontSize: 28, lineHeight: 38, fontWeight: '700', color: colors.accent },
+  resultYears: { fontSize: 17, lineHeight: 25, fontWeight: '600', color: colors.green },
 });
