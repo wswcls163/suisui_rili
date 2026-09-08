@@ -119,27 +119,44 @@ test('时光记可切换为每年纪念并预览周年', async () => {
   );
 });
 
-test('日期计算接受任意有效日期，自动格式化并立即计算到今天的天数', () => {
+function enterCalculatorDate(year: string, month: string, day: string) {
+  fireEvent.changeText(screen.getByLabelText('年份'), year);
+  fireEvent.changeText(screen.getByLabelText('月份'), month);
+  fireEvent.changeText(screen.getByLabelText('日期'), day);
+}
+
+test('日期计算的月份和日期无需前导零，并立即计算到今天的天数', () => {
   const close = jest.fn();
   render(<DateCalculatorDialog today="2026-09-08" onClose={close} />);
-  fireEvent.changeText(screen.getByLabelText('想计算的日期'), '20200928');
-  expect(screen.getByLabelText('想计算的日期').props.value).toBe('2020-09-28');
-  expect(screen.getByText('2020年9月28日 距今天')).toBeTruthy();
-  expect(screen.getByText('已经过去 2171 天')).toBeTruthy();
+  enterCalculatorDate('2020', '3', '5');
+  expect(screen.getByLabelText('月份').props.value).toBe('3');
+  expect(screen.getByLabelText('日期').props.value).toBe('5');
+  expect(screen.getByText('2020年3月5日 距今天')).toBeTruthy();
+  expect(screen.getByText('已经过去 2378 天')).toBeTruthy();
   expect(screen.getByText('仅用于本次查询，不会保存，也不会参与同步。')).toBeTruthy();
   fireEvent.press(screen.getByRole('button', { name: '完成' }));
   expect(close).toHaveBeenCalledTimes(1);
 });
 
+test('删除月份数字不会把日期数字串到月份中', () => {
+  render(<DateCalculatorDialog today="2026-09-08" onClose={() => {}} />);
+  enterCalculatorDate('2020', '3', '5');
+  fireEvent.changeText(screen.getByLabelText('月份'), '');
+  expect(screen.getByLabelText('月份').props.value).toBe('');
+  expect(screen.getByLabelText('日期').props.value).toBe('5');
+  expect(screen.queryByText(/已经过去/)).toBeNull();
+  fireEvent.changeText(screen.getByLabelText('月份'), '4');
+  expect(screen.getByText('2020年4月5日 距今天')).toBeTruthy();
+});
+
 test('日期计算校验无效日期，并能识别今天和未来日期', () => {
   render(<DateCalculatorDialog today="2026-09-08" onClose={() => {}} />);
-  const input = screen.getByLabelText('想计算的日期');
-  fireEvent.changeText(input, '20210229');
+  enterCalculatorDate('2021', '2', '29');
   expect(screen.getByText('请输入 1901—2100 年内的有效日期')).toBeTruthy();
   expect(screen.queryByText(/已经过去/)).toBeNull();
-  fireEvent.changeText(input, '20260908');
+  enterCalculatorDate('2026', '9', '8');
   expect(screen.getByText('就是今天')).toBeTruthy();
-  fireEvent.changeText(input, '20260918');
+  enterCalculatorDate('2026', '9', '18');
   expect(screen.getByText('距离那天还有 10 天')).toBeTruthy();
 });
 test('月历七列、选日回调和多人标记；首尾月份禁止越界', () => {
@@ -510,7 +527,7 @@ test('首页提供独立日期计算入口，查询不会创建生日或时光�
   );
   await screen.findByRole('button', { name: '日期计算' });
   fireEvent.press(screen.getByRole('button', { name: '日期计算' }));
-  fireEvent.changeText(screen.getByLabelText('想计算的日期'), '20200101');
+  enterCalculatorDate('2020', '1', '1');
   expect(screen.getByText('已经过去 2438 天')).toBeTruthy();
   expect(repo.create).not.toHaveBeenCalled();
   expect(repo.createCountup).not.toHaveBeenCalled();

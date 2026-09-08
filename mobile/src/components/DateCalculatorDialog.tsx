@@ -3,11 +3,8 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { dayNumber, supported } from '../core/dates';
 import { Button, colors, common, Dialog, Icon } from './ui';
 
-function formatDateInput(value: string): string {
-  const digits = value.replace(/\D/g, '').slice(0, 8);
-  if (digits.length <= 4) return digits;
-  if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
-  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
+function numericPart(value: string, length: number): string {
+  return value.replace(/\D/g, '').slice(0, length);
 }
 
 function readableDate(date: string): string {
@@ -16,13 +13,16 @@ function readableDate(date: string): string {
 }
 
 export function DateCalculatorDialog({ today, onClose }: { today: string; onClose: () => void }) {
-  const [input, setInput] = useState('');
-  const valid = supported(input) && supported(today);
+  const [year, setYear] = useState('');
+  const [month, setMonth] = useState('');
+  const [day, setDay] = useState('');
+  const complete = year.length === 4 && month.length > 0 && day.length > 0;
+  const input = complete ? `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}` : '';
+  const valid = complete && supported(input) && supported(today);
   const difference = useMemo(
     () => (valid ? dayNumber(today) - dayNumber(input) : null),
     [input, today, valid],
   );
-  const complete = input.length === 10;
   const result =
     difference === null
       ? null
@@ -45,22 +45,49 @@ export function DateCalculatorDialog({ today, onClose }: { today: string; onClos
       </View>
       <View style={styles.inputGroup}>
         <Text style={styles.label}>想计算的日期</Text>
-        <TextInput
-          accessibilityLabel="想计算的日期"
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoFocus
-          inputMode="numeric"
-          keyboardType="number-pad"
-          maxLength={10}
-          onChangeText={(value) => setInput(formatDateInput(value))}
-          placeholder="例如：20200928"
-          placeholderTextColor="#A0A5A1"
-          style={common.input}
-          value={input}
-        />
+        <View style={styles.dateRow}>
+          <TextInput
+            accessibilityLabel="年份"
+            autoFocus
+            inputMode="numeric"
+            keyboardType="number-pad"
+            maxLength={4}
+            onChangeText={(value) => setYear(numericPart(value, 4))}
+            placeholder="2020"
+            placeholderTextColor="#A0A5A1"
+            style={[common.input, styles.yearInput]}
+            value={year}
+          />
+          <Text style={styles.separator}>年</Text>
+          <TextInput
+            accessibilityLabel="月份"
+            inputMode="numeric"
+            keyboardType="number-pad"
+            maxLength={2}
+            onChangeText={(value) => setMonth(numericPart(value, 2))}
+            placeholder="3"
+            placeholderTextColor="#A0A5A1"
+            style={[common.input, styles.shortInput]}
+            value={month}
+          />
+          <Text style={styles.separator}>月</Text>
+          <TextInput
+            accessibilityLabel="日期"
+            inputMode="numeric"
+            keyboardType="number-pad"
+            maxLength={2}
+            onChangeText={(value) => setDay(numericPart(value, 2))}
+            placeholder="5"
+            placeholderTextColor="#A0A5A1"
+            style={[common.input, styles.shortInput]}
+            value={day}
+          />
+          <Text style={styles.separator}>日</Text>
+        </View>
         <Text style={complete && !valid ? common.error : common.muted}>
-          {complete && !valid ? '请输入 1901—2100 年内的有效日期' : '输入 8 位数字，会自动整理为 YYYY-MM-DD'}
+          {complete && !valid
+            ? '请输入 1901—2100 年内的有效日期'
+            : '年份输入 4 位，月份和日期可以直接输入 1—2 位数字'}
         </Text>
       </View>
       {result && difference !== null && (
@@ -94,6 +121,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.tint,
   },
   inputGroup: { gap: 8, marginTop: 18 },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  yearInput: { flex: 1.45, minWidth: 0, textAlign: 'center' },
+  shortInput: { flex: 1, minWidth: 0, textAlign: 'center' },
+  separator: { color: colors.muted, fontSize: 14 },
   label: { fontSize: 15, fontWeight: '600', color: colors.ink },
   result: { gap: 8, padding: 20, marginVertical: 18, borderRadius: 16, backgroundColor: '#F5F7F2' },
   resultNumber: { fontSize: 28, lineHeight: 38, fontWeight: '700', color: colors.accent },
