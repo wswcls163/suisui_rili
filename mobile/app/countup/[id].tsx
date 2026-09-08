@@ -100,6 +100,9 @@ export default function CountupDetails() {
                 {item.displayMode === 'anniversary' && progress.phase === 'active' && (
                   <Text style={common.muted}>从开始至今 · 第 {progress.day} 天</Text>
                 )}
+                {item.displayMode === 'days' && progress.phase === 'active' && (
+                  <Text style={common.muted}>从开始日到今天 · 已经过 {progress.elapsed} 天</Text>
+                )}
                 <Text style={common.muted}>开始日期 · {item.startDate.replaceAll('-', '.')}</Text>
               </View>
               {!!item.note && (

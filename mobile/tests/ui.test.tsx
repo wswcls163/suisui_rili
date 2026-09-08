@@ -117,6 +117,18 @@ test('时光记可切换为每年纪念并预览周年', async () => {
     }),
   );
 });
+
+test('时光记可直接输入较早日期，并同时显示经过天数与当前第几天', () => {
+  render(
+    <CountupForm selectedDate="2026-09-08" today="2026-09-08" onSave={async () => {}} onCancel={() => {}} />,
+  );
+  fireEvent.press(screen.getByRole('button', { name: '选择开始日期：2026.09.08' }));
+  fireEvent.changeText(screen.getByLabelText('直接输入日期'), '20200928');
+  fireEvent.press(screen.getByRole('button', { name: '使用此日期' }));
+  expect(screen.getByText('第 2172 天')).toBeTruthy();
+  expect(screen.getByText('从开始日到今天，已经过 2171 天')).toBeTruthy();
+  expect(screen.getByRole('button', { name: '选择开始日期：2020.09.28' })).toBeTruthy();
+});
 test('月历七列、选日回调和多人标记；首尾月份禁止越界', () => {
   const select = jest.fn();
   const entries = entriesForMonth(lunarCalendar, [fixture('a'), fixture('b')], today);

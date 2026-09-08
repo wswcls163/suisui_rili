@@ -54,6 +54,11 @@ describe('时光记规则', () => {
       elapsed: 5,
     });
     expect(countupProgress('2025-12-31', '2026-01-01')).toMatchObject({ phase: 'active', day: 2 });
+    expect(countupProgress('2020-09-28', '2026-09-08')).toEqual({
+      phase: 'active',
+      day: 2172,
+      elapsed: 2171,
+    });
   });
 
   test('未来开始日显示剩余天数，到当天自动切换累计', () => {

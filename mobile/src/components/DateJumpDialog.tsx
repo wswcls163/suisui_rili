@@ -1,6 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { dateInMonth, FIRST_DATE, LAST_DATE, monthEnd } from '../core/dates';
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import { dateInMonth, FIRST_DATE, LAST_DATE, monthEnd, supported } from '../core/dates';
 import { Button, colors, common, Dialog } from './ui';
 
 const ROW_HEIGHT = 44;
@@ -169,30 +178,69 @@ function DateWheel({
 
 export function DateJumpDialog({
   initialDate,
+  title = '跳转日期',
+  confirmLabel = '跳转',
   onConfirm,
   onClose,
 }: {
   initialDate: string;
+  title?: string;
+  confirmLabel?: string;
   onConfirm: (date: string) => void;
   onClose: () => void;
 }) {
   const [date, setDate] = useState(initialDate);
+  const [input, setInput] = useState(initialDate);
+  const dateRef = useRef(initialDate);
   const [year, month, day] = date.split('-').map(Number);
   const { height } = useWindowDimensions();
   const visibleRows = height < 700 ? 3 : 5;
+  const inputValid = supported(input);
+  const applyDate = (next: string) => {
+    dateRef.current = next;
+    setDate(next);
+    setInput(next);
+  };
   const changePart = (part: 0 | 1 | 2, next: number) => {
     // Wheels may emit in the same render batch; always retain the latest other columns.
-    setDate((previous) => {
-      const parts = previous.split('-');
-      parts[part] = String(next).padStart(2, '0');
-      return dateInMonth(parts.join('-'), `${parts[0]}-${parts[1]}-01`);
-    });
+    const parts = dateRef.current.split('-');
+    parts[part] = String(next).padStart(2, '0');
+    applyDate(dateInMonth(parts.join('-'), `${parts[0]}-${parts[1]}-01`));
   };
   return (
-    <Dialog visible title="跳转日期" onClose={onClose}>
+    <Dialog visible title={title} onClose={onClose}>
       <Text style={common.muted}>
-        {Platform.OS === 'web' ? '滚动鼠标滚轮或点选年月日' : '上下滑动或点选年月日'} · 阳历
+        直接输入 8 位日期，或{Platform.OS === 'web' ? '滚动鼠标滚轮、点选年月日' : '上下滑动、点选年月日'}
       </Text>
+      <View style={styles.inputGroup}>
+        <TextInput
+          accessibilityLabel="直接输入日期"
+          autoCapitalize="none"
+          autoCorrect={false}
+          inputMode="numeric"
+          keyboardType="number-pad"
+          maxLength={10}
+          onChangeText={(value) => {
+            const digits = value.replace(/\D/g, '').slice(0, 8);
+            const formatted =
+              digits.length <= 4
+                ? digits
+                : digits.length <= 6
+                  ? `${digits.slice(0, 4)}-${digits.slice(4)}`
+                  : `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
+            if (supported(formatted)) applyDate(formatted);
+            else setInput(formatted);
+          }}
+          placeholder="例如：20200928"
+          placeholderTextColor="#A0A5A1"
+          selectTextOnFocus
+          style={common.input}
+          value={input}
+        />
+        <Text style={input.length === 10 && !inputValid ? common.error : common.muted}>
+          {input.length === 10 && !inputValid ? '请输入 1901—2100 年内的有效日期' : '格式：YYYY-MM-DD · 阳历'}
+        </Text>
+      </View>
       <View style={styles.wheels}>
         <DateWheel
           label="年份"
@@ -227,14 +275,20 @@ export function DateJumpDialog({
       </Text>
       <View style={styles.actions}>
         <Button label="取消" variant="secondary" onPress={onClose} style={{ flex: 1 }} />
-        <Button label="跳转" onPress={() => onConfirm(date)} style={{ flex: 1 }} />
+        <Button
+          label={confirmLabel}
+          disabled={!inputValid}
+          onPress={() => onConfirm(input)}
+          style={{ flex: 1 }}
+        />
       </View>
     </Dialog>
   );
 }
 
 const styles = StyleSheet.create({
-  wheels: { flexDirection: 'row', gap: 10, marginTop: 20 },
+  inputGroup: { gap: 7, marginTop: 16 },
+  wheels: { flexDirection: 'row', gap: 10, marginTop: 16 },
   column: { flex: 1, minWidth: 0 },
   unit: { ...common.muted, textAlign: 'center', marginBottom: 8 },
   item: { height: ROW_HEIGHT, alignItems: 'center', justifyContent: 'center' },

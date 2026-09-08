@@ -12,7 +12,7 @@ npm ci
 npm run web
 ```
 
-浏览器打开终端中的地址，默认 `http://localhost:8081`。新建时先在月历选日期，再点「＋」选择“生日”或“时光记”；生日会自动预填农历信息，时光记会把所选日期作为开始日期，并可选择“记录天数”或“每年纪念”。生日簿和时光记列表都可查看、编辑和删除记录。点击月历标题，可通过年、月、日三列滚轮跳转到 1901—2100 年的具体日期，支持滑动、鼠标滚轮和点选；电脑聚焦滚轮后也可用方向键调整、Page Up / Page Down 快选、Home / End 到首尾。切换年月时自动处理闰年和大小月，取消不改变原先选择。
+浏览器打开终端中的地址，默认 `http://localhost:8081`。新建时先在月历选日期，再点「＋」选择“生日”或“时光记”；生日会自动预填农历信息，时光记会把所选日期作为开始日期，并可选择“记录天数”或“每年纪念”。日期弹窗支持直接输入 8 位日期（例如 `20200928`，自动整理为 `2020-09-28`）或使用年、月、日三列滚轮；记录天数同时显示不含开始当天的完整经过天数，以及包含开始当天的“第几天”。生日簿和时光记列表都可查看、编辑和删除记录。日期范围为 1901—2100 年，支持滑动、鼠标滚轮和点选；电脑聚焦滚轮后也可用方向键调整、Page Up / Page Down 快选、Home / End 到首尾。切换年月时自动处理闰年和大小月，无效输入不能确认，取消不改变原先选择。
 
 预览使用当前浏览器的 IndexedDB，刷新、关闭再打开页面后保留数据。未登录时，不同浏览器、不同端口或不同设备的数据彼此独立；登录同一个账号后可通过 Supabase 同步。清理网站数据会删除未登录记录和本机缓存，不会删除已经同步的云端生日。预览不是手机 SQLite 或真机验收的替代品。
 
@@ -76,19 +76,19 @@ npx expo-doctor
 
 ## 修改代码的位置
 
-| 要修改的内容 | 位置 |
-| --- | --- |
-| 页面与导航 | `app/` |
-| 月历、生日表单、共用样式和小组件 | `src/components/` |
-| 年月日滚轮与日期跳转弹窗 | `src/components/DateJumpDialog.tsx` |
-| 输入校验、年度生日与时光记规则 | `src/core/birthday.ts`、`src/core/countup.ts` |
-| 常见节日、纪念日规则与同日节气组合 | `src/core/festivals.ts` |
-| 历法库与核验口径 | `src/core/calendar.ts` |
-| 日期运算、北京时间与前台时钟 | `src/core/dates.ts`、`src/core/clock.ts` |
-| 共享生日状态与手机生命周期 | `src/state/AppProvider.tsx` |
-| 邮箱认证、会话存储与回调 | `src/auth/`、`src/state/AuthProvider.tsx` |
-| 离线队列、云端适配与同步状态 | `src/sync/`、`src/state/SyncProvider.tsx` |
-| SQLite、IndexedDB 和版本迁移 | `src/data/` |
+| 要修改的内容                       | 位置                                          |
+| ---------------------------------- | --------------------------------------------- |
+| 页面与导航                         | `app/`                                        |
+| 月历、生日表单、共用样式和小组件   | `src/components/`                             |
+| 年月日滚轮与日期跳转弹窗           | `src/components/DateJumpDialog.tsx`           |
+| 输入校验、年度生日与时光记规则     | `src/core/birthday.ts`、`src/core/countup.ts` |
+| 常见节日、纪念日规则与同日节气组合 | `src/core/festivals.ts`                       |
+| 历法库与核验口径                   | `src/core/calendar.ts`                        |
+| 日期运算、北京时间与前台时钟       | `src/core/dates.ts`、`src/core/clock.ts`      |
+| 共享生日状态与手机生命周期         | `src/state/AppProvider.tsx`                   |
+| 邮箱认证、会话存储与回调           | `src/auth/`、`src/state/AuthProvider.tsx`     |
+| 离线队列、云端适配与同步状态       | `src/sync/`、`src/state/SyncProvider.tsx`     |
+| SQLite、IndexedDB 和版本迁移       | `src/data/`                                   |
 
 Supabase 数据库迁移与注销函数位于 `supabase/`。仓库不包含任何项目密钥；未配置环境变量时账号功能保持关闭。系统通知尚未实现。新增功能按实际职责扩展，不预先建立空目录、通用事件引擎或多层服务。图标源文件与生成脚本在 `assets/icon.svg`、`scripts/generate-icons.mjs`；修改后运行 `node scripts/generate-icons.mjs`。
 
