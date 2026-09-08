@@ -5,7 +5,6 @@ import {
   type Countup,
   type CountupDisplayMode,
   type CountupDraft,
-  countupProgress,
   normalizeCountupDraft,
   timeNoteProgressText,
 } from '../core/countup';
@@ -38,7 +37,6 @@ export function CountupForm({
     () => timeNoteProgressText({ type: 'countup', title, startDate, note, displayMode }, today),
     [displayMode, note, startDate, title, today],
   );
-  const dayProgress = useMemo(() => countupProgress(startDate, today), [startDate, today]);
   const submit = async () => {
     if (saving || busy) return;
     try {
@@ -138,11 +136,6 @@ export function CountupForm({
       <View style={styles.preview}>
         <Text style={common.eyebrow}>{displayMode === 'days' ? '今天的记录' : '纪念进度'}</Text>
         <Text style={[common.title, { color: colors.accent, marginTop: 8 }]}>{progressText}</Text>
-        {displayMode === 'days' && dayProgress.phase === 'active' && (
-          <Text style={[common.muted, { marginTop: 6 }]}>
-            从开始日到今天，已经过 {dayProgress.elapsed} 天
-          </Text>
-        )}
         <Text style={[common.body, { marginTop: 6 }]}>从 {startDate.replaceAll('-', '.')} 开始</Text>
       </View>
       {!!error && (
@@ -162,8 +155,6 @@ export function CountupForm({
       {choosingDate && (
         <DateJumpDialog
           initialDate={startDate}
-          title="选择开始日期"
-          confirmLabel="使用此日期"
           onClose={() => setChoosingDate(false)}
           onConfirm={(date) => {
             setStartDate(date);

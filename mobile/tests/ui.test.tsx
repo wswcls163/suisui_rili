@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { router } from 'expo-router';
 import { BirthdayForm } from '../src/components/BirthdayForm';
 import { CountupForm } from '../src/components/CountupForm';
+import { DateCalculatorDialog } from '../src/components/DateCalculatorDialog';
 import { MonthCalendar } from '../src/components/MonthCalendar';
 import { AppProvider } from '../src/state/AppProvider';
 import Home from '../app/index';
@@ -118,16 +119,28 @@ test('时光记可切换为每年纪念并预览周年', async () => {
   );
 });
 
-test('时光记可直接输入较早日期，并同时显示经过天数与当前第几天', () => {
-  render(
-    <CountupForm selectedDate="2026-09-08" today="2026-09-08" onSave={async () => {}} onCancel={() => {}} />,
-  );
-  fireEvent.press(screen.getByRole('button', { name: '选择开始日期：2026.09.08' }));
-  fireEvent.changeText(screen.getByLabelText('直接输入日期'), '20200928');
-  fireEvent.press(screen.getByRole('button', { name: '使用此日期' }));
-  expect(screen.getByText('第 2172 天')).toBeTruthy();
-  expect(screen.getByText('从开始日到今天，已经过 2171 天')).toBeTruthy();
-  expect(screen.getByRole('button', { name: '选择开始日期：2020.09.28' })).toBeTruthy();
+test('日期计算接受任意有效日期，自动格式化并立即计算到今天的天数', () => {
+  const close = jest.fn();
+  render(<DateCalculatorDialog today="2026-09-08" onClose={close} />);
+  fireEvent.changeText(screen.getByLabelText('想计算的日期'), '20200928');
+  expect(screen.getByLabelText('想计算的日期').props.value).toBe('2020-09-28');
+  expect(screen.getByText('2020年9月28日 距今天')).toBeTruthy();
+  expect(screen.getByText('已经过去 2171 天')).toBeTruthy();
+  expect(screen.getByText('仅用于本次查询，不会保存，也不会参与同步。')).toBeTruthy();
+  fireEvent.press(screen.getByRole('button', { name: '完成' }));
+  expect(close).toHaveBeenCalledTimes(1);
+});
+
+test('日期计算校验无效日期，并能识别今天和未来日期', () => {
+  render(<DateCalculatorDialog today="2026-09-08" onClose={() => {}} />);
+  const input = screen.getByLabelText('想计算的日期');
+  fireEvent.changeText(input, '20210229');
+  expect(screen.getByText('请输入 1901—2100 年内的有效日期')).toBeTruthy();
+  expect(screen.queryByText(/已经过去/)).toBeNull();
+  fireEvent.changeText(input, '20260908');
+  expect(screen.getByText('就是今天')).toBeTruthy();
+  fireEvent.changeText(input, '20260918');
+  expect(screen.getByText('距离那天还有 10 天')).toBeTruthy();
 });
 test('月历七列、选日回调和多人标记；首尾月份禁止越界', () => {
   const select = jest.fn();
@@ -487,6 +500,20 @@ test('直接打开新建页遇到读库失败时给出重试入口', async () =>
   await screen.findByText('数据库不可用');
   fireEvent.press(screen.getByRole('button', { name: '重新读取' }));
   await waitFor(() => expect(screen.getByRole('button', { name: '生日' })).toBeEnabled());
+});
+test('首页提供独立日期计算入口，查询不会创建生日或时光记', async () => {
+  const repo = memoryRepository();
+  render(
+    <AppProvider repo={repo} clock={clock}>
+      <Home />
+    </AppProvider>,
+  );
+  await screen.findByRole('button', { name: '日期计算' });
+  fireEvent.press(screen.getByRole('button', { name: '日期计算' }));
+  fireEvent.changeText(screen.getByLabelText('想计算的日期'), '20200101');
+  expect(screen.getByText('已经过去 2438 天')).toBeTruthy();
+  expect(repo.create).not.toHaveBeenCalled();
+  expect(repo.createCountup).not.toHaveBeenCalled();
 });
 test('首页首次使用为空，无虚构亲友；同日多人全部提醒', async () => {
   const empty = render(

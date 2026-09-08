@@ -11,36 +11,14 @@ function mount(date: string) {
 }
 const pick = (label: string) => fireEvent.press(screen.getByRole('button', { name: label }));
 
-test('三列和直接输入框预选完整日期，直接确认不改变日期', () => {
+test('三列预选完整日期，直接确认不改变日，不需要键盘输入', () => {
   const { onConfirm } = mount('2026-09-18');
-  expect(screen.getByLabelText('直接输入日期').props.value).toBe('2026-09-18');
+  expect(screen.queryByRole('textbox')).toBeNull();
   expect(screen.getByLabelText('年份').props.accessibilityValue.now).toBe(2026);
   expect(screen.getByLabelText('月份').props.accessibilityValue.now).toBe(9);
   expect(screen.getByLabelText('日期').props.accessibilityValue.now).toBe(18);
   pick('跳转');
   expect(onConfirm).toHaveBeenCalledWith('2026-09-18');
-});
-
-test('可直接输入较早日期并立即更新年月日滚轮', () => {
-  const { onConfirm } = mount('2026-09-18');
-  fireEvent.changeText(screen.getByLabelText('直接输入日期'), '20200928');
-  expect(screen.getByLabelText('直接输入日期').props.value).toBe('2020-09-28');
-  expect(screen.getByLabelText('年份').props.accessibilityValue.now).toBe(2020);
-  expect(screen.getByLabelText('月份').props.accessibilityValue.now).toBe(9);
-  expect(screen.getByLabelText('日期').props.accessibilityValue.now).toBe(28);
-  pick('跳转');
-  expect(onConfirm).toHaveBeenCalledWith('2020-09-28');
-});
-
-test('无效日期显示错误并禁止确认，重新滚动后恢复有效日期', () => {
-  const { onConfirm } = mount('2026-09-18');
-  fireEvent.changeText(screen.getByLabelText('直接输入日期'), '20210229');
-  expect(screen.getByText('请输入 1901—2100 年内的有效日期')).toBeTruthy();
-  expect(screen.getByRole('button', { name: '跳转' })).toBeDisabled();
-  pick('2024 年');
-  expect(screen.getByLabelText('直接输入日期').props.value).toBe('2024-09-18');
-  pick('跳转');
-  expect(onConfirm).toHaveBeenCalledWith('2024-09-18');
 });
 
 test.each([

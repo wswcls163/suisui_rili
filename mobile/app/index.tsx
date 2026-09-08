@@ -24,6 +24,7 @@ import { festivalsOn } from '../src/core/festivals';
 import { supported } from '../src/core/dates';
 import { anniversaryProgress, timeNoteProgressText, type Countup } from '../src/core/countup';
 import { MonthCalendar } from '../src/components/MonthCalendar';
+import { DateCalculatorDialog } from '../src/components/DateCalculatorDialog';
 import { Avatar, Button, colors, common, Icon } from '../src/components/ui';
 import { storageDescription } from '../src/data/repository';
 import { useAuth } from '../src/state/AuthProvider';
@@ -98,6 +99,7 @@ export default function Home() {
   const { width } = useWindowDimensions();
   const wide = width >= 900;
   const [tab, setTab] = useState<'calendar' | 'book' | 'countup'>('calendar');
+  const [calculatingDate, setCalculatingDate] = useState(false);
   useFocusEffect(state.refreshToday);
   const entries = useMemo(
     () => entriesForMonth(lunarCalendar, state.people, state.month),
@@ -185,13 +187,21 @@ export default function Home() {
             ))}
           </View>
         </View>
-        <Text style={common.muted}>
-          今天 {state.today.replaceAll('-', '.')}　
-          {supported(state.today)
-            ? `农历${lunarLabel(lunarCalendar.lunarOn(state.today))}`
-            : '设备日期超出历法支持范围'}{' '}
-          · 北京时间
-        </Text>
+        <View style={[common.between, { flexWrap: 'wrap' }]}>
+          <Text style={common.muted}>
+            今天 {state.today.replaceAll('-', '.')}　
+            {supported(state.today)
+              ? `农历${lunarLabel(lunarCalendar.lunarOn(state.today))}`
+              : '设备日期超出历法支持范围'}{' '}
+            · 北京时间
+          </Text>
+          <Button
+            label="日期计算"
+            icon="calculator-outline"
+            variant="secondary"
+            onPress={() => setCalculatingDate(true)}
+          />
+        </View>
         {state.status === 'loading' ? (
           <View style={styles.loading}>
             <ActivityIndicator color={colors.accent} />
@@ -455,6 +465,9 @@ export default function Home() {
           </Text>
         </View>
       </ScrollView>
+      {calculatingDate && (
+        <DateCalculatorDialog today={state.today} onClose={() => setCalculatingDate(false)} />
+      )}
     </SafeAreaView>
   );
 }
