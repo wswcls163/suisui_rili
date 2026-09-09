@@ -1,6 +1,6 @@
 # 岁岁日历 · 技术方案
 
-版本：V1.1｜日期：2026-09-08｜状态：生日、时光记、账号与同步代码已实现，时光记云端迁移已应用至开发项目，手机安装包与真机验收待完成
+版本：V1.1｜日期：2026-09-09｜状态：生日、时光记、账号与同步代码已实现，Android 测试 APK 已生成并校验，真机验收待完成
 
 依据：[产品设计文档](product-design.md) 与 [交互 Demo](../demo/README.md)。本方案面向第一期生日功能，重点是手机端交付、便于修改，以及为后续功能保留清晰的接入位置。
 
@@ -33,6 +33,8 @@
 导航、本地保存和开发构建参考 [Router 文档](https://docs.expo.dev/router/introduction/)、[SQLite 文档](https://docs.expo.dev/versions/latest/sdk/sqlite/) 和 [development build 文档](https://docs.expo.dev/develop/development-builds/introduction/)。测试环境参考 [Expo 单元测试文档](https://docs.expo.dev/develop/unit-testing/)。
 
 工程使用 Expo SDK 57、React Native 0.86、React 19.2 和匹配的原生模块，提交 npm 锁文件及 `.nvmrc`（Node.js 22.23.2），并用 `expo-doctor` 检查依赖匹配。代码通过 ESLint、Prettier 统一规范。避免分别追逐各依赖的最新版本。Demo 的 Vite、Vinext、浏览器组件和部署配置不迁入手机工程。
+
+Windows 本地 Android 构建使用完整 JDK 17、Android SDK / Build Tools 36 和 NDK 27.1.12297006。原生目录仍由 Expo 生成并保持 Git 忽略；当前工程所在路径包含中文，而该版本 JDK / Gradle / Expo 自动链接在 Windows 上不能稳定贯穿 Unicode 物理路径，因此发布构建将 `mobile/` 输入复制到纯英文临时目录、按同一 `package-lock.json` 执行 `npm ci` 后再运行 `app:assembleRelease`。临时目录只解决工具链路径兼容，不是新的源码来源。测试 APK 使用 Android Debug 证书，仅用于安装验收；正式发布前必须改为独立的安全签名配置，且签名文件和密码不得进入仓库。
 
 月历先用 React Native 基础组件实现七列网格，单日接收阳历、农历标签、生日数量和选中状态，月份计算放在业务模块。第一期不引入完整日程系统。
 
@@ -205,6 +207,6 @@ mobile/
 4. **接入账号与同步。** 完成认证、本地数据范围、离线队列、服务端迁移、冲突处理和账号管理。
 5. **完成设备验收。** 检查跨午夜、重启保留、失败恢复、账号深链接、跨设备同步和手机交互，完成目标平台发布构建。
 
-当前第 2、3、4 步的代码与自动测试已完成，电脑预览已走通真实 CRUD 和账号入口；第 1 步完成工程初始化、Android 原生工程生成和双平台 Hermes 资源导出，但本机缺少 Android SDK，尚未完成安装包编译。第 4 步仍需 Supabase 开发项目完成真实云端联调，第 5 步的设备验收待具备工具链和测试手机后执行。
+当前第 2、3、4 步的代码与自动测试已完成，电脑预览已走通真实 CRUD 和账号入口；第 1 步已完成工程初始化、Android 原生工程生成、双平台 Hermes 资源导出，以及 Android 通用测试 APK 的本地编译、对齐、签名和包信息校验。第 4 步仍需继续完成手机与电脑的真实跨设备同步和注销联调；第 5 步的 Android 安装、启动与设备行为验收待手机连接并授权 USB 调试后执行，iOS 仍需 macOS / Xcode 与测试设备。
 
 iOS 本地构建和模拟器需要 macOS / Xcode；Windows 环境也可选择 EAS Build 云构建，配合真实 iPhone 验证。云服务是可选工具，其账号、签名、费用与分发条件在实际使用时确定，当前未上传工程或发布应用。参见 [Expo FAQ](https://docs.expo.dev/faq/) 与 [EAS Build 文档](https://docs.expo.dev/build/introduction/)。

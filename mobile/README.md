@@ -54,7 +54,9 @@ npm run ios
 npx expo run:android --variant release
 ```
 
-该命令用于本地验收；正式分发还须配置自己的签名、确认应用标识并执行真机检查。默认标识为 `com.suisui.calendar`。应用代码在手机端使用 SQLite 保存数据；杀进程保留、断网启动、生命周期和键盘等仍要在设备上验收。当前完成情况见[验证记录](../docs/validation.md)。
+也可以在生成的 `android/` 目录执行 `gradlew.bat app:assembleRelease`，产物位于 `android/app/build/outputs/apk/release/app-release.apk`。Windows 下如果工程物理路径包含中文，而 Gradle、JDK 或 Expo 自动链接报路径不存在，应将 `mobile/` 构建输入复制到纯英文临时目录，在那里按 `package-lock.json` 重新执行 `npm ci` 和原生构建；不要把临时目录当作源码继续开发，也不要提交其中的 `.env`、原生缓存或签名文件。
+
+2026-09-09 已用 JDK 17、Android SDK / Build Tools 36 和 NDK 27.1 在本机成功生成通用测试 APK，并校验包名 `com.suisui.calendar`、最低 API 24、目标 API 36、ZIP 对齐和 v2 签名。当前 APK 使用 Android Debug 证书，只供真机验收；正式分发还须配置自己的签名并重新构建。应用代码在手机端使用 SQLite 保存数据；杀进程保留、断网启动、生命周期和键盘等仍要在设备上验收。当前完成情况见[验证记录](../docs/validation.md)。
 
 ## 检查命令
 

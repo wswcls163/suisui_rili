@@ -76,3 +76,13 @@ test('AGENTS 记录适度模块化的长期代码准则', async () => {
   assert.match(content, /避免把互不相关的功能堆在一起/);
   assert.match(content, /避免为了拆分而拆分/);
 });
+
+test('Android 验证记录区分测试包生成与真机验收', async () => {
+  const content = await readFile(join(root, 'docs', 'validation.md'), 'utf8');
+
+  assert.match(content, /Android release 测试 APK/);
+  assert.match(content, /包名 `com\.suisui\.calendar`/);
+  assert.match(content, /Android Debug 证书/);
+  assert.match(content, /Android 通用 APK 编译[\s\S]*已通过/);
+  assert.match(content, /Android 真机安装、启动与冷启动[\s\S]*待连接/);
+});
