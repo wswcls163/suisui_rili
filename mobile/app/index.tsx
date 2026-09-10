@@ -217,7 +217,7 @@ export default function Home() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="账号与同步"
-            onPress={() => router.push('/account')}
+            onPress={() => router.push(phonePreview ? '/account?preview=phone' : '/account')}
             style={({ pressed }) => [styles.localChip, pressed && { opacity: 0.68 }]}
           >
             <Icon
@@ -502,7 +502,7 @@ export default function Home() {
         >
           <Icon name="lock-closed-outline" size={14} color={colors.muted} />
           <Text style={[common.muted, { flexShrink: 1, fontSize: 11, lineHeight: 18 }]}>
-            {storageDescription} 仅在应用内提醒。
+            {storageDescription} 系统提醒可在“设置”中开启。
           </Text>
         </View>
       </ScrollView>

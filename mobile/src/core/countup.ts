@@ -66,7 +66,7 @@ export function countupProgressText(countup: CountupDraft, today: string): strin
   return progress.phase === 'active' ? `第 ${progress.day} 天` : `${progress.remaining} 天后开始`;
 }
 
-function anniversaryDate(startDate: string, year: number): string | null {
+export function anniversaryDate(startDate: string, year: number): string | null {
   if (year < 1901 || year > 2100) return null;
   const candidate = `${year}${startDate.slice(4)}`;
   try {

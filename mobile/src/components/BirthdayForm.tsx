@@ -290,7 +290,7 @@ export function BirthdayForm({
           onPress={() => void submit()}
         />
       </View>
-      <Text style={[common.muted, { textAlign: 'center' }]}>仅在应用内提醒 · 按北京时间计算</Text>
+      <Text style={[common.muted, { textAlign: 'center' }]}>系统提醒由设置页统一控制 · 按北京时间计算</Text>
     </View>
   );
 }

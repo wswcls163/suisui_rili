@@ -1,0 +1,171 @@
+import {
+  birthdayDates,
+  birthdayTitle,
+  upcoming,
+  type Birthday,
+  type BirthdayKind,
+  type Occurrence,
+} from './birthday';
+import type { LunarCalendar } from './calendar';
+import { anniversaryDate, type Countup } from './countup';
+import { todayInBeijing } from './dates';
+
+export const DEFAULT_NOTIFICATION_SETTINGS = Object.freeze({ enabled: false, hour: 9, minute: 0 });
+export const MAX_SCHEDULED_REMINDERS = 60;
+
+export type NotificationSettings = {
+  enabled: boolean;
+  hour: number;
+  minute: number;
+};
+
+export type ReminderKind = 'birthday' | 'anniversary';
+
+export type ScheduledReminder = {
+  identifier: string;
+  kind: ReminderKind;
+  itemId: string;
+  date: string;
+  triggerAt: number;
+  title: string;
+  body: string;
+};
+
+function integerInRange(value: unknown, from: number, to: number): value is number {
+  return Number.isInteger(value) && Number(value) >= from && Number(value) <= to;
+}
+
+export function normalizeNotificationSettings(value: unknown): NotificationSettings {
+  if (!value || typeof value !== 'object') return { ...DEFAULT_NOTIFICATION_SETTINGS };
+  const input = value as Record<string, unknown>;
+  return {
+    enabled: typeof input.enabled === 'boolean' ? input.enabled : DEFAULT_NOTIFICATION_SETTINGS.enabled,
+    hour: integerInRange(input.hour, 0, 23) ? Number(input.hour) : DEFAULT_NOTIFICATION_SETTINGS.hour,
+    minute: integerInRange(input.minute, 0, 59) ? Number(input.minute) : DEFAULT_NOTIFICATION_SETTINGS.minute,
+  };
+}
+
+export function notificationTimeText(settings: Pick<NotificationSettings, 'hour' | 'minute'>): string {
+  return `${String(settings.hour).padStart(2, '0')}:${String(settings.minute).padStart(2, '0')}`;
+}
+
+export function beijingTriggerAt(
+  date: string,
+  settings: Pick<NotificationSettings, 'hour' | 'minute'>,
+): number {
+  return Date.parse(
+    `${date}T${String(settings.hour).padStart(2, '0')}:${String(settings.minute).padStart(2, '0')}:00+08:00`,
+  );
+}
+
+function futureBirthdayOccurrences(
+  calendar: LunarCalendar,
+  person: Birthday,
+  kind: BirthdayKind,
+  today: string,
+  now: number,
+  settings: NotificationSettings,
+): Occurrence[] {
+  const single = {
+    name: person.name,
+    lunar: kind === 'lunar' ? person.lunar : null,
+    solar: kind === 'solar' ? person.solar : null,
+  };
+  if (!single.lunar && !single.solar) return [];
+  return upcoming(calendar, single, today, MAX_SCHEDULED_REMINDERS + 1)
+    .filter((occurrence) => beijingTriggerAt(occurrence.solar, settings) > now)
+    .slice(0, MAX_SCHEDULED_REMINDERS);
+}
+
+function mergeBirthdayOccurrences(values: Occurrence[]): Occurrence[] {
+  const merged = new Map<string, Occurrence>();
+  for (const value of values) {
+    const previous = merged.get(value.solar);
+    if (!previous) {
+      merged.set(value.solar, value);
+      continue;
+    }
+    merged.set(value.solar, {
+      solar: value.solar,
+      kinds: ['lunar', 'solar'],
+      lunar: previous.lunar ?? value.lunar,
+      adjustments: [...previous.adjustments, ...value.adjustments],
+    });
+  }
+  return [...merged.values()].sort((a, b) => a.solar.localeCompare(b.solar));
+}
+
+function birthdayReminders(
+  calendar: LunarCalendar,
+  person: Birthday,
+  today: string,
+  now: number,
+  settings: NotificationSettings,
+): ScheduledReminder[] {
+  const occurrences = mergeBirthdayOccurrences(
+    (['lunar', 'solar'] as const).flatMap((kind) =>
+      futureBirthdayOccurrences(calendar, person, kind, today, now, settings),
+    ),
+  );
+  return occurrences.map((occurrence) => ({
+    identifier: `suisui-birthday-${person.id}-${occurrence.solar}`,
+    kind: 'birthday',
+    itemId: person.id,
+    date: occurrence.solar,
+    triggerAt: beijingTriggerAt(occurrence.solar, settings),
+    title: `今天是${birthdayTitle(person.name)}`,
+    body: `${birthdayDates(person, occurrence.kinds)} · 记得送上一句祝福。`,
+  }));
+}
+
+function anniversaryReminders(
+  item: Countup,
+  today: string,
+  now: number,
+  settings: NotificationSettings,
+): ScheduledReminder[] {
+  if (item.displayMode !== 'anniversary') return [];
+  const startYear = Number(item.startDate.slice(0, 4));
+  let year = Math.max(Number(today.slice(0, 4)), startYear + 1);
+  const reminders: ScheduledReminder[] = [];
+  while (year <= 2100 && reminders.length < MAX_SCHEDULED_REMINDERS) {
+    const date = anniversaryDate(item.startDate, year);
+    if (date && beijingTriggerAt(date, settings) > now) {
+      const years = year - startYear;
+      reminders.push({
+        identifier: `suisui-anniversary-${item.id}-${date}`,
+        kind: 'anniversary',
+        itemId: item.id,
+        date,
+        triggerAt: beijingTriggerAt(date, settings),
+        title: `今天是「${item.title}」${years} 周年`,
+        body: `从 ${item.startDate.replaceAll('-', '.')} 开始，值得纪念的一天。`,
+      });
+    }
+    year += 1;
+  }
+  return reminders;
+}
+
+export function buildNotificationPlan({
+  calendar,
+  people,
+  countups,
+  now,
+  settings,
+}: {
+  calendar: LunarCalendar;
+  people: Birthday[];
+  countups: Countup[];
+  now: number;
+  settings: NotificationSettings;
+}): ScheduledReminder[] {
+  if (!settings.enabled) return [];
+  const today = todayInBeijing(now);
+  return [
+    ...people.flatMap((person) => birthdayReminders(calendar, person, today, now, settings)),
+    ...countups.flatMap((item) => anniversaryReminders(item, today, now, settings)),
+  ]
+    .sort((a, b) => a.triggerAt - b.triggerAt || a.identifier.localeCompare(b.identifier))
+    .slice(0, MAX_SCHEDULED_REMINDERS);
+}

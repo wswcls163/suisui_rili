@@ -17,6 +17,7 @@ import { itemType, type CalendarItem, type RemoteItem } from '../sync/model';
 import { useAuth } from '../state/AuthProvider';
 import { useAccountSync, type SyncStatus } from '../state/SyncProvider';
 import { Button, colors, common, Dialog, Icon } from './ui';
+import { NotificationSettingsCard } from './NotificationSettingsCard';
 
 type GuestMode = 'login' | 'register' | 'forgot';
 
@@ -384,18 +385,23 @@ function SignedInAccount() {
 
 export function AccountScreen() {
   const auth = useAuth();
+  const phonePreview =
+    Platform.OS === 'web' &&
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('preview') === 'phone';
   const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
   return (
     <SafeAreaView style={common.page}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={[common.content, styles.content]}
+          contentContainerStyle={[common.content, styles.content, phonePreview && styles.phonePreviewContent]}
         >
           <View style={common.between}>
             <Button label="返回" variant="quiet" icon="chevron-back" onPress={back} />
-            <Text style={common.eyebrow}>账号与同步</Text>
+            <Text style={common.eyebrow}>设置</Text>
           </View>
+          <NotificationSettingsCard />
           {auth.status === 'unconfigured' ? (
             <View style={[common.card, styles.unconfigured]}>
               <View style={styles.accountMark}>
@@ -429,6 +435,7 @@ export function AccountScreen() {
 
 const styles = StyleSheet.create({
   content: { maxWidth: 720 },
+  phonePreviewContent: { maxWidth: 443 },
   formCard: { gap: 18, padding: 28 },
   label: { color: colors.ink, fontSize: 13, fontWeight: '600' },
   passwordToggle: {

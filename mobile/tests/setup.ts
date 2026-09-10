@@ -1,3 +1,16 @@
+if (typeof globalThis.CustomEvent === 'undefined') {
+  Object.defineProperty(globalThis, 'CustomEvent', {
+    configurable: true,
+    value: class<T = unknown> extends Event {
+      readonly detail: T;
+      constructor(type: string, init?: CustomEventInit<T>) {
+        super(type, init);
+        this.detail = init?.detail as T;
+      }
+    },
+  });
+}
+
 jest.mock('@expo/vector-icons/Ionicons', () => () => null);
 jest.mock('@expo/vector-icons/MaterialCommunityIcons', () => {
   const React = jest.requireActual('react');
@@ -15,3 +28,14 @@ jest.mock('expo-secure-store', () => {
     deleteItemAsync: jest.fn(async (key: string) => void values.delete(key)),
   };
 });
+jest.mock('expo-notifications', () => ({
+  AndroidImportance: { HIGH: 6 },
+  SchedulableTriggerInputTypes: { DATE: 'date' },
+  setNotificationHandler: jest.fn(),
+  setNotificationChannelAsync: jest.fn(async () => null),
+  getPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  requestPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  getAllScheduledNotificationsAsync: jest.fn(async () => []),
+  cancelScheduledNotificationAsync: jest.fn(async () => {}),
+  scheduleNotificationAsync: jest.fn(async ({ identifier }: { identifier?: string }) => identifier ?? 'test'),
+}));
