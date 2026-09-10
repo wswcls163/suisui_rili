@@ -6,7 +6,7 @@ import { CountupForm } from '../src/components/CountupForm';
 import { DateCalculatorDialog } from '../src/components/DateCalculatorDialog';
 import { MonthCalendar } from '../src/components/MonthCalendar';
 import { AppProvider } from '../src/state/AppProvider';
-import Home from '../app/index';
+import Home, { homeLayoutWidth } from '../app/index';
 import NewBirthday from '../app/new';
 import BirthdayDetails from '../app/birthday/[id]';
 import CountupDetails from '../app/countup/[id]';
@@ -24,6 +24,12 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ id: 'a' }),
 }));
 const today = '2026-09-04';
+test('电脑手机预览参数固定使用 443 像素布局宽度', () => {
+  expect(homeLayoutWidth(1440, 'web', '?preview=phone')).toBe(443);
+  expect(homeLayoutWidth(1440, 'web', '')).toBe(1440);
+  expect(homeLayoutWidth(390, 'android', '?preview=phone')).toBe(390);
+});
+
 test('新建先选择类型，预填所选闰月日期；未开放类型不可点击', async () => {
   const save = jest.fn(async () => {});
   render(<BirthdayForm selectedDate="2023-03-22" today={today} onSave={save} onCancel={() => {}} />);
@@ -574,9 +580,9 @@ test('详情删除需要确认，取消不写库；失败保留记录，成功�
   expect(repo.remove).toHaveBeenCalledTimes(2);
 });
 
-test('首页展示时光记摘要和列表，详情支持编辑入口与确认删除', async () => {
+test('首页按标签直接展示对应内容，时光记不再跨标签预览或重复', async () => {
   const repo = memoryRepository(
-    [],
+    [fixture('person', { name: '妈妈' })],
     [countupFixture('a', { title: '开始健身', startDate: '2026-09-04', note: '每天半小时' })],
   );
   const home = render(
@@ -584,10 +590,21 @@ test('首页展示时光记摘要和列表，详情支持编辑入口与确认�
       <Home />
     </AppProvider>,
   );
-  await screen.findByRole('button', { name: '查看时光记开始健身' });
-  expect(screen.getByText('第 1 天')).toBeTruthy();
+  await screen.findByRole('header', { name: '我的日历' });
+  expect(screen.queryByRole('button', { name: '查看时光记开始健身' })).toBeNull();
+  expect(screen.queryByRole('button', { name: '查看时光记开始健身，第 1 天' })).toBeNull();
+
+  fireEvent.press(screen.getByRole('tab', { name: '生日簿 1' }));
+  expect(screen.getByRole('header', { name: '生日簿' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: '查看妈妈的生日' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '日期计算' })).toBeNull();
+  expect(screen.queryByText('今天有 1 位亲友过生日')).toBeNull();
+
   fireEvent.press(screen.getByRole('tab', { name: '时光记 1' }));
+  expect(screen.getByRole('header', { name: '时光记' })).toBeTruthy();
   expect(screen.getByText('每天半小时')).toBeTruthy();
+  expect(screen.getAllByText('开始健身')).toHaveLength(1);
+  expect(screen.queryByRole('button', { name: /查看全部.*时光记/ })).toBeNull();
   fireEvent.press(screen.getByRole('button', { name: '查看时光记开始健身，第 1 天' }));
   expect(router.push).toHaveBeenCalledWith({ pathname: '/countup/[id]', params: { id: 'a' } });
   home.unmount();
@@ -605,7 +622,7 @@ test('首页展示时光记摘要和列表，详情支持编辑入口与确认�
   expect(repo.removeCountup).not.toHaveBeenCalled();
 });
 
-test('首页最多展示三条时光记摘要，并可切换到完整列表', async () => {
+test('时光记标签直接展示全部记录', async () => {
   const repo = memoryRepository(
     [],
     [
@@ -620,16 +637,16 @@ test('首页最多展示三条时光记摘要，并可切换到完整列表', as
       <Home />
     </AppProvider>,
   );
-  await screen.findByRole('button', { name: '查看时光记最新的记录' });
-  expect(screen.getByRole('button', { name: '查看时光记第三条记录' })).toBeTruthy();
-  expect(screen.getByRole('button', { name: '查看时光记第二条记录' })).toBeTruthy();
-  expect(screen.queryByRole('button', { name: '查看时光记最早的记录' })).toBeNull();
-
-  fireEvent.press(screen.getByRole('button', { name: '查看全部 4 条时光记' }));
+  await screen.findByRole('tab', { name: '时光记 4' });
+  fireEvent.press(screen.getByRole('tab', { name: '时光记 4' }));
   expect(screen.getByRole('tab', { name: '时光记 4' }).props.accessibilityState).toEqual({
     selected: true,
   });
+  expect(screen.getByRole('button', { name: '查看时光记最新的记录，第 1 天' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: '查看时光记第三条记录，第 1 天' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: '查看时光记第二条记录，第 1 天' })).toBeTruthy();
   expect(screen.getByRole('button', { name: '查看时光记最早的记录，第 1 天' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: /查看全部.*时光记/ })).toBeNull();
 });
 
 test('每年纪念详情同时展示周年、下一次纪念日和总天数', async () => {
