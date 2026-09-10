@@ -180,9 +180,11 @@ test('月历七列、选日回调和多人标记；首尾月份禁止越界', ()
       onSelect={select}
       onMonth={() => {}}
       onToday={() => {}}
+      compact
     />,
   );
   const day = screen.getByRole('button', { name: /2026-09-04.*2/ });
+  expect(day).toHaveStyle({ minHeight: 74, marginVertical: 1, paddingVertical: 4 });
   fireEvent.press(day);
   expect(select).toHaveBeenCalledWith(today);
   rerender(

@@ -16,6 +16,7 @@ export function MonthCalendar({
   onSelect,
   onMonth,
   onToday,
+  compact = false,
 }: {
   month: string;
   today: string;
@@ -24,6 +25,7 @@ export function MonthCalendar({
   onSelect: (date: string) => void;
   onMonth: (month: string) => void;
   onToday: () => void;
+  compact?: boolean;
 }) {
   const [jump, setJump] = useState(false);
   const grid = useMemo(() => monthGrid(month), [month]);
@@ -34,8 +36,8 @@ export function MonthCalendar({
     return result;
   }, [entries]);
   return (
-    <View style={styles.calendar}>
-      <View style={[common.between, { paddingHorizontal: 8, paddingBottom: 20, flexWrap: 'wrap' }]}>
+    <View style={[styles.calendar, compact && styles.calendarCompact]}>
+      <View style={[common.between, styles.calendarHeader, compact && styles.calendarHeaderCompact]}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="跳转日期"
@@ -73,7 +75,7 @@ export function MonthCalendar({
       </View>
       <View style={styles.week}>
         {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
-          <Text key={day} style={styles.weekday}>
+          <Text key={day} style={[styles.weekday, compact && styles.weekdayCompact]}>
             {day}
           </Text>
         ))}
@@ -81,7 +83,8 @@ export function MonthCalendar({
       {grid.map((week, index) => (
         <View key={index} style={styles.week}>
           {week.map((date, dayIndex) => {
-            if (!date) return <View key={`empty-${dayIndex}`} style={styles.cell} />;
+            if (!date)
+              return <View key={`empty-${dayIndex}`} style={[styles.cell, compact && styles.cellCompact]} />;
             const lunar = lunarCalendar.lunarOn(date);
             const label =
               lunar.day === 1
@@ -100,14 +103,16 @@ export function MonthCalendar({
                 onPress={() => onSelect(date)}
                 style={({ pressed }) => [
                   styles.cell,
+                  compact && styles.cellCompact,
                   styles.day,
+                  compact && styles.dayCompact,
                   date === today && styles.today,
                   isSelected && styles.selected,
                   pressed && { opacity: 0.75 },
                 ]}
               >
                 <Text style={[styles.dayNumber, isSelected && styles.white]}>{Number(date.slice(8))}</Text>
-                <View style={styles.labelLine}>
+                <View style={[styles.labelLine, compact && styles.labelLineCompact]}>
                   <Text
                     numberOfLines={1}
                     ellipsizeMode="tail"
@@ -125,7 +130,7 @@ export function MonthCalendar({
                     </Text>
                   )}
                 </View>
-                <View style={styles.birthday}>
+                <View style={[styles.birthday, compact && styles.birthdayCompact]}>
                   {birthdays.length > 0 && (
                     <>
                       <View style={styles.birthdayName}>
@@ -160,7 +165,7 @@ export function MonthCalendar({
           })}
         </View>
       ))}
-      <View style={[common.between, { paddingTop: 18, paddingHorizontal: 8, flexWrap: 'wrap' }]}>
+      <View style={[common.between, styles.calendarFooter, compact && styles.calendarFooterCompact]}>
         <View style={common.row}>
           <MaterialCommunityIcons name="cake-variant" size={16} color={colors.accent} accessible={false} />
           <Text style={common.muted}>有生日　◯ 今天</Text>
@@ -182,9 +187,15 @@ export function MonthCalendar({
 }
 const styles = StyleSheet.create({
   calendar: { ...common.card, padding: 14 },
+  calendarCompact: { padding: 12 },
+  calendarHeader: { paddingHorizontal: 8, paddingBottom: 20, flexWrap: 'wrap' },
+  calendarHeaderCompact: { paddingHorizontal: 4, paddingBottom: 12 },
+  calendarFooter: { paddingTop: 18, paddingHorizontal: 8, flexWrap: 'wrap' },
+  calendarFooterCompact: { paddingTop: 12, paddingHorizontal: 4 },
   arrow: { width: 40, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
   week: { flexDirection: 'row', gap: 3 },
   weekday: { flex: 1, textAlign: 'center', color: colors.muted, fontSize: 12, paddingVertical: 12 },
+  weekdayCompact: { paddingVertical: 8 },
   cell: {
     flex: 1,
     minWidth: 0,
@@ -194,13 +205,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'transparent',
   },
+  cellCompact: { minHeight: 74, marginVertical: 1 },
   day: { alignItems: 'center', justifyContent: 'center', paddingVertical: 7, paddingHorizontal: 2 },
+  dayCompact: { paddingVertical: 4 },
   dayNumber: { fontSize: 18, color: colors.ink, fontWeight: '500' },
   labelLine: { flexDirection: 'row', alignItems: 'center', maxWidth: '100%', marginTop: 4, gap: 1 },
+  labelLineCompact: { marginTop: 2 },
   lunar: { fontSize: 10, color: colors.muted, flexShrink: 1 },
   labelCount: { fontSize: 8, color: colors.accent },
   festival: { color: colors.accent, fontWeight: '600' },
   birthday: { width: '100%', minHeight: 40, marginTop: 4, alignItems: 'center' },
+  birthdayCompact: { minHeight: 28, marginTop: 2 },
   birthdayName: { flexDirection: 'row', alignItems: 'center', gap: 2, maxWidth: '100%' },
   event: { fontSize: 10, lineHeight: 13, color: colors.accent, fontWeight: '500', flexShrink: 1 },
   birthdayKinds: {

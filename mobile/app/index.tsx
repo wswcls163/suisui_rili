@@ -339,6 +339,7 @@ export default function Home() {
                       onSelect={state.selectDate}
                       onMonth={state.viewMonth}
                       onToday={() => state.selectDate(state.today)}
+                      compact={narrow}
                     />
                   </View>
                   {!wide && (
