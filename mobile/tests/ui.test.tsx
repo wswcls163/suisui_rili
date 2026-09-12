@@ -6,7 +6,7 @@ import { CountupForm } from '../src/components/CountupForm';
 import { DateCalculatorDialog } from '../src/components/DateCalculatorDialog';
 import { MonthCalendar } from '../src/components/MonthCalendar';
 import { AppProvider } from '../src/state/AppProvider';
-import Home, { homeLayoutWidth } from '../app/index';
+import Home, { homeLayoutWidth, homeTabFromParam } from '../app/index';
 import NewBirthday from '../app/new';
 import BirthdayDetails from '../app/birthday/[id]';
 import CountupDetails from '../app/countup/[id]';
@@ -28,6 +28,33 @@ test('电脑手机预览参数固定使用 443 像素布局宽度', () => {
   expect(homeLayoutWidth(1440, 'web', '?preview=phone')).toBe(443);
   expect(homeLayoutWidth(1440, 'web', '')).toBe(1440);
   expect(homeLayoutWidth(390, 'android', '?preview=phone')).toBe(390);
+  expect(homeTabFromParam('book')).toBe('book');
+  expect(homeTabFromParam('invalid')).toBe('calendar');
+});
+
+test('左侧功能菜单直接切换首页功能并提供独立设置入口', async () => {
+  render(
+    <AppProvider
+      repo={memoryRepository([fixture('a')], [countupFixture('a', { title: '开始健身' })])}
+      clock={clock}
+    >
+      <Home />
+    </AppProvider>,
+  );
+  await screen.findByRole('button', { name: '打开功能菜单' });
+  fireEvent.press(screen.getByRole('button', { name: '打开功能菜单' }));
+  expect(screen.getByRole('button', { name: '功能菜单：生日簿 1' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: '功能菜单：重要日期提醒' })).toBeTruthy();
+  fireEvent.press(screen.getByRole('button', { name: '功能菜单：时光记 1' }));
+  expect(screen.getByRole('header', { name: '时光记' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '功能菜单：生日簿 1' })).toBeNull();
+
+  fireEvent.press(screen.getByRole('button', { name: '打开功能菜单' }));
+  fireEvent.press(screen.getByRole('button', { name: '功能菜单：重要日期提醒' }));
+  expect(router.push).toHaveBeenCalledWith({
+    pathname: '/account',
+    params: { section: 'notifications' },
+  });
 });
 
 test('新建先选择类型，预填所选闰月日期；未开放类型不可点击', async () => {

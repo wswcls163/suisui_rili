@@ -18,7 +18,7 @@ jest.mock(
   () => jest.requireActual('react-native-safe-area-context/jest/mock').default,
 );
 jest.mock('expo-router', () => ({
-  router: { back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
+  router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
 }));
 
 function authService(initial: { userId: string; email: string } | null = null) {
@@ -121,6 +121,17 @@ test('未配置账号服务时说明本机仍可使用', () => {
   );
   expect(screen.getByText('账号服务尚未配置')).toBeTruthy();
   expect(screen.getByText('当前生日仍会安全地保存在这台设备上。')).toBeTruthy();
+});
+
+test('重要日期提醒作为独立侧边栏页面，不混入账号内容', () => {
+  render(
+    <AuthProvider service={null}>
+      <AccountScreen section="notifications" />
+    </AuthProvider>,
+  );
+  expect(screen.getByRole('header', { name: '重要日期提醒' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: '打开功能菜单' })).toBeTruthy();
+  expect(screen.queryByText('账号服务尚未配置')).toBeNull();
 });
 
 test('登录页提交邮箱密码，并能切换到注册和找回密码', async () => {

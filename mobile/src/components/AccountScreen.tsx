@@ -18,6 +18,7 @@ import { useAuth } from '../state/AuthProvider';
 import { useAccountSync, type SyncStatus } from '../state/SyncProvider';
 import { Button, colors, common, Dialog, Icon } from './ui';
 import { NotificationSettingsCard } from './NotificationSettingsCard';
+import { NavigationDrawer } from './NavigationDrawer';
 
 type GuestMode = 'login' | 'register' | 'forgot';
 
@@ -383,12 +384,20 @@ function SignedInAccount() {
   );
 }
 
-export function AccountScreen() {
+export type AccountSection = 'notifications' | 'account';
+
+export function AccountScreen({
+  section = 'account',
+  phonePreview = false,
+  birthdayCount = 0,
+  countupCount = 0,
+}: {
+  section?: AccountSection;
+  phonePreview?: boolean;
+  birthdayCount?: number;
+  countupCount?: number;
+}) {
   const auth = useAuth();
-  const phonePreview =
-    Platform.OS === 'web' &&
-    typeof window !== 'undefined' &&
-    new URLSearchParams(window.location.search).get('preview') === 'phone';
   const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
   return (
     <SafeAreaView style={common.page}>
@@ -398,11 +407,22 @@ export function AccountScreen() {
           contentContainerStyle={[common.content, styles.content, phonePreview && styles.phonePreviewContent]}
         >
           <View style={common.between}>
-            <Button label="返回" variant="quiet" icon="chevron-back" onPress={back} />
-            <Text style={common.eyebrow}>设置</Text>
+            <View style={common.row}>
+              <NavigationDrawer
+                active={section}
+                birthdayCount={birthdayCount}
+                countupCount={countupCount}
+                phonePreview={phonePreview}
+              />
+              <Text style={common.eyebrow}>
+                {section === 'notifications' ? '重要日期提醒' : '账号与同步'}
+              </Text>
+            </View>
+            <Button label="返回" variant="quiet" onPress={back} />
           </View>
-          <NotificationSettingsCard />
-          {auth.status === 'unconfigured' ? (
+          {section === 'notifications' ? (
+            <NotificationSettingsCard />
+          ) : auth.status === 'unconfigured' ? (
             <View style={[common.card, styles.unconfigured]}>
               <View style={styles.accountMark}>
                 <Icon name="cloud-offline-outline" color={colors.accent} size={28} />

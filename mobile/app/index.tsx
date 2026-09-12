@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useBirthdays } from '../src/state/AppProvider';
 import {
   adjustmentText,
@@ -30,8 +30,9 @@ import { Avatar, Button, colors, common, Icon } from '../src/components/ui';
 import { storageDescription } from '../src/data/repository';
 import { useAuth } from '../src/state/AuthProvider';
 import { useAccountSync } from '../src/state/SyncProvider';
+import { NavigationDrawer, type HomeSection } from '../src/components/NavigationDrawer';
 
-type HomeTab = 'calendar' | 'book' | 'countup';
+type HomeTab = HomeSection;
 const PHONE_PREVIEW_WIDTH = 443;
 
 const tabCopy: Record<HomeTab, { eyebrow: string; title: string }> = {
@@ -44,6 +45,11 @@ export function homeLayoutWidth(width: number, platform: string, search: string)
   return platform === 'web' && new URLSearchParams(search).get('preview') === 'phone'
     ? PHONE_PREVIEW_WIDTH
     : width;
+}
+
+export function homeTabFromParam(value: string | string[] | undefined): HomeTab {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  return candidate === 'book' || candidate === 'countup' ? candidate : 'calendar';
 }
 
 function PersonRow({ row }: { row: BirthdayRow }) {
@@ -178,14 +184,17 @@ export default function Home() {
   const state = useBirthdays();
   const auth = useAuth();
   const sync = useAccountSync();
+  const params = useLocalSearchParams<{ tab?: string | string[]; tool?: string | string[] }>();
   const { width } = useWindowDimensions();
   const previewSearch = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.search : '';
   const layoutWidth = homeLayoutWidth(width, Platform.OS, previewSearch);
   const phonePreview = layoutWidth !== width;
   const wide = layoutWidth >= 900;
   const narrow = layoutWidth < 600;
-  const [tab, setTab] = useState<HomeTab>('calendar');
-  const [calculatingDate, setCalculatingDate] = useState(false);
+  const [tab, setTab] = useState<HomeTab>(() => homeTabFromParam(params.tab));
+  const [calculatingDate, setCalculatingDate] = useState(
+    () => (Array.isArray(params.tool) ? params.tool[0] : params.tool) === 'calculator',
+  );
   useFocusEffect(state.refreshToday);
   const entries = useMemo(
     () => entriesForMonth(lunarCalendar, state.people, state.month),
@@ -206,6 +215,20 @@ export default function Home() {
       >
         <View style={[common.between, !narrow && { marginBottom: 6 }]}>
           <View style={common.row}>
+            <NavigationDrawer
+              active={tab}
+              birthdayCount={state.people.length}
+              countupCount={state.countups.length}
+              phonePreview={phonePreview}
+              onSelectHomeSection={(section) => {
+                setTab(section);
+                state.refreshToday();
+              }}
+              onOpenDateCalculator={() => {
+                setTab('calendar');
+                setCalculatingDate(true);
+              }}
+            />
             <View style={[styles.brandIcon, narrow && styles.brandIconNarrow]}>
               <Icon name="calendar-outline" color="#FFF" size={23} />
             </View>
@@ -217,7 +240,12 @@ export default function Home() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="账号与同步"
-            onPress={() => router.push(phonePreview ? '/account?preview=phone' : '/account')}
+            onPress={() =>
+              router.push({
+                pathname: '/account',
+                params: { section: 'account', ...(phonePreview ? { preview: 'phone' } : {}) },
+              })
+            }
             style={({ pressed }) => [styles.localChip, pressed && { opacity: 0.68 }]}
           >
             <Icon
