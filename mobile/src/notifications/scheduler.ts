@@ -28,7 +28,7 @@ async function ensureChannel(): Promise<void> {
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     name: '重要日期提醒',
-    description: '生日和时光记周年当天的提醒',
+    description: '节日、节气、生日和时光记周年当天的提醒',
     importance: Notifications.AndroidImportance.HIGH,
     sound: 'default',
     enableVibrate: true,

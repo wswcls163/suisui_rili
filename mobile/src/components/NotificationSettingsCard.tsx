@@ -47,6 +47,7 @@ export function NotificationSettingsCard() {
       </View>
 
       <View style={styles.rules}>
+        <ReminderRule icon="flag-outline" label="节日与节气" value={`当天 ${time} · 重叠合并`} />
         <ReminderRule icon="gift-outline" label="生日" value={`当天 ${time}`} />
         <ReminderRule icon="sparkles-outline" label="每年纪念" value={`周年当天 ${time}`} />
         <ReminderRule icon="calendar-outline" label="记录天数" value="不发送通知" />
@@ -91,7 +92,7 @@ function ReminderRule({
   label,
   value,
 }: {
-  icon: 'gift-outline' | 'sparkles-outline' | 'calendar-outline';
+  icon: 'flag-outline' | 'gift-outline' | 'sparkles-outline' | 'calendar-outline';
   label: string;
   value: string;
 }) {

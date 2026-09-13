@@ -118,28 +118,43 @@ function CountupRow({ item, today }: { item: Countup; today: string }) {
 function TodayReminder({
   rows,
   peopleCount,
+  festivals,
   compact,
 }: {
   rows: BirthdayRow[];
   peopleCount: number;
+  festivals: string[];
   compact: boolean;
 }) {
+  const hasBirthdays = rows.length > 0;
+  const hasFestivals = festivals.length > 0;
+  const hasReminder = hasBirthdays || hasFestivals;
+  const heading =
+    hasBirthdays && hasFestivals
+      ? '今天有多个重要日子'
+      : hasFestivals
+        ? `今天是${festivals.join('、')}`
+        : hasBirthdays
+          ? `今天有 ${rows.length} 位亲友过生日`
+          : '今天没有重要日期提醒';
+  const icon = hasFestivals ? (hasBirthdays ? 'notifications-outline' : 'flag-outline') : 'gift-outline';
   return (
     <View
+      testID="today-reminder"
       style={[
         styles.reminder,
         compact && styles.reminderNarrow,
-        rows.length > 0 && { backgroundColor: colors.ink, borderColor: colors.ink },
+        hasReminder && { backgroundColor: colors.ink, borderColor: colors.ink },
       ]}
     >
       <View
         style={[
           styles.reminderIcon,
           compact && styles.reminderIconNarrow,
-          rows.length > 0 && { backgroundColor: '#465052' },
+          hasReminder && { backgroundColor: '#465052' },
         ]}
       >
-        <Icon name="gift-outline" size={24} color={rows.length ? '#EDBEA6' : colors.accent} />
+        <Icon name={icon} size={24} color={hasReminder ? '#EDBEA6' : colors.accent} />
       </View>
       <View style={{ flex: 1, gap: 7 }}>
         <Text
@@ -147,12 +162,17 @@ function TodayReminder({
             common.heading,
             { fontSize: 17 },
             compact && styles.reminderHeadingNarrow,
-            rows.length > 0 && { color: '#FFF' },
+            hasReminder && { color: '#FFF' },
           ]}
         >
-          {rows.length ? `今天有 ${rows.length} 位亲友过生日` : '今天没有生日提醒'}
+          {heading}
         </Text>
-        {rows.length ? (
+        {hasFestivals && (
+          <Text style={{ fontSize: 13, lineHeight: 22, color: '#EBE7E1' }}>
+            节日与节气 · {festivals.join('、')}
+          </Text>
+        )}
+        {hasBirthdays ? (
           rows.map(({ person, next }) => (
             <Pressable
               key={person.id}
@@ -170,11 +190,11 @@ function TodayReminder({
               </Text>
             </Pressable>
           ))
-        ) : (
+        ) : !hasFestivals ? (
           <Text style={common.muted}>
             {peopleCount ? '重要的日子，都好好记着。' : '从一个生日开始，把牵挂记在这里。'}
           </Text>
-        )}
+        ) : null}
       </View>
     </View>
   );
@@ -203,6 +223,7 @@ export default function Home() {
   const selected = entries.filter((entry) => entry.occurrence.solar === state.selectedDate);
   const selectedLunar = lunarCalendar.lunarOn(state.selectedDate);
   const selectedFestivals = festivalsOn(state.selectedDate);
+  const todayFestivals = supported(state.today) ? festivalsOn(state.today) : [];
   const create = () => router.push('/new');
   return (
     <SafeAreaView style={common.page}>
@@ -374,6 +395,7 @@ export default function Home() {
                     <TodayReminder
                       rows={state.todayRows}
                       peopleCount={state.people.length}
+                      festivals={todayFestivals}
                       compact={narrow}
                     />
                   )}
@@ -471,7 +493,12 @@ export default function Home() {
                   </View>
                 </View>
                 {wide && (
-                  <TodayReminder rows={state.todayRows} peopleCount={state.people.length} compact={false} />
+                  <TodayReminder
+                    rows={state.todayRows}
+                    peopleCount={state.people.length}
+                    festivals={todayFestivals}
+                    compact={false}
+                  />
                 )}
               </View>
             ) : tab === 'book' ? (

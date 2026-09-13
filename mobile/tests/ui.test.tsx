@@ -293,7 +293,7 @@ test('节日同日保留生日姓名与完整无障碍日期，选择后显示�
   expect(screen.getByText('国庆节', { exact: true })).toBeTruthy();
   expect(screen.getByText('2020 农历年 · 八月十五')).toBeTruthy();
   expect(screen.getByRole('button', { name: '查看团圆的生日详情' })).toBeTruthy();
-  expect(screen.getByText('今天没有生日提醒')).toBeTruthy();
+  expect(screen.getByText('今天没有重要日期提醒')).toBeTruthy();
 });
 
 test('小年与节气同日时保留数量提示，选日展示全部名称', async () => {
@@ -307,7 +307,8 @@ test('小年与节气同日时保留数量提示，选日展示全部名称', as
   expect(screen.getAllByText('北方小年')).toHaveLength(2);
   expect(within(date).getByText('+1')).toBeTruthy();
   expect(screen.getByText('大寒')).toBeTruthy();
-  expect(screen.getByText('今天没有生日提醒')).toBeTruthy();
+  expect(screen.getByText('今天是北方小年、大寒')).toBeTruthy();
+  expect(screen.getByText('节日与节气 · 北方小年、大寒')).toBeTruthy();
 });
 
 test.each([
@@ -330,7 +331,7 @@ test.each([
   expect(label.props.numberOfLines).toBe(1);
   expect(label.props.ellipsizeMode).toBe('tail');
   expect(screen.getAllByText(name, { exact: true })).toHaveLength(2);
-  expect(screen.getByText('今天没有生日提醒')).toBeTruthy();
+  expect(screen.getByText(new RegExp(`今天是.*${name}`))).toBeTruthy();
 });
 
 test.each([
@@ -576,7 +577,7 @@ test('首页首次使用为空，无虚构亲友；同日多人全部提醒', as
       <Home />
     </AppProvider>,
   );
-  await screen.findByText('今天没有生日提醒');
+  await screen.findByText('今天没有重要日期提醒');
   expect(screen.getByRole('button', { name: '添加第一个生日' })).toBeTruthy();
   empty.unmount();
   render(
@@ -587,6 +588,23 @@ test('首页首次使用为空，无虚构亲友；同日多人全部提醒', as
   await screen.findByText('今天有 2 位亲友过生日');
   expect(screen.getByRole('button', { name: '今天：亲友a的生日' })).toBeTruthy();
   expect(screen.getByRole('button', { name: '今天：亲友b的生日' })).toBeTruthy();
+});
+
+test('首页把同日节日和生日放在同一张重要日期提醒卡中', async () => {
+  render(
+    <AppProvider
+      repo={memoryRepository([
+        fixture('teacher', { name: '老师', lunar: null, solar: { month: 9, day: 10 } }),
+      ])}
+      clock={{ now: () => Date.parse('2026-09-10T04:00:00Z') }}
+    >
+      <Home />
+    </AppProvider>,
+  );
+  const reminder = await screen.findByTestId('today-reminder');
+  expect(within(reminder).getByText('今天有多个重要日子')).toBeTruthy();
+  expect(within(reminder).getByText('节日与节气 · 教师节')).toBeTruthy();
+  expect(within(reminder).getByRole('button', { name: '今天：老师的生日' })).toBeTruthy();
 });
 test('详情删除需要确认，取消不写库；失败保留记录，成功才返回', async () => {
   const repo = memoryRepository([fixture('a')]);

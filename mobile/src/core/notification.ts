@@ -8,7 +8,8 @@ import {
 } from './birthday';
 import type { LunarCalendar } from './calendar';
 import { anniversaryDate, type Countup } from './countup';
-import { todayInBeijing } from './dates';
+import { addDays, LAST_DATE, todayInBeijing } from './dates';
+import { festivalsOn } from './festivals';
 
 export const DEFAULT_NOTIFICATION_SETTINGS = Object.freeze({ enabled: false, hour: 9, minute: 0 });
 export const MAX_SCHEDULED_REMINDERS = 60;
@@ -19,7 +20,7 @@ export type NotificationSettings = {
   minute: number;
 };
 
-export type ReminderKind = 'birthday' | 'anniversary';
+export type ReminderKind = 'birthday' | 'anniversary' | 'festival' | 'combined';
 
 export type ScheduledReminder = {
   identifier: string;
@@ -147,6 +148,56 @@ function anniversaryReminders(
   return reminders;
 }
 
+function festivalReminders(today: string, now: number, settings: NotificationSettings): ScheduledReminder[] {
+  const reminders: ScheduledReminder[] = [];
+  let date = today;
+  while (date <= LAST_DATE && reminders.length < MAX_SCHEDULED_REMINDERS) {
+    const triggerAt = beijingTriggerAt(date, settings);
+    if (triggerAt > now) {
+      const names = festivalsOn(date);
+      if (names.length > 0) {
+        reminders.push({
+          identifier: `suisui-festival-${date}`,
+          kind: 'festival',
+          itemId: date,
+          date,
+          triggerAt,
+          title: `今天是${names.join('、')}`,
+          body: '日历上的重要日子，愿今天有值得记住的时刻。',
+        });
+      }
+    }
+    if (date === LAST_DATE) break;
+    date = addDays(date, 1);
+  }
+  return reminders;
+}
+
+function reminderSubject(reminder: ScheduledReminder): string {
+  return reminder.title.startsWith('今天是') ? reminder.title.slice(3) : reminder.title;
+}
+
+function mergeRemindersOnSameDate(reminders: ScheduledReminder[]): ScheduledReminder[] {
+  const grouped = new Map<string, ScheduledReminder[]>();
+  for (const reminder of reminders) {
+    const values = grouped.get(reminder.date) ?? [];
+    values.push(reminder);
+    grouped.set(reminder.date, values);
+  }
+  return [...grouped.entries()].map(([date, values]) => {
+    if (values.length === 1) return values[0];
+    return {
+      identifier: `suisui-combined-${date}`,
+      kind: 'combined',
+      itemId: date,
+      date,
+      triggerAt: values[0].triggerAt,
+      title: '今天有多个重要日子',
+      body: `${values.map(reminderSubject).join('、')}。都值得好好记住。`,
+    };
+  });
+}
+
 export function buildNotificationPlan({
   calendar,
   people,
@@ -162,10 +213,11 @@ export function buildNotificationPlan({
 }): ScheduledReminder[] {
   if (!settings.enabled) return [];
   const today = todayInBeijing(now);
-  return [
+  return mergeRemindersOnSameDate([
+    ...festivalReminders(today, now, settings),
     ...people.flatMap((person) => birthdayReminders(calendar, person, today, now, settings)),
     ...countups.flatMap((item) => anniversaryReminders(item, today, now, settings)),
-  ]
+  ])
     .sort((a, b) => a.triggerAt - b.triggerAt || a.identifier.localeCompare(b.identifier))
     .slice(0, MAX_SCHEDULED_REMINDERS);
 }
