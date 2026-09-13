@@ -1,10 +1,17 @@
 import * as SecureStore from 'expo-secure-store';
 
 const CHUNK_SIZE = 1800;
+const MAX_CHUNKS = 64;
+
+function validChunkCount(value: string | null): number | null {
+  if (value === null || !/^\d+$/.test(value)) return null;
+  const count = Number(value);
+  return Number.isSafeInteger(count) && count >= 1 && count <= MAX_CHUNKS ? count : null;
+}
 
 async function removeChunks(key: string): Promise<void> {
-  const count = Number(await SecureStore.getItemAsync(`${key}.parts`));
-  if (Number.isInteger(count) && count > 0) {
+  const count = validChunkCount(await SecureStore.getItemAsync(`${key}.parts`));
+  if (count !== null) {
     await Promise.all(
       Array.from({ length: count }, (_, index) => SecureStore.deleteItemAsync(`${key}.${index}`)),
     );
@@ -16,14 +23,16 @@ export const sessionStorage = {
   async getItem(key: string): Promise<string | null> {
     const direct = await SecureStore.getItemAsync(key);
     if (direct !== null) return direct;
-    const count = Number(await SecureStore.getItemAsync(`${key}.parts`));
-    if (!Number.isInteger(count) || count < 1) return null;
+    const count = validChunkCount(await SecureStore.getItemAsync(`${key}.parts`));
+    if (count === null) return null;
     const parts = await Promise.all(
       Array.from({ length: count }, (_, index) => SecureStore.getItemAsync(`${key}.${index}`)),
     );
     return parts.every((part): part is string => part !== null) ? parts.join('') : null;
   },
   async setItem(key: string, value: string): Promise<void> {
+    const partCount = Math.ceil(value.length / CHUNK_SIZE);
+    if (partCount > MAX_CHUNKS) throw new Error('账号会话数据异常，无法安全保存');
     await removeChunks(key);
     if (value.length <= CHUNK_SIZE) {
       await SecureStore.setItemAsync(key, value);

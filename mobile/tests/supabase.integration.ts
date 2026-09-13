@@ -16,6 +16,10 @@ const timeNoteMigration = readFileSync(
   join(root, 'supabase', 'migrations', '202609050003_time_notes.sql'),
   'utf8',
 );
+const securityMigration = readFileSync(
+  join(root, 'supabase', 'migrations', '202609130001_account_security_hardening.sql'),
+  'utf8',
+);
 const deletionFunction = readFileSync(
   join(root, 'supabase', 'functions', 'delete-account', 'index.ts'),
   'utf8',
@@ -68,4 +72,28 @@ test('注销函数先验证当前会话，服务端密钥只用于删除该用�
   assert.match(deletionFunction, /SUPABASE_SERVICE_ROLE_KEY/);
   assert.match(deletionFunction, /admin\.auth\.admin\.deleteUser\(data\.user\.id\)/);
   assert.doesNotMatch(deletionFunction, /deleteUser\(request|deleteUser\([^d]/);
+});
+
+test('安全加固禁止客户端绕过同步 RPC 直接写表，并隔离幂等结果', () => {
+  assert.match(
+    securityMigration,
+    /revoke all privileges on table public\.birthdays from public, anon, authenticated/i,
+  );
+  assert.match(securityMigration, /grant select on table public\.birthdays to authenticated/i);
+  assert.doesNotMatch(
+    securityMigration,
+    /grant\s+(insert|update|delete|all)[\s\S]+public\.birthdays[\s\S]+authenticated/i,
+  );
+  assert.match(
+    securityMigration,
+    /revoke all privileges on table public\.sync_operations from public, anon, authenticated/i,
+  );
+  assert.match(
+    securityMigration,
+    /revoke all on function public\.apply_birthday_mutation[\s\S]+from public, anon/i,
+  );
+  assert.match(
+    securityMigration,
+    /for select to authenticated[\s\S]+auth\.uid\(\)\) is not null[\s\S]+auth\.uid\(\)\) = user_id/i,
+  );
 });

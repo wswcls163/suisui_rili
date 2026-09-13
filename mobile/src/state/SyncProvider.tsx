@@ -77,6 +77,12 @@ export function SyncProvider({
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const retryAttempt = useRef(0);
   const ownerSwitches = useRef<Promise<void>>(Promise.resolve());
+  const sessionOwner = auth.session ? accountOwner(auth.session.userId) : null;
+  const sessionOwnerRef = useRef(sessionOwner);
+
+  useEffect(() => {
+    sessionOwnerRef.current = sessionOwner;
+  }, [sessionOwner]);
 
   const refreshMeta = useCallback(async () => {
     if (!local) return { pending: 0, conflicts: 0 };
@@ -99,16 +105,19 @@ export function SyncProvider({
         setStatus(auth.session ? 'unavailable' : 'local');
         return;
       }
+      if (sessionOwnerRef.current !== target || local.getOwner() !== target) return;
       setStatus('syncing');
       setError('');
       try {
         await coordinator.sync(target);
+        if (sessionOwnerRef.current !== target || local.getOwner() !== target) return;
         const meta = await refreshMeta();
         retryAttempt.current = 0;
         setLastSyncedAt(new Date().toISOString());
         setStatus(meta.conflicts ? 'conflict' : 'synced');
         setRevision((value) => value + 1);
       } catch (reason) {
+        if (sessionOwnerRef.current !== target || local.getOwner() !== target) return;
         retryAttempt.current++;
         setError(reason instanceof Error ? reason.message : '暂时无法同步，请稍后重试');
         setStatus('error');

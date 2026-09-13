@@ -1,8 +1,13 @@
 import 'react-native-url-polyfill/auto';
-import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';
-import type { AccountSession, AuthCallbackKind, AuthService } from './auth';
+import {
+  markAuthCallbackUrl,
+  parseAuthCallbackUrl,
+  type AccountSession,
+  type AuthCallbackKind,
+  type AuthService,
+} from './auth';
 import { sessionStorage } from './session-storage';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim();
@@ -16,7 +21,7 @@ export const supabaseClient: SupabaseClient | null = accountConfigured
         storage: sessionStorage,
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: Platform.OS === 'web',
+        detectSessionInUrl: false,
         flowType: 'pkce',
       },
     })
@@ -27,8 +32,8 @@ function accountSession(session: Session | null): AccountSession | null {
   return { userId: session.user.id, email: session.user.email };
 }
 
-function redirectUrl(): string {
-  return Linking.createURL('auth/callback');
+function authRedirectUrl(kind?: AuthCallbackKind): string {
+  return markAuthCallbackUrl(Linking.createURL('auth/callback'), kind);
 }
 
 class SupabaseAuthService implements AuthService {
@@ -51,7 +56,7 @@ class SupabaseAuthService implements AuthService {
     const { data, error } = await this.client.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: redirectUrl() },
+      options: { emailRedirectTo: authRedirectUrl() },
     });
     if (error) throw error;
     return { session: accountSession(data.session) };
@@ -66,7 +71,9 @@ class SupabaseAuthService implements AuthService {
   }
 
   async requestPasswordReset(email: string): Promise<void> {
-    const { error } = await this.client.auth.resetPasswordForEmail(email, { redirectTo: redirectUrl() });
+    const { error } = await this.client.auth.resetPasswordForEmail(email, {
+      redirectTo: authRedirectUrl('recovery'),
+    });
     if (error) throw error;
   }
 
@@ -76,29 +83,13 @@ class SupabaseAuthService implements AuthService {
   }
 
   async handleCallback(url: string): Promise<{ kind: AuthCallbackKind; session: AccountSession }> {
-    const parsed = new URL(url);
-    const hash = new URLSearchParams(parsed.hash.replace(/^#/, ''));
-    const code = parsed.searchParams.get('code');
-    const type = parsed.searchParams.get('type') ?? hash.get('type');
-    let session: Session | null = null;
-    if (code) {
-      const result = await this.client.auth.exchangeCodeForSession(code);
-      if (result.error) throw result.error;
-      session = result.data.session;
-    } else {
-      const accessToken = hash.get('access_token') ?? parsed.searchParams.get('access_token');
-      const refreshToken = hash.get('refresh_token') ?? parsed.searchParams.get('refresh_token');
-      if (!accessToken || !refreshToken) throw new Error('邮箱链接无效或已经过期');
-      const result = await this.client.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      });
-      if (result.error) throw result.error;
-      session = result.data.session;
-    }
+    const callback = parseAuthCallbackUrl(url, authRedirectUrl());
+    const result = await this.client.auth.exchangeCodeForSession(callback.code);
+    if (result.error) throw result.error;
+    const session: Session | null = result.data.session;
     const value = accountSession(session);
     if (!value) throw new Error('邮箱链接没有返回有效账号');
-    return { kind: type === 'recovery' ? 'recovery' : 'confirmed', session: value };
+    return { kind: callback.kind, session: value };
   }
 
   async signOut(): Promise<void> {

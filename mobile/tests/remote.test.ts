@@ -38,9 +38,20 @@ const mutation: SyncMutation = {
   createdAt: record.created_at,
 };
 
+function verifiedAuth(userId = 'account') {
+  return {
+    getSession: jest.fn(async () => ({
+      data: { session: { access_token: 'verified-token', user: { id: userId } } },
+      error: null,
+    })),
+    getUser: jest.fn(async () => ({ data: { user: { id: userId } }, error: null })),
+  };
+}
+
 test('旧云端缺少展示方式字段时阻止提交，避免静默覆盖每年纪念', async () => {
   const rpc = jest.fn();
   const unsupported = new SupabaseBirthdayGateway({
+    auth: verifiedAuth(),
     from: () => ({
       select: () => ({ limit: async () => ({ error: { code: '42703', message: '字段不存在' } }) }),
     }),
@@ -50,6 +61,7 @@ test('旧云端缺少展示方式字段时阻止提交，避免静默覆盖每�
   expect(rpc).not.toHaveBeenCalled();
 
   const supported = new SupabaseBirthdayGateway({
+    auth: verifiedAuth(),
     from: () => ({ select: () => ({ limit: async () => ({ error: null }) }) }),
     rpc: async () => ({
       data: { status: 'applied', record: { ...record, display_mode: 'anniversary' } },
@@ -60,4 +72,22 @@ test('旧云端缺少展示方式字段时阻止提交，避免静默覆盖每�
     status: 'applied',
     record: { displayMode: 'anniversary' },
   });
+});
+
+test('云端读写先核对当前会话归属，列表同时显式限定用户', async () => {
+  const rpc = jest.fn();
+  const from = jest.fn();
+  const wrongOwner = new SupabaseBirthdayGateway({ auth: verifiedAuth('another'), rpc, from } as never);
+  await expect(wrongOwner.apply(mutation)).rejects.toThrow('账号会话已经变化');
+  expect(rpc).not.toHaveBeenCalled();
+  expect(from).not.toHaveBeenCalled();
+
+  const order = jest.fn(async () => ({ data: [{ ...record, display_mode: 'anniversary' }], error: null }));
+  const eq = jest.fn(() => ({ order }));
+  const verified = new SupabaseBirthdayGateway({
+    auth: verifiedAuth(),
+    from: jest.fn(() => ({ select: () => ({ eq }) })),
+  } as never);
+  await expect(verified.list('user:account')).resolves.toHaveLength(1);
+  expect(eq).toHaveBeenCalledWith('user_id', 'account');
 });

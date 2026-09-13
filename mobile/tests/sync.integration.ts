@@ -8,12 +8,17 @@ import type { ApplyMutationResult, RemoteItem, RemoteBirthdayGateway, SyncMutati
 
 class MemoryGateway implements RemoteBirthdayGateway {
   records = new Map<string, RemoteItem>();
+  recordOwners = new Map<string, string>();
   applyCalls = 0;
   listCalls = 0;
+  listOwners: string[] = [];
 
-  async list(): Promise<RemoteItem[]> {
+  async list(ownerKey: string): Promise<RemoteItem[]> {
     this.listCalls++;
-    return [...this.records.values()];
+    this.listOwners.push(ownerKey);
+    return [...this.records.entries()]
+      .filter(([id]) => this.recordOwners.get(id) === ownerKey)
+      .map(([, record]) => record);
   }
 
   async apply(mutation: SyncMutation): Promise<ApplyMutationResult> {
@@ -30,6 +35,7 @@ class MemoryGateway implements RemoteBirthdayGateway {
       deletedAt: mutation.kind === 'delete' ? stamp : null,
     };
     this.records.set(record.id, record);
+    this.recordOwners.set(record.id, mutation.ownerKey);
     return { status: 'applied', record };
   }
 }
@@ -65,6 +71,42 @@ test('同步协调器上传本机修改、拉取云端修改，并处理并发�
     assert.deepEqual(await coordinator.sync('user:one'), { uploaded: 1, downloaded: 0, conflicts: 0 });
     assert.equal((gateway.records.get(local.id) as { name: string }).name, '本机修改');
     assert.equal(gateway.records.get(local.id)?.version, 3);
+  } finally {
+    await repo.close();
+    await Dexie.delete(name);
+  }
+});
+
+test('账号切换时旧同步停止落库，新账号同步排队后独立执行', async () => {
+  const name = `suisui-sync-owner-switch-${Date.now()}`;
+  let sequence = 0;
+  const repo = new WebBirthdayRepository(name, () => `owner-switch-${++sequence}`);
+  let release!: () => void;
+  let started!: () => void;
+  const applyStarted = new Promise<void>((resolve) => (started = resolve));
+  const resumeApply = new Promise<void>((resolve) => (release = resolve));
+  const gateway = new MemoryGateway();
+  const originalApply = gateway.apply.bind(gateway);
+  gateway.apply = async (mutation) => {
+    started();
+    await resumeApply;
+    return originalApply(mutation);
+  };
+  const coordinator = new SyncCoordinator(repo, gateway);
+  try {
+    await repo.setOwner('user:one');
+    await repo.create(draft);
+    const first = coordinator.sync('user:one');
+    await applyStarted;
+    await repo.setOwner('user:two');
+    const second = coordinator.sync('user:two');
+    assert.notEqual(first, second);
+    release();
+    await first;
+    await second;
+    assert.deepEqual(gateway.listOwners, ['user:two']);
+    assert.equal(gateway.applyCalls, 1);
+    assert.deepEqual(await repo.list(), []);
   } finally {
     await repo.close();
     await Dexie.delete(name);

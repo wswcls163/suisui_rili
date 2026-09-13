@@ -3,6 +3,8 @@ import { normalizeDraft } from '../core/birthday';
 import { normalizeCountupDraft, type Countup } from '../core/countup';
 import { supabaseClient } from '../auth/client';
 import {
+  accountOwner,
+  isAccountOwner,
   itemType,
   type ApplyMutationResult,
   type CalendarItem,
@@ -92,7 +94,30 @@ function payload(mutation: SyncMutation) {
 }
 
 export class SupabaseBirthdayGateway implements RemoteBirthdayGateway {
+  private verifiedOwner: { ownerKey: string; until: number } | null = null;
+
   constructor(private client: SupabaseClient) {}
+
+  private async requireOwner(ownerKey: string): Promise<string> {
+    if (!isAccountOwner(ownerKey)) throw new Error('账号数据范围无效');
+    const sessionResult = await this.client.auth.getSession();
+    if (sessionResult.error) throw sessionResult.error;
+    const session = sessionResult.data.session;
+    const userId = session?.user.id;
+    if (!userId || accountOwner(userId) !== ownerKey) {
+      this.verifiedOwner = null;
+      throw new Error('账号会话已经变化，已停止同步');
+    }
+    if (this.verifiedOwner?.ownerKey === ownerKey && this.verifiedOwner.until > Date.now()) return userId;
+    const userResult = await this.client.auth.getUser(session.access_token);
+    if (userResult.error) throw userResult.error;
+    if (!userResult.data.user || userResult.data.user.id !== userId) {
+      this.verifiedOwner = null;
+      throw new Error('账号会话验证失败，已停止同步');
+    }
+    this.verifiedOwner = { ownerKey, until: Date.now() + 30_000 };
+    return userId;
+  }
 
   private async requireTimeNoteModes(): Promise<void> {
     const { error } = await this.client.from('birthdays').select('display_mode').limit(1);
@@ -102,13 +127,19 @@ export class SupabaseBirthdayGateway implements RemoteBirthdayGateway {
     throw error;
   }
 
-  async list(): Promise<RemoteItem[]> {
-    const { data, error } = await this.client.from('birthdays').select('*').order('created_at');
+  async list(ownerKey: string): Promise<RemoteItem[]> {
+    const userId = await this.requireOwner(ownerKey);
+    const { data, error } = await this.client
+      .from('birthdays')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at');
     if (error) throw error;
     return (data as BirthdayRow[]).map(fromRow);
   }
 
   async apply(mutation: SyncMutation): Promise<ApplyMutationResult> {
+    await this.requireOwner(mutation.ownerKey);
     if (
       mutation.payload &&
       itemType(mutation.payload) === 'countup' &&

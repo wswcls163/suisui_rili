@@ -105,3 +105,60 @@ test('登录后网络同步失败时保留账号数据范围并显示同步错�
     await Dexie.delete(name);
   }
 });
+
+test('旧账号同步稍后失败时不会把新账号标记为失败', async () => {
+  const name = `suisui-sync-stale-error-${Date.now()}`;
+  const repo = new WebBirthdayRepository(name);
+  const firstSession = { userId: 'account-a', email: 'a@example.com' };
+  let authListener: (session: typeof firstSession | null) => void = () => {};
+  const service: AuthService = {
+    getSession: jest.fn(async () => firstSession),
+    subscribe: jest.fn((listener) => {
+      authListener = listener;
+      return jest.fn();
+    }),
+    signUp: jest.fn(),
+    signIn: jest.fn(),
+    requestPasswordReset: jest.fn(),
+    updatePassword: jest.fn(),
+    handleCallback: jest.fn(),
+    signOut: jest.fn(),
+    deleteAccount: jest.fn(),
+    startAutoRefresh: jest.fn(),
+    stopAutoRefresh: jest.fn(),
+  };
+  let release!: () => void;
+  const pauseFirstList = new Promise<void>((resolve) => (release = resolve));
+  const gateway: RemoteBirthdayGateway = {
+    list: jest.fn(async (ownerKey) => {
+      if (ownerKey === 'user:account-a') {
+        await pauseFirstList;
+        throw new Error('旧账号网络失败');
+      }
+      return [];
+    }),
+    apply: jest.fn(),
+  };
+  const { result, unmount } = renderHook(useAccountSync, {
+    wrapper: ({ children }) => (
+      <AuthProvider service={service}>
+        <SyncProvider repo={repo} gateway={gateway}>
+          {children}
+        </SyncProvider>
+      </AuthProvider>
+    ),
+  });
+  try {
+    await waitFor(() => expect(gateway.list).toHaveBeenCalledWith('user:account-a'));
+    await act(async () => authListener({ userId: 'account-b', email: 'b@example.com' }));
+    await waitFor(() => expect(result.current.ownerKey).toBe('user:account-b'));
+    act(() => release());
+    await waitFor(() => expect(result.current.status).toBe('synced'));
+    expect(result.current.error).toBe('');
+    expect(gateway.list).toHaveBeenCalledWith('user:account-b');
+  } finally {
+    unmount();
+    await repo.close();
+    await Dexie.delete(name);
+  }
+});

@@ -67,6 +67,9 @@ test('账号登录技术方案覆盖认证、同步和安全边界', async () =>
   assert.match(content, /Row Level Security/);
   assert.match(content, /service_role[\s\S]*不得进入/);
   assert.match(content, /邮箱深链接/);
+  assert.match(content, /PKCE/);
+  assert.match(content, /客户端角色只保留[\s\S]*SELECT/);
+  assert.match(content, /apply_birthday_mutation/);
 });
 
 test('AGENTS 记录适度模块化的长期代码准则', async () => {

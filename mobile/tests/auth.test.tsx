@@ -1,10 +1,13 @@
 import React from 'react';
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react-native';
 import * as Linking from 'expo-linking';
+import * as SecureStore from 'expo-secure-store';
 import { AccountScreen } from '../src/components/AccountScreen';
 import {
   friendlyAuthError,
+  markAuthCallbackUrl,
   normalizeEmail,
+  parseAuthCallbackUrl,
   requirePassword,
   type AccountSession,
   type AuthCallbackKind,
@@ -62,12 +65,60 @@ test('邮箱和密码在进入服务前完成基础校验，常见服务错误�
   );
 });
 
+test('邮箱回调只接受当前应用的 PKCE 地址和授权码，拒绝外部地址及明文令牌', () => {
+  expect(
+    parseAuthCallbackUrl('suisui://auth/callback?code=verified-code&type=recovery', 'suisui://auth/callback'),
+  ).toEqual({ code: 'verified-code', kind: 'recovery' });
+  expect(
+    parseAuthCallbackUrl(
+      'https://calendar.example/auth/callback/?code=verified-code',
+      'https://calendar.example/auth/callback',
+    ),
+  ).toEqual({ code: 'verified-code', kind: 'confirmed' });
+  expect(() =>
+    parseAuthCallbackUrl(
+      'https://attacker.example/auth/callback?code=attacker-code',
+      'https://calendar.example/auth/callback',
+    ),
+  ).toThrow('无效或已经过期');
+  expect(() =>
+    parseAuthCallbackUrl(
+      'suisui://auth/callback#access_token=attacker&refresh_token=attacker',
+      'suisui://auth/callback',
+    ),
+  ).toThrow('无效或已经过期');
+  expect(() =>
+    parseAuthCallbackUrl('suisui://auth/callback-extra?code=code', 'suisui://auth/callback'),
+  ).toThrow('无效或已经过期');
+});
+
+test('密码重置回调携带恢复标记，普通邮箱确认不携带', () => {
+  expect(new URL(markAuthCallbackUrl('suisui://auth/callback', 'recovery')).searchParams.get('type')).toBe(
+    'recovery',
+  );
+  expect(markAuthCallbackUrl('suisui://auth/callback')).toBe('suisui://auth/callback');
+});
+
 test('原生会话存储可以完整读写和删除超过单项限制的令牌', async () => {
   const value = 'token'.repeat(1200);
   await sessionStorage.setItem('session', value);
   expect(await sessionStorage.getItem('session')).toBe(value);
   await sessionStorage.removeItem('session');
   expect(await sessionStorage.getItem('session')).toBeNull();
+});
+
+test('原生会话存储拒绝异常分片数量，避免损坏数据造成大量读写', async () => {
+  await SecureStore.setItemAsync('damaged.parts', '999999999');
+  expect(await sessionStorage.getItem('damaged')).toBeNull();
+  await sessionStorage.removeItem('damaged');
+  expect(SecureStore.deleteItemAsync).not.toHaveBeenCalledWith('damaged.0');
+});
+
+test('过大的新会话被拒绝时仍保留原有有效会话', async () => {
+  await sessionStorage.setItem('oversized', 'previous-session');
+  await expect(sessionStorage.setItem('oversized', 'x'.repeat(1800 * 65))).rejects.toThrow('无法安全保存');
+  expect(await sessionStorage.getItem('oversized')).toBe('previous-session');
+  await sessionStorage.removeItem('oversized');
 });
 
 test('账号状态初始化、注册、登录与退出由 AuthProvider 统一管理', async () => {
@@ -110,6 +161,10 @@ test('密码重置深链接优先于旧会话恢复，并进入设置新密码�
   await waitFor(() => expect(result.current.status).toBe('recovery'));
   expect(service.getSession).not.toHaveBeenCalled();
   expect(result.current.notice).toBe('请设置新的登录密码');
+  act(() => {
+    service.subscribe.mock.calls[0][0]({ userId: 'user-1', email: 'user@example.com' });
+  });
+  expect(result.current.status).toBe('recovery');
   initialUrl.mockRestore();
 });
 

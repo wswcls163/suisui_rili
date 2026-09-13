@@ -333,29 +333,32 @@ export class SqliteBirthdayRepository implements SyncBirthdayRepository {
   }
 
   async list(): Promise<Birthday[]> {
+    const ownerKey = this.ownerKey;
     const rows = await (
       await this.db()
     ).getAllAsync<StoredBirthday>(
       "SELECT * FROM birthdays WHERE ownerKey=? AND itemType='birthday' AND deletedAt IS NULL ORDER BY createdAt,id",
-      this.ownerKey,
+      ownerKey,
     );
     return rows.map(toBirthday);
   }
 
   async create(input: BirthdayDraft): Promise<Birthday> {
+    const ownerKey = this.ownerKey;
     const draft = normalizeDraft(input);
     const stamp = this.now().toISOString();
     const row = { ...draft, id: this.id(), createdAt: stamp, updatedAt: stamp };
     await (
       await this.db()
     ).withExclusiveTransactionAsync(async (tx) => {
-      await putBirthday(tx, this.ownerKey, row);
-      if (isAccountOwner(this.ownerKey)) await this.queue(tx, row, 'upsert', 0);
+      await putBirthday(tx, ownerKey, row);
+      if (isAccountOwner(ownerKey)) await this.queue(tx, row, 'upsert', 0, ownerKey);
     });
     return row;
   }
 
   async update(id: string, input: BirthdayDraft): Promise<Birthday> {
+    const ownerKey = this.ownerKey;
     const draft = normalizeDraft(input);
     let updated: Birthday | undefined;
     await (
@@ -363,30 +366,31 @@ export class SqliteBirthdayRepository implements SyncBirthdayRepository {
     ).withExclusiveTransactionAsync(async (tx) => {
       const previous = await tx.getFirstAsync<StoredBirthday>(
         "SELECT * FROM birthdays WHERE ownerKey=? AND id=? AND itemType='birthday' AND deletedAt IS NULL",
-        this.ownerKey,
+        ownerKey,
         id,
       );
       if (!previous) throw new Error('这条生日已不存在，请返回生日簿刷新');
       updated = { ...toBirthday(previous), ...draft, updatedAt: this.now().toISOString() };
-      await putBirthday(tx, this.ownerKey, updated, previous.remoteVersion);
-      if (isAccountOwner(this.ownerKey)) await this.queue(tx, updated, 'upsert', previous.remoteVersion);
+      await putBirthday(tx, ownerKey, updated, previous.remoteVersion);
+      if (isAccountOwner(ownerKey)) await this.queue(tx, updated, 'upsert', previous.remoteVersion, ownerKey);
     });
     return updated!;
   }
 
   async remove(id: string): Promise<void> {
+    const ownerKey = this.ownerKey;
     await (
       await this.db()
     ).withExclusiveTransactionAsync(async (tx) => {
       const previous = await tx.getFirstAsync<StoredBirthday>(
         "SELECT * FROM birthdays WHERE ownerKey=? AND id=? AND itemType='birthday' AND deletedAt IS NULL",
-        this.ownerKey,
+        ownerKey,
         id,
       );
       if (!previous) throw new Error('这条生日已不存在，请返回生日簿刷新');
-      if (!isAccountOwner(this.ownerKey) || previous.remoteVersion === 0) {
-        await tx.runAsync('DELETE FROM sync_outbox WHERE ownerKey=? AND birthdayId=?', this.ownerKey, id);
-        await tx.runAsync('DELETE FROM birthdays WHERE ownerKey=? AND id=?', this.ownerKey, id);
+      if (!isAccountOwner(ownerKey) || previous.remoteVersion === 0) {
+        await tx.runAsync('DELETE FROM sync_outbox WHERE ownerKey=? AND birthdayId=?', ownerKey, id);
+        await tx.runAsync('DELETE FROM birthdays WHERE ownerKey=? AND id=?', ownerKey, id);
         return;
       }
       const deletedAt = this.now().toISOString();
@@ -394,7 +398,7 @@ export class SqliteBirthdayRepository implements SyncBirthdayRepository {
         'UPDATE birthdays SET deletedAt=?,updatedAt=? WHERE ownerKey=? AND id=?',
         deletedAt,
         deletedAt,
-        this.ownerKey,
+        ownerKey,
         id,
       );
       await this.queue(
@@ -402,34 +406,38 @@ export class SqliteBirthdayRepository implements SyncBirthdayRepository {
         { ...toBirthday(previous), updatedAt: deletedAt },
         'delete',
         previous.remoteVersion,
+        ownerKey,
       );
     });
   }
 
   async listCountups(): Promise<Countup[]> {
+    const ownerKey = this.ownerKey;
     const rows = await (
       await this.db()
     ).getAllAsync<StoredBirthday>(
       "SELECT * FROM birthdays WHERE ownerKey=? AND itemType='countup' AND deletedAt IS NULL ORDER BY createdAt,id",
-      this.ownerKey,
+      ownerKey,
     );
     return rows.map(toCountup);
   }
 
   async createCountup(input: CountupDraft): Promise<Countup> {
+    const ownerKey = this.ownerKey;
     const draft = normalizeCountupDraft(input);
     const stamp = this.now().toISOString();
     const row = { ...draft, id: this.id(), createdAt: stamp, updatedAt: stamp };
     await (
       await this.db()
     ).withExclusiveTransactionAsync(async (tx) => {
-      await putBirthday(tx, this.ownerKey, row);
-      if (isAccountOwner(this.ownerKey)) await this.queue(tx, row, 'upsert', 0);
+      await putBirthday(tx, ownerKey, row);
+      if (isAccountOwner(ownerKey)) await this.queue(tx, row, 'upsert', 0, ownerKey);
     });
     return row;
   }
 
   async updateCountup(id: string, input: CountupDraft): Promise<Countup> {
+    const ownerKey = this.ownerKey;
     const draft = normalizeCountupDraft(input);
     let updated: Countup | undefined;
     await (
@@ -437,30 +445,31 @@ export class SqliteBirthdayRepository implements SyncBirthdayRepository {
     ).withExclusiveTransactionAsync(async (tx) => {
       const previous = await tx.getFirstAsync<StoredBirthday>(
         "SELECT * FROM birthdays WHERE ownerKey=? AND id=? AND itemType='countup' AND deletedAt IS NULL",
-        this.ownerKey,
+        ownerKey,
         id,
       );
       if (!previous) throw new Error('这条时光记已不存在，请返回时光记列表刷新');
       updated = { ...toCountup(previous), ...draft, updatedAt: this.now().toISOString() };
-      await putBirthday(tx, this.ownerKey, updated, previous.remoteVersion);
-      if (isAccountOwner(this.ownerKey)) await this.queue(tx, updated, 'upsert', previous.remoteVersion);
+      await putBirthday(tx, ownerKey, updated, previous.remoteVersion);
+      if (isAccountOwner(ownerKey)) await this.queue(tx, updated, 'upsert', previous.remoteVersion, ownerKey);
     });
     return updated!;
   }
 
   async removeCountup(id: string): Promise<void> {
+    const ownerKey = this.ownerKey;
     await (
       await this.db()
     ).withExclusiveTransactionAsync(async (tx) => {
       const previous = await tx.getFirstAsync<StoredBirthday>(
         "SELECT * FROM birthdays WHERE ownerKey=? AND id=? AND itemType='countup' AND deletedAt IS NULL",
-        this.ownerKey,
+        ownerKey,
         id,
       );
       if (!previous) throw new Error('这条时光记已不存在，请返回时光记列表刷新');
-      if (!isAccountOwner(this.ownerKey) || previous.remoteVersion === 0) {
-        await tx.runAsync('DELETE FROM sync_outbox WHERE ownerKey=? AND birthdayId=?', this.ownerKey, id);
-        await tx.runAsync('DELETE FROM birthdays WHERE ownerKey=? AND id=?', this.ownerKey, id);
+      if (!isAccountOwner(ownerKey) || previous.remoteVersion === 0) {
+        await tx.runAsync('DELETE FROM sync_outbox WHERE ownerKey=? AND birthdayId=?', ownerKey, id);
+        await tx.runAsync('DELETE FROM birthdays WHERE ownerKey=? AND id=?', ownerKey, id);
         return;
       }
       const deletedAt = this.now().toISOString();
@@ -468,7 +477,7 @@ export class SqliteBirthdayRepository implements SyncBirthdayRepository {
         'UPDATE birthdays SET deletedAt=?,updatedAt=? WHERE ownerKey=? AND id=?',
         deletedAt,
         deletedAt,
-        this.ownerKey,
+        ownerKey,
         id,
       );
       await this.queue(
@@ -476,14 +485,21 @@ export class SqliteBirthdayRepository implements SyncBirthdayRepository {
         { ...toCountup(previous), updatedAt: deletedAt },
         'delete',
         previous.remoteVersion,
+        ownerKey,
       );
     });
   }
 
-  private async queue(tx: SqlDatabase, row: CalendarItem, kind: SyncMutation['kind'], baseVersion: number) {
+  private async queue(
+    tx: SqlDatabase,
+    row: CalendarItem,
+    kind: SyncMutation['kind'],
+    baseVersion: number,
+    ownerKey: string,
+  ) {
     const existing = await tx.getFirstAsync<StoredMutation>(
       'SELECT * FROM sync_outbox WHERE ownerKey=? AND birthdayId=?',
-      this.ownerKey,
+      ownerKey,
       row.id,
     );
     await tx.runAsync(
@@ -491,7 +507,7 @@ export class SqliteBirthdayRepository implements SyncBirthdayRepository {
        VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(ownerKey,birthdayId) DO UPDATE SET
        itemType=excluded.itemType,operationId=excluded.operationId,kind=excluded.kind,baseVersion=excluded.baseVersion,
        payload=excluded.payload,createdAt=excluded.createdAt`,
-      this.ownerKey,
+      ownerKey,
       row.id,
       itemType(row),
       this.id(),
@@ -503,12 +519,13 @@ export class SqliteBirthdayRepository implements SyncBirthdayRepository {
   }
 
   async pending(): Promise<SyncMutation[]> {
+    const ownerKey = this.ownerKey;
     return (
       await (
         await this.db()
       ).getAllAsync<StoredMutation>(
         'SELECT * FROM sync_outbox WHERE ownerKey=? ORDER BY createdAt,birthdayId',
-        this.ownerKey,
+        ownerKey,
       )
     ).map(parseMutation);
   }
@@ -547,7 +564,8 @@ export class SqliteBirthdayRepository implements SyncBirthdayRepository {
     });
   }
 
-  async mergeRemote(records: RemoteItem[]): Promise<number> {
+  async mergeRemote(records: RemoteItem[], ownerKey: string): Promise<number> {
+    if (this.ownerKey !== ownerKey) return 0;
     let changed = 0;
     await (
       await this.db()
@@ -555,12 +573,12 @@ export class SqliteBirthdayRepository implements SyncBirthdayRepository {
       for (const remote of records) {
         const local = await tx.getFirstAsync<StoredBirthday>(
           'SELECT * FROM birthdays WHERE ownerKey=? AND id=?',
-          this.ownerKey,
+          ownerKey,
           remote.id,
         );
         const pending = await tx.getFirstAsync<StoredMutation>(
           'SELECT * FROM sync_outbox WHERE ownerKey=? AND birthdayId=?',
-          this.ownerKey,
+          ownerKey,
           remote.id,
         );
         if (pending) {
@@ -571,7 +589,7 @@ export class SqliteBirthdayRepository implements SyncBirthdayRepository {
           continue;
         }
         if (!local || local.remoteVersion !== remote.version) {
-          await putBirthday(tx, this.ownerKey, remote, remote.version, remote.deletedAt);
+          await putBirthday(tx, ownerKey, remote, remote.version, remote.deletedAt);
           changed++;
         }
       }
@@ -625,12 +643,13 @@ export class SqliteBirthdayRepository implements SyncBirthdayRepository {
   }
 
   async conflicts(): Promise<SyncConflict[]> {
+    const ownerKey = this.ownerKey;
     return (
       await (
         await this.db()
       ).getAllAsync<StoredConflict>(
         'SELECT * FROM sync_conflicts WHERE ownerKey=? ORDER BY createdAt,birthdayId',
-        this.ownerKey,
+        ownerKey,
       )
     ).map((row) => ({
       ownerKey: row.ownerKey,
@@ -643,29 +662,26 @@ export class SqliteBirthdayRepository implements SyncBirthdayRepository {
   }
 
   async resolveConflict(birthdayId: string, choice: 'local' | 'remote'): Promise<void> {
+    const ownerKey = this.ownerKey;
     await (
       await this.db()
     ).withExclusiveTransactionAsync(async (tx) => {
       const conflict = await tx.getFirstAsync<StoredConflict>(
         'SELECT * FROM sync_conflicts WHERE ownerKey=? AND birthdayId=?',
-        this.ownerKey,
+        ownerKey,
         birthdayId,
       );
       if (!conflict) throw new Error('这条同步冲突已不存在');
       const remote = JSON.parse(conflict.remotePayload) as RemoteItem;
       if (choice === 'remote') {
-        await putBirthday(tx, this.ownerKey, remote, remote.version, remote.deletedAt);
+        await putBirthday(tx, ownerKey, remote, remote.version, remote.deletedAt);
       } else {
         const local = conflict.localPayload ? (JSON.parse(conflict.localPayload) as CalendarItem) : null;
         const value = local ?? remote;
-        await putBirthday(tx, this.ownerKey, value, remote.version, local ? null : this.now().toISOString());
-        await this.queue(tx, value, local ? 'upsert' : 'delete', remote.version);
+        await putBirthday(tx, ownerKey, value, remote.version, local ? null : this.now().toISOString());
+        await this.queue(tx, value, local ? 'upsert' : 'delete', remote.version, ownerKey);
       }
-      await tx.runAsync(
-        'DELETE FROM sync_conflicts WHERE ownerKey=? AND birthdayId=?',
-        this.ownerKey,
-        birthdayId,
-      );
+      await tx.runAsync('DELETE FROM sync_conflicts WHERE ownerKey=? AND birthdayId=?', ownerKey, birthdayId);
     });
   }
 
@@ -683,7 +699,8 @@ export class SqliteBirthdayRepository implements SyncBirthdayRepository {
   }
 
   async importGuest(): Promise<{ imported: number; skipped: number }> {
-    if (!isAccountOwner(this.ownerKey)) throw new Error('请先登录再合并本机事项');
+    const ownerKey = this.ownerKey;
+    if (!isAccountOwner(ownerKey)) throw new Error('请先登录再合并本机事项');
     let imported = 0;
     let skipped = 0;
     await (
@@ -695,7 +712,7 @@ export class SqliteBirthdayRepository implements SyncBirthdayRepository {
       );
       const accountRows = await tx.getAllAsync<StoredBirthday>(
         'SELECT * FROM birthdays WHERE ownerKey=? AND deletedAt IS NULL',
-        this.ownerKey,
+        ownerKey,
       );
       const fingerprints = new Set(accountRows.map((row) => itemFingerprint(toItem(row))));
       const ids = new Set(accountRows.map((row) => row.id));
@@ -707,8 +724,8 @@ export class SqliteBirthdayRepository implements SyncBirthdayRepository {
           continue;
         }
         const row = { ...source, id: ids.has(source.id) ? this.id() : source.id };
-        await putBirthday(tx, this.ownerKey, row);
-        await this.queue(tx, row, 'upsert', 0);
+        await putBirthday(tx, ownerKey, row);
+        await this.queue(tx, row, 'upsert', 0, ownerKey);
         ids.add(row.id);
         fingerprints.add(fingerprint);
         imported++;

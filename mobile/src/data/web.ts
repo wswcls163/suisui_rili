@@ -181,113 +181,131 @@ export class WebBirthdayRepository implements SyncBirthdayRepository {
   }
 
   async list(): Promise<Birthday[]> {
+    const ownerKey = this.ownerKey;
     await this.initialize();
-    const rows = await this.birthdays.where('ownerKey').equals(this.ownerKey).sortBy('createdAt');
+    const rows = await this.birthdays.where('ownerKey').equals(ownerKey).sortBy('createdAt');
     return rows
       .filter((row) => !row.deletedAt && row.itemType === 'birthday')
       .map((row) => toItem(row) as Birthday);
   }
 
   async create(input: BirthdayDraft): Promise<Birthday> {
+    const ownerKey = this.ownerKey;
     const draft = normalizeDraft(input);
     const stamp = this.now().toISOString();
     const row = { ...draft, id: this.id(), createdAt: stamp, updatedAt: stamp };
     await this.initialize();
     await this.db.transaction('rw', this.birthdays, this.outbox, async () => {
-      await this.birthdays.add(stored(this.ownerKey, row));
-      if (isAccountOwner(this.ownerKey)) await this.queue(row, 'upsert', 0);
+      await this.birthdays.add(stored(ownerKey, row));
+      if (isAccountOwner(ownerKey)) await this.queue(row, 'upsert', 0, ownerKey);
     });
     return row;
   }
 
   async update(id: string, input: BirthdayDraft): Promise<Birthday> {
+    const ownerKey = this.ownerKey;
     const draft = normalizeDraft(input);
     await this.initialize();
     return this.db.transaction('rw', this.birthdays, this.outbox, async () => {
-      const old = await this.row(id);
+      const old = await this.row(id, ownerKey);
       if (!old || old.deletedAt || old.itemType !== 'birthday')
         throw new Error('这条生日已不存在，请返回生日簿刷新');
       const row = { ...(toItem(old) as Birthday), ...draft, updatedAt: this.now().toISOString() };
-      await this.birthdays.put(stored(this.ownerKey, row, old.remoteVersion));
-      if (isAccountOwner(this.ownerKey)) await this.queue(row, 'upsert', old.remoteVersion);
+      await this.birthdays.put(stored(ownerKey, row, old.remoteVersion));
+      if (isAccountOwner(ownerKey)) await this.queue(row, 'upsert', old.remoteVersion, ownerKey);
       return row;
     });
   }
 
   async remove(id: string): Promise<void> {
+    const ownerKey = this.ownerKey;
     await this.initialize();
     await this.db.transaction('rw', this.birthdays, this.outbox, async () => {
-      const old = await this.row(id);
+      const old = await this.row(id, ownerKey);
       if (!old || old.deletedAt || old.itemType !== 'birthday')
         throw new Error('这条生日已不存在，请返回生日簿刷新');
-      if (!isAccountOwner(this.ownerKey) || old.remoteVersion === 0) {
-        await this.outbox.delete(key(this.ownerKey, id));
+      if (!isAccountOwner(ownerKey) || old.remoteVersion === 0) {
+        await this.outbox.delete(key(ownerKey, id));
         await this.birthdays.delete(old.id);
         return;
       }
       const deletedAt = this.now().toISOString();
       await this.birthdays.put({ ...old, updatedAt: deletedAt, deletedAt });
-      await this.queue({ ...(toItem(old) as Birthday), updatedAt: deletedAt }, 'delete', old.remoteVersion);
+      await this.queue(
+        { ...(toItem(old) as Birthday), updatedAt: deletedAt },
+        'delete',
+        old.remoteVersion,
+        ownerKey,
+      );
     });
   }
 
   async listCountups(): Promise<Countup[]> {
+    const ownerKey = this.ownerKey;
     await this.initialize();
-    const rows = await this.birthdays.where('ownerKey').equals(this.ownerKey).sortBy('createdAt');
+    const rows = await this.birthdays.where('ownerKey').equals(ownerKey).sortBy('createdAt');
     return rows
       .filter((row) => !row.deletedAt && row.itemType === 'countup')
       .map((row) => toItem(row) as Countup);
   }
 
   async createCountup(input: CountupDraft): Promise<Countup> {
+    const ownerKey = this.ownerKey;
     const draft = normalizeCountupDraft(input);
     const stamp = this.now().toISOString();
     const row = { ...draft, id: this.id(), createdAt: stamp, updatedAt: stamp };
     await this.initialize();
     await this.db.transaction('rw', this.birthdays, this.outbox, async () => {
-      await this.birthdays.add(stored(this.ownerKey, row));
-      if (isAccountOwner(this.ownerKey)) await this.queue(row, 'upsert', 0);
+      await this.birthdays.add(stored(ownerKey, row));
+      if (isAccountOwner(ownerKey)) await this.queue(row, 'upsert', 0, ownerKey);
     });
     return row;
   }
 
   async updateCountup(id: string, input: CountupDraft): Promise<Countup> {
+    const ownerKey = this.ownerKey;
     const draft = normalizeCountupDraft(input);
     await this.initialize();
     return this.db.transaction('rw', this.birthdays, this.outbox, async () => {
-      const old = await this.row(id);
+      const old = await this.row(id, ownerKey);
       if (!old || old.deletedAt || old.itemType !== 'countup')
         throw new Error('这条时光记已不存在，请返回时光记列表刷新');
       const row = { ...(toItem(old) as Countup), ...draft, updatedAt: this.now().toISOString() };
-      await this.birthdays.put(stored(this.ownerKey, row, old.remoteVersion));
-      if (isAccountOwner(this.ownerKey)) await this.queue(row, 'upsert', old.remoteVersion);
+      await this.birthdays.put(stored(ownerKey, row, old.remoteVersion));
+      if (isAccountOwner(ownerKey)) await this.queue(row, 'upsert', old.remoteVersion, ownerKey);
       return row;
     });
   }
 
   async removeCountup(id: string): Promise<void> {
+    const ownerKey = this.ownerKey;
     await this.initialize();
     await this.db.transaction('rw', this.birthdays, this.outbox, async () => {
-      const old = await this.row(id);
+      const old = await this.row(id, ownerKey);
       if (!old || old.deletedAt || old.itemType !== 'countup')
         throw new Error('这条时光记已不存在，请返回时光记列表刷新');
-      if (!isAccountOwner(this.ownerKey) || old.remoteVersion === 0) {
-        await this.outbox.delete(key(this.ownerKey, id));
+      if (!isAccountOwner(ownerKey) || old.remoteVersion === 0) {
+        await this.outbox.delete(key(ownerKey, id));
         await this.birthdays.delete(old.id);
         return;
       }
       const deletedAt = this.now().toISOString();
       await this.birthdays.put({ ...old, updatedAt: deletedAt, deletedAt });
-      await this.queue({ ...(toItem(old) as Countup), updatedAt: deletedAt }, 'delete', old.remoteVersion);
+      await this.queue(
+        { ...(toItem(old) as Countup), updatedAt: deletedAt },
+        'delete',
+        old.remoteVersion,
+        ownerKey,
+      );
     });
   }
 
-  private async queue(row: CalendarItem, kind: SyncMutation['kind'], baseVersion: number) {
-    const storageKey = key(this.ownerKey, row.id);
+  private async queue(row: CalendarItem, kind: SyncMutation['kind'], baseVersion: number, ownerKey: string) {
+    const storageKey = key(ownerKey, row.id);
     const existing = await this.outbox.get(storageKey);
     await this.outbox.put({
       storageKey,
-      ownerKey: this.ownerKey,
+      ownerKey,
       operationId: this.id(),
       birthdayId: row.id,
       itemType: itemType(row),
@@ -299,8 +317,9 @@ export class WebBirthdayRepository implements SyncBirthdayRepository {
   }
 
   async pending(): Promise<SyncMutation[]> {
+    const ownerKey = this.ownerKey;
     await this.initialize();
-    const rows = await this.outbox.where('ownerKey').equals(this.ownerKey).sortBy('createdAt');
+    const rows = await this.outbox.where('ownerKey').equals(ownerKey).sortBy('createdAt');
     return rows.map(({ storageKey: _storageKey, ...row }) => row);
   }
 
@@ -321,13 +340,14 @@ export class WebBirthdayRepository implements SyncBirthdayRepository {
     });
   }
 
-  async mergeRemote(records: RemoteItem[]): Promise<number> {
+  async mergeRemote(records: RemoteItem[], ownerKey: string): Promise<number> {
     await this.initialize();
+    if (this.ownerKey !== ownerKey) return 0;
     let changed = 0;
     await this.db.transaction('rw', this.birthdays, this.outbox, this.conflictTable, async () => {
       for (const remote of records) {
-        const storageKey = key(this.ownerKey, remote.id);
-        const local = await this.row(remote.id);
+        const storageKey = key(ownerKey, remote.id);
+        const local = await this.row(remote.id, ownerKey);
         const pending = await this.outbox.get(storageKey);
         if (pending) {
           if (remote.version > pending.baseVersion) {
@@ -337,7 +357,7 @@ export class WebBirthdayRepository implements SyncBirthdayRepository {
           continue;
         }
         if (!local || local.remoteVersion !== remote.version) {
-          await this.birthdays.put(stored(this.ownerKey, remote, remote.version, remote.deletedAt));
+          await this.birthdays.put(stored(ownerKey, remote, remote.version, remote.deletedAt));
           changed++;
         }
       }
@@ -368,33 +388,30 @@ export class WebBirthdayRepository implements SyncBirthdayRepository {
   }
 
   async conflicts(): Promise<SyncConflict[]> {
+    const ownerKey = this.ownerKey;
     await this.initialize();
-    return (await this.conflictTable.where('ownerKey').equals(this.ownerKey).sortBy('createdAt')).map(
+    return (await this.conflictTable.where('ownerKey').equals(ownerKey).sortBy('createdAt')).map(
       ({ storageKey: _storageKey, ...row }) => row,
     );
   }
 
   async resolveConflict(birthdayId: string, choice: 'local' | 'remote'): Promise<void> {
+    const ownerKey = this.ownerKey;
     await this.initialize();
     await this.db.transaction('rw', this.birthdays, this.outbox, this.conflictTable, async () => {
-      const storageKey = key(this.ownerKey, birthdayId);
+      const storageKey = key(ownerKey, birthdayId);
       const conflict = await this.conflictTable.get(storageKey);
       if (!conflict) throw new Error('这条同步冲突已不存在');
       if (choice === 'remote') {
         await this.birthdays.put(
-          stored(this.ownerKey, conflict.remote, conflict.remote.version, conflict.remote.deletedAt),
+          stored(ownerKey, conflict.remote, conflict.remote.version, conflict.remote.deletedAt),
         );
       } else {
         const value = conflict.local ?? conflict.remote;
         await this.birthdays.put(
-          stored(
-            this.ownerKey,
-            value,
-            conflict.remote.version,
-            conflict.local ? null : this.now().toISOString(),
-          ),
+          stored(ownerKey, value, conflict.remote.version, conflict.local ? null : this.now().toISOString()),
         );
-        await this.queue(value, conflict.local ? 'upsert' : 'delete', conflict.remote.version);
+        await this.queue(value, conflict.local ? 'upsert' : 'delete', conflict.remote.version, ownerKey);
       }
       await this.conflictTable.delete(storageKey);
     });
@@ -410,13 +427,14 @@ export class WebBirthdayRepository implements SyncBirthdayRepository {
   }
 
   async importGuest(): Promise<{ imported: number; skipped: number }> {
-    if (!isAccountOwner(this.ownerKey)) throw new Error('请先登录再合并本机事项');
+    const ownerKey = this.ownerKey;
+    if (!isAccountOwner(ownerKey)) throw new Error('请先登录再合并本机事项');
     await this.initialize();
     return this.db.transaction('rw', this.birthdays, this.outbox, async () => {
       const guests = (await this.birthdays.where('ownerKey').equals(GUEST_OWNER).toArray()).filter(
         (row) => !row.deletedAt,
       );
-      const accountRows = (await this.birthdays.where('ownerKey').equals(this.ownerKey).toArray()).filter(
+      const accountRows = (await this.birthdays.where('ownerKey').equals(ownerKey).toArray()).filter(
         (row) => !row.deletedAt,
       );
       const fingerprints = new Set(accountRows.map((row) => itemFingerprint(toItem(row))));
@@ -430,8 +448,8 @@ export class WebBirthdayRepository implements SyncBirthdayRepository {
           continue;
         }
         const row = { ...source, id: this.id() };
-        await this.birthdays.add(stored(this.ownerKey, row));
-        await this.queue(row, 'upsert', 0);
+        await this.birthdays.add(stored(ownerKey, row));
+        await this.queue(row, 'upsert', 0, ownerKey);
         fingerprints.add(fingerprint);
         imported++;
       }

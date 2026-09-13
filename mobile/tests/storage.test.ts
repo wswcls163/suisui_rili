@@ -477,6 +477,76 @@ for (const engine of ['SQLite', 'IndexedDB'] as const) {
     }
   });
 
+  test(`${engine}: 访客时光记仅备注不同时仍全部导入，避免去重丢失`, async () => {
+    const name =
+      engine === 'SQLite' ? join(dir, `countup-note-${engine}.db`) : `suisui-countup-note-${Date.now()}`;
+    let sequence = 0;
+    const repo: SyncBirthdayRepository =
+      engine === 'SQLite'
+        ? new SqliteBirthdayRepository(
+            async () => sqlite(name),
+            () => `countup-note-${++sequence}`,
+          )
+        : new WebBirthdayRepository(name, () => `countup-note-${++sequence}`);
+    const base = {
+      type: 'countup' as const,
+      title: '每天锻炼',
+      startDate: '2026-09-13',
+      displayMode: 'days' as const,
+    };
+    try {
+      await repo.createCountup({ ...base, note: '跑步' });
+      await repo.createCountup({ ...base, note: '游泳' });
+      await repo.setOwner('user:account-notes');
+      assert.deepEqual(await repo.importGuest(), { imported: 2, skipped: 0 });
+      assert.deepEqual((await repo.listCountups()).map((item) => item.note).sort(), ['游泳', '跑步']);
+    } finally {
+      await repo.close();
+      if (engine === 'IndexedDB') await Dexie.delete(name);
+    }
+  });
+
+  test(`${engine}: 保存期间切换账号仍写入原账号范围，不会串到新账号`, async () => {
+    const name =
+      engine === 'SQLite' ? join(dir, `owner-race-${engine}.db`) : `suisui-owner-race-${Date.now()}`;
+    let sequence = 0;
+    const repo: SyncBirthdayRepository =
+      engine === 'SQLite'
+        ? new SqliteBirthdayRepository(
+            async () => sqlite(name),
+            () => `owner-race-${++sequence}`,
+          )
+        : new WebBirthdayRepository(name, () => `owner-race-${++sequence}`);
+    try {
+      await repo.setOwner('user:account-a');
+      const originalInitialize = repo.initialize.bind(repo);
+      let entered!: () => void;
+      let release!: () => void;
+      const started = new Promise<void>((resolve) => (entered = resolve));
+      const paused = new Promise<void>((resolve) => (release = resolve));
+      repo.initialize = async () => {
+        entered();
+        await paused;
+        return originalInitialize();
+      };
+      const saving = repo.create({ ...draft, name: '账号 A 的生日' });
+      await started;
+      repo.initialize = originalInitialize;
+      await repo.setOwner('user:account-b');
+      release();
+      await saving;
+
+      assert.deepEqual(await repo.list(), []);
+      assert.deepEqual(await repo.pending(), []);
+      await repo.setOwner('user:account-a');
+      assert.equal((await repo.list())[0].name, '账号 A 的生日');
+      assert.equal((await repo.pending()).length, 1);
+    } finally {
+      await repo.close();
+      if (engine === 'IndexedDB') await Dexie.delete(name);
+    }
+  });
+
   test(`${engine}: 远端变更与本机修改冲突时保留两份内容并可逐条解决`, async () => {
     const name = engine === 'SQLite' ? join(dir, `conflict-${engine}.db`) : `suisui-conflict-${Date.now()}`;
     let sequence = 0;
@@ -499,10 +569,12 @@ for (const engine of ['SQLite', 'IndexedDB'] as const) {
         version: 1,
         deletedAt: null,
       };
-      assert.equal(await repo.mergeRemote([base]), 1);
+      assert.equal(await repo.mergeRemote([base], 'user:another-account'), 0);
+      assert.deepEqual(await repo.list(), []);
+      assert.equal(await repo.mergeRemote([base], 'user:account-b'), 1);
       await repo.update(base.id, { ...draft, name: '本机妈妈' });
       const remote = { ...base, name: '云端妈妈', version: 2, updatedAt: '2026-02-01T00:00:00.000Z' };
-      assert.equal(await repo.mergeRemote([remote]), 1);
+      assert.equal(await repo.mergeRemote([remote], 'user:account-b'), 1);
       assert.deepEqual(await repo.pending(), []);
       assert.equal(((await repo.conflicts())[0].local as { name: string }).name, '本机妈妈');
       assert.equal(((await repo.conflicts())[0].remote as { name: string }).name, '云端妈妈');

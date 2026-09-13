@@ -1,6 +1,42 @@
 export type AccountSession = { userId: string; email: string };
 export type AuthCallbackKind = 'confirmed' | 'recovery';
 
+export function markAuthCallbackUrl(url: string, kind?: AuthCallbackKind): string {
+  if (kind !== 'recovery') return url;
+  const value = new URL(url);
+  value.searchParams.set('type', 'recovery');
+  return value.toString();
+}
+
+function callbackPath(path: string): string {
+  return path.length > 1 ? path.replace(/\/+$/, '') : path;
+}
+
+export function parseAuthCallbackUrl(
+  url: string,
+  expectedUrl: string,
+): { code: string; kind: AuthCallbackKind } {
+  let actual: URL;
+  let expected: URL;
+  try {
+    actual = new URL(url);
+    expected = new URL(expectedUrl);
+  } catch {
+    throw new Error('邮箱链接无效或已经过期');
+  }
+  const sameTarget =
+    actual.protocol === expected.protocol &&
+    actual.hostname === expected.hostname &&
+    actual.port === expected.port &&
+    actual.username === expected.username &&
+    actual.password === expected.password &&
+    callbackPath(actual.pathname) === callbackPath(expected.pathname);
+  const code = actual.searchParams.get('code');
+  if (!sameTarget || !code) throw new Error('邮箱链接无效或已经过期');
+  const type = actual.searchParams.get('type');
+  return { code, kind: type === 'recovery' ? 'recovery' : 'confirmed' };
+}
+
 export interface AuthService {
   getSession(): Promise<AccountSession | null>;
   subscribe(listener: (session: AccountSession | null) => void): () => void;

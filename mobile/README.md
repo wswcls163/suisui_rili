@@ -25,7 +25,7 @@ npm run web
 没有云端配置时应用继续本地运行，“账号与同步”页面会明确显示尚未配置。需要联调账号时：
 
 1. 创建 Supabase 开发项目，将 `.env.example` 复制为 `.env`，填写项目 URL 与 publishable key。不要把数据库密码或 `service_role` 放进客户端环境变量。
-2. 使用 Supabase CLI 关联开发项目，执行 `supabase/migrations/` 中的迁移，并部署 `delete-account` Edge Function。
+2. 使用 Supabase CLI 关联开发项目，按顺序执行 `supabase/migrations/` 中的全部迁移（包括 `202609130001_account_security_hardening.sql`），并部署 `delete-account` Edge Function。安全加固后客户端只有查询权限，增删改统一经过版本与幂等 RPC。
 3. 在 Supabase Auth 的 URL 配置中加入开发网页 `http://localhost:8081/auth/callback`、原生 `suisui://auth/callback`，以及以后实际使用的生产回调地址。
 4. 开发阶段可用 Supabase 测试邮件；正式发布前配置自己的 SMTP、发件域名和中文邮件模板。
 
@@ -72,6 +72,7 @@ npm run format:check
 npm run build:web
 npm run build:bundles
 npx expo-doctor
+npm audit --registry=https://registry.npmjs.org/
 ```
 
 `test:storage` 使用 Node 自带的真实 SQLite 引擎验证仓库与迁移，使用 fake-indexeddb 验证浏览器仓库。Node.js 22 可能显示 SQLite 实验性功能提示；这是运行时提示，不代表用例失败。历法核验使用已提交的独立对照数据，无需联网，来源和差异处理见[历法数据说明](tests/fixtures/README.md)。

@@ -63,7 +63,7 @@ export function AuthProvider({
 
   const acceptSession = useCallback((next: AccountSession | null) => {
     setSession(next);
-    setStatus(next ? 'authenticated' : 'guest');
+    setStatus((current) => (next ? (current === 'recovery' ? 'recovery' : 'authenticated') : 'guest'));
   }, []);
 
   const handleCallback = useCallback(

@@ -55,7 +55,7 @@ export interface SyncBirthdayRepository extends BirthdayRepository, CountupRepos
   getOwner(): string;
   pending(): Promise<SyncMutation[]>;
   acknowledge(mutation: SyncMutation, remote: RemoteItem): Promise<void>;
-  mergeRemote(records: RemoteItem[]): Promise<number>;
+  mergeRemote(records: RemoteItem[], ownerKey: string): Promise<number>;
   recordConflict(mutation: SyncMutation, remote: RemoteItem): Promise<void>;
   conflicts(): Promise<SyncConflict[]>;
   resolveConflict(birthdayId: string, choice: 'local' | 'remote'): Promise<void>;
@@ -69,7 +69,7 @@ export type ApplyMutationResult =
   { status: 'applied'; record: RemoteItem } | { status: 'conflict'; record: RemoteItem };
 
 export interface RemoteBirthdayGateway {
-  list(): Promise<RemoteItem[]>;
+  list(ownerKey: string): Promise<RemoteItem[]>;
   apply(mutation: SyncMutation): Promise<ApplyMutationResult>;
 }
 
@@ -89,6 +89,7 @@ export function itemFingerprint(value: CalendarItem): string {
         type: 'countup',
         title: (value as Countup).title.trim(),
         startDate: (value as Countup).startDate,
+        note: (value as Countup).note.trim(),
         displayMode: (value as Countup).displayMode,
       })
     : JSON.stringify({
