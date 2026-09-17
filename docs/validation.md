@@ -82,7 +82,13 @@
 
 ## 手机端构建与待验收
 
-Android release 测试 APK 已于 2026-09-09 在 Windows 本地完成首次完整构建。构建使用完整 JDK 17、Android SDK 36、Build Tools 36.0.0、NDK 27.1.12297006 和 Node.js 24.19.0；由于 Windows 下的 JDK / Gradle / Expo 工具链不能稳定处理当前中文工程路径，构建输入按 npm 锁文件复制到纯英文临时目录后重新安装依赖，未移动或改名正式源码。`app:assembleRelease` 共执行 794 个任务并成功结束，JS bundle 包含 1,372 个模块和 31 个资源文件。
+Android release 测试 APK 已于 2026-09-15 完成第二次完整构建。本次发布版本为 `0.2.0`、Android 版本号为 `2`，可覆盖安装签名相同的 `0.1.0`，并包含手机首页紧凑布局、左侧功能菜单、独立日期计算、时光记、节日与生日及周年合并提醒、同步边界修复和账号安全加固。Expo SDK 57 的依赖补丁已按 Doctor 推荐更新，21/21 项配置检查通过。
+
+本次构建使用 JDK 17、Android SDK 36、Build Tools 36.0.0、NDK 27.1.12297006 和 Node.js 24.19.0。由于 Windows 下的 JDK / Gradle / Expo 工具链不能稳定处理中文或过长工程路径，构建输入按 npm 锁文件复制到 `C:\s20` 短路径后重新安装依赖，未移动或改名正式源码。`app:assembleRelease` 共执行 794 个任务并成功结束，JS bundle 包含 1,440 个模块和 31 个资源文件。
+
+`0.2.0` 产物为同时包含 `arm64-v8a`、`armeabi-v7a`、`x86`、`x86_64` 的通用 APK，包名 `com.suisui.calendar`、最低 Android API 24、目标 API 36，大小 107,845,085 字节。APK 已通过 ZIP 对齐和 APK Signature Scheme v2 验证，SHA-256 为 `53923B31254DA61C3CACB3AD00ECE098E4B042F6AC81AB5A8EF41DF5E0C15CD2`。新旧 APK 的签名证书 SHA-256 均为 `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`，因此 Android 可将它识别为同一应用的升级包。合并清单已确认包含 Android 13 通知、精确闹钟和开机恢复权限，不包含录音及外部存储读写权限。
+
+Android release 测试 APK 曾于 2026-09-09 在 Windows 本地完成首次完整构建。构建使用相同的 JDK、Android SDK、Build Tools、NDK 和 Node.js 版本；由于中文工程路径兼容性问题，构建输入同样复制到纯英文临时目录。
 
 产物为同时包含 `arm64-v8a`、`armeabi-v7a`、`x86`、`x86_64` 的通用 APK，包名 `com.suisui.calendar`、版本名 `0.1.0`、版本号 `1`、最低 Android API 24、目标 API 36。APK 已通过 ZIP 对齐和 APK Signature Scheme v2 验证，SHA-256 为 `EAA41D7848E61B351A26E23B07C1336B704E67FF7003E7C0BCAA7ACF4A3762F5`。当前使用 Android Debug 证书签名，只供本轮真机测试，不作为应用商店发布包；产物放在被 Git 忽略的 `releases/` 目录，不把二进制和密钥提交到仓库。
 
@@ -96,7 +102,7 @@ Android release 测试 APK 已于 2026-09-09 在 Windows 本地完成首次完�
 | 断网启动与完整 CRUD                              | 待执行                               |
 | 真实邮箱验证、密码重置、手机与电脑跨设备同步     | 待 Supabase 开发项目与测试账号后执行 |
 | 前后台切换、手机跨午夜及设备时间变化             | 待执行（业务时钟模拟测试已通过）     |
-| 节日、生日与周年系统通知，合并内容及锁屏后送达   | 待生成新 APK 并在真机授权后执行      |
+| 节日、生日与周年系统通知，合并内容及锁屏后送达   | 0.2.0 APK 已生成，待真机授权后执行   |
 | 安全区域、键盘遮挡、系统返回、字体放大、横竖屏   | 待执行（Web 窄屏检查已通过）         |
 | 正式签名、渠道与发布包                           | 待确定后执行                         |
 

@@ -2,7 +2,7 @@
   "expo": {
     "name": "岁岁日历",
     "slug": "suisui-calendar",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "scheme": "suisui",
     "orientation": "default",
     "icon": "./assets/icon.png",
@@ -12,6 +12,7 @@
       "bundleIdentifier": "com.suisui.calendar"
     },
     "android": {
+      "versionCode": 2,
       "permissions": ["android.permission.SCHEDULE_EXACT_ALARM"],
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",

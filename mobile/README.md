@@ -60,6 +60,8 @@ npx expo run:android --variant release
 
 2026-09-09 已用 JDK 17、Android SDK / Build Tools 36 和 NDK 27.1 在本机成功生成通用测试 APK，并校验包名 `com.suisui.calendar`、最低 API 24、目标 API 36、ZIP 对齐和 v2 签名。当前 APK 使用 Android Debug 证书，只供真机验收；正式分发还须配置自己的签名并重新构建。应用代码在手机端使用 SQLite 保存数据；杀进程保留、断网启动、生命周期和键盘等仍要在设备上验收。当前完成情况见[验证记录](../docs/validation.md)。
 
+2026-09-15 已生成 `0.2.0`（Android 版本号 `2`）通用测试 APK，包含当前手机布局、左侧功能菜单、日期计算、时光记、合并提醒和账号安全修复。新包与 `0.1.0` 使用同一测试证书，可直接覆盖安装；APK 的 SHA-256 为 `53923B31254DA61C3CACB3AD00ECE098E4B042F6AC81AB5A8EF41DF5E0C15CD2`。Windows 本机构建须使用足够短的纯英文临时路径，避免 React Native 原生 CMake 对象路径超过限制。
+
 ## 检查命令
 
 ```sh
