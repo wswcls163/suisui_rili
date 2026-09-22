@@ -223,6 +223,7 @@ test('月历七列、选日回调和多人标记；首尾月份禁止越界', ()
       onSelect={select}
       onMonth={() => {}}
       onToday={() => {}}
+      compact
     />,
   );
   expect(screen.getByRole('button', { name: '上个月' })).toBeDisabled();
@@ -235,10 +236,58 @@ test('月历七列、选日回调和多人标记；首尾月份禁止越界', ()
       onSelect={select}
       onMonth={() => {}}
       onToday={() => {}}
+      compact
     />,
   );
   expect(screen.getByRole('button', { name: '下个月' })).toBeDisabled();
 });
+
+test.each([9, 10, 11, 12])(
+  '320—443 像素紧凑月历的 2026 年 %i 月标题与全部操作保持单行布局',
+  (monthNumber) => {
+    const month = `2026-${String(monthNumber).padStart(2, '0')}-01`;
+    const { unmount } = render(
+      <MonthCalendar
+        month={month}
+        today={today}
+        selected={month}
+        entries={[]}
+        onSelect={() => {}}
+        onMonth={() => {}}
+        onToday={() => {}}
+        compact
+      />,
+    );
+
+    expect(screen.getByTestId('month-calendar-header')).toHaveStyle({
+      flexDirection: 'row',
+      flexWrap: 'nowrap',
+      gap: 2,
+      paddingHorizontal: 0,
+    });
+    expect(screen.getByTestId('month-calendar-title')).toHaveStyle({
+      flex: 1,
+      minWidth: 0,
+      minHeight: 44,
+      flexDirection: 'row',
+      gap: 2,
+    });
+    expect(screen.getByText(`2026 年 ${monthNumber} 月`)).toHaveStyle({ fontSize: 16 });
+    expect(screen.getByTestId('month-calendar-actions')).toHaveStyle({
+      flexDirection: 'row',
+      flexShrink: 0,
+      gap: 2,
+    });
+    expect(screen.getByRole('button', { name: '上个月' })).toHaveStyle({ width: 44, minHeight: 44 });
+    expect(screen.getByRole('button', { name: '下个月' })).toHaveStyle({ width: 44, minHeight: 44 });
+    expect(screen.getByRole('button', { name: '今天' })).toHaveStyle({
+      minWidth: 44,
+      minHeight: 44,
+      paddingHorizontal: 8,
+    });
+    unmount();
+  },
+);
 const clock = { now: () => Date.parse(`${today}T04:00:00Z`) };
 
 test('滚轮跳转具体日期同步月份、选中状态和详情，保留真实今天提醒；重新打开预选最新日期', async () => {

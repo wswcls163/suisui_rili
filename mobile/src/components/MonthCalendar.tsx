@@ -37,26 +37,33 @@ export function MonthCalendar({
   }, [entries]);
   return (
     <View style={[styles.calendar, compact && styles.calendarCompact]}>
-      <View style={[common.between, styles.calendarHeader, compact && styles.calendarHeaderCompact]}>
+      <View
+        testID="month-calendar-header"
+        style={[common.between, styles.calendarHeader, compact && styles.calendarHeaderCompact]}
+      >
         <Pressable
+          testID="month-calendar-title"
           accessibilityRole="button"
           accessibilityLabel="跳转日期"
           onPress={() => setJump(true)}
-          style={common.row}
+          style={[styles.calendarTitle, compact && styles.calendarTitleCompact]}
         >
-          <Text style={common.heading}>
+          <Text style={[common.heading, compact && styles.calendarTitleTextCompact]}>
             {Number(month.slice(0, 4))} 年 {Number(month.slice(5, 7))} 月
           </Text>
           <Icon name="chevron-down" size={16} color={colors.muted} />
         </Pressable>
-        <View style={{ flexDirection: 'row', gap: 3 }}>
+        <View
+          testID="month-calendar-actions"
+          style={[styles.calendarActions, compact && styles.calendarActionsCompact]}
+        >
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="上个月"
             accessibilityState={{ disabled: !supported(shiftMonth(month, -1)) }}
             disabled={!supported(shiftMonth(month, -1))}
             onPress={() => onMonth(shiftMonth(month, -1))}
-            style={styles.arrow}
+            style={[styles.arrow, compact && styles.arrowCompact]}
           >
             <Icon name="chevron-back" />
           </Pressable>
@@ -66,11 +73,17 @@ export function MonthCalendar({
             accessibilityState={{ disabled: !supported(shiftMonth(month, 1)) }}
             disabled={!supported(shiftMonth(month, 1))}
             onPress={() => onMonth(shiftMonth(month, 1))}
-            style={styles.arrow}
+            style={[styles.arrow, compact && styles.arrowCompact]}
           >
             <Icon name="chevron-forward" />
           </Pressable>
-          <Button label="今天" variant="secondary" onPress={onToday} disabled={!supported(today)} />
+          <Button
+            label="今天"
+            variant="secondary"
+            onPress={onToday}
+            disabled={!supported(today)}
+            style={compact && styles.todayButtonCompact}
+          />
         </View>
       </View>
       <View style={styles.week}>
@@ -188,11 +201,25 @@ export function MonthCalendar({
 const styles = StyleSheet.create({
   calendar: { ...common.card, padding: 14 },
   calendarCompact: { padding: 12 },
-  calendarHeader: { paddingHorizontal: 8, paddingBottom: 20, flexWrap: 'wrap' },
-  calendarHeaderCompact: { paddingHorizontal: 4, paddingBottom: 12 },
+  calendarHeader: { paddingHorizontal: 8, paddingBottom: 20, flexWrap: 'nowrap' },
+  calendarHeaderCompact: { paddingHorizontal: 0, paddingBottom: 12, gap: 2 },
+  calendarTitle: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  calendarTitleCompact: { gap: 2 },
+  calendarTitleTextCompact: { fontSize: 16 },
+  calendarActions: { flexDirection: 'row', alignItems: 'center', gap: 3, flexShrink: 0 },
+  calendarActionsCompact: { gap: 2 },
   calendarFooter: { paddingTop: 18, paddingHorizontal: 8, flexWrap: 'wrap' },
   calendarFooterCompact: { paddingTop: 12, paddingHorizontal: 4 },
   arrow: { width: 40, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
+  arrowCompact: { width: 44 },
+  todayButtonCompact: { minWidth: 44, paddingHorizontal: 8 },
   week: { flexDirection: 'row', gap: 3 },
   weekday: { flex: 1, textAlign: 'center', color: colors.muted, fontSize: 12, paddingVertical: 12 },
   weekdayCompact: { paddingVertical: 8 },
