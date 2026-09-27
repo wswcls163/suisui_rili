@@ -26,6 +26,9 @@ jest.mock('expo-router', () => ({
 const today = '2026-09-04';
 test('电脑手机预览参数固定使用 443 像素布局宽度', () => {
   expect(homeLayoutWidth(1440, 'web', '?preview=phone')).toBe(443);
+  expect(homeLayoutWidth(1440, 'web', '?preview=phone&previewWidth=320')).toBe(320);
+  expect(homeLayoutWidth(1440, 'web', '?preview=phone&previewWidth=390')).toBe(390);
+  expect(homeLayoutWidth(1440, 'web', '?preview=phone&previewWidth=999')).toBe(443);
   expect(homeLayoutWidth(1440, 'web', '')).toBe(1440);
   expect(homeLayoutWidth(390, 'android', '?preview=phone')).toBe(390);
   expect(homeTabFromParam('book')).toBe('book');
@@ -70,7 +73,7 @@ test('新建先选择类型，预填所选闰月日期；未开放类型不可�
   fireEvent.press(screen.getByRole('button', { name: '保存生日' }));
   await waitFor(() =>
     expect(save).toHaveBeenCalledWith(
-      { name: '妈妈', lunar: { month: 2, day: 1, isLeap: true }, solar: null },
+      { name: '妈妈', lunar: { month: 2, day: 1, isLeap: true }, solar: null, birthYear: null },
       'birthday',
     ),
   );
@@ -99,6 +102,45 @@ test('校验长称呼不崩溃；失败保留输入、支持重试且阻止连�
   expect(save).toHaveBeenCalledTimes(2);
   expect(screen.getByRole('button', { name: '保存生日' })).toBeDisabled();
   await act(async () => finish());
+});
+test('出生年份可留空、编辑回填和清空，非法或未来年份不会保存', async () => {
+  const save = jest.fn(async () => {});
+  const { unmount } = render(
+    <BirthdayForm
+      person={fixture('a', { birthYear: 2000 })}
+      selectedDate={today}
+      today={today}
+      onSave={save}
+      onCancel={() => {}}
+    />,
+  );
+  const input = screen.getByLabelText('出生年份（可选）');
+  expect(input.props.value).toBe('2000');
+  fireEvent.changeText(input, '2027');
+  fireEvent.press(screen.getByRole('button', { name: '保存修改' }));
+  expect(screen.getByRole('alert')).toHaveTextContent('出生年份应在 1901—2026 年之间');
+  expect(save).not.toHaveBeenCalled();
+  fireEvent.changeText(input, '');
+  fireEvent.press(screen.getByRole('button', { name: '保存修改' }));
+  await waitFor(() =>
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ birthYear: null }), 'birthday'),
+  );
+  unmount();
+
+  render(
+    <BirthdayForm
+      person={fixture('b', { birthYear: null })}
+      selectedDate={today}
+      today={today}
+      onSave={save}
+      onCancel={() => {}}
+    />,
+  );
+  fireEvent.changeText(screen.getByLabelText('出生年份（可选）'), '2000');
+  fireEvent.press(screen.getByRole('button', { name: '保存修改' }));
+  await waitFor(() =>
+    expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ birthYear: 2000 }), 'birthday'),
+  );
 });
 test('编辑回填原始闰月三十，预览调整不改变原始输入', () => {
   render(
@@ -290,6 +332,47 @@ test.each([9, 10, 11, 12])(
 );
 const clock = { now: () => Date.parse(`${today}T04:00:00Z`) };
 
+test('首页明确显示北京今天的完整日期星期，未来选日显示距离而今天和过去不显示', async () => {
+  render(
+    <AppProvider repo={memoryRepository()} clock={clock}>
+      <Home />
+    </AppProvider>,
+  );
+  await screen.findByLabelText(/今天，2026 年 9 月 4 日 星期五，农历/);
+  expect(screen.getByText('今天 2026 年 9 月 4 日 星期五')).toBeTruthy();
+  fireEvent.press(screen.getByRole('button', { name: /2026-09-05，农历/ }));
+  expect(screen.getByText('距离今天还有 1 天')).toBeTruthy();
+  fireEvent.press(screen.getByRole('button', { name: /2026-09-04，农历/ }));
+  expect(screen.queryByText(/距离今天还有/)).toBeNull();
+  fireEvent.press(screen.getByRole('button', { name: /2026-09-03，农历/ }));
+  expect(screen.queryByText(/距离今天还有/)).toBeNull();
+});
+
+test('生日簿、今天提醒、选日事项和详情统一显示实足周岁', async () => {
+  const repo = memoryRepository([fixture('a', { name: '妈妈', birthYear: 2000 })]);
+  const home = render(
+    <AppProvider repo={repo} clock={clock}>
+      <Home />
+    </AppProvider>,
+  );
+  await screen.findByText('今天有 1 位亲友过生日');
+  expect(screen.getAllByText(/满 26 周岁/).length).toBeGreaterThanOrEqual(2);
+  expect(screen.getByRole('button', { name: '今天：妈妈的生日，满 26 周岁' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: '查看妈妈的生日详情，满 26 周岁' })).toBeTruthy();
+  fireEvent.press(screen.getByRole('tab', { name: '生日簿 1' }));
+  expect(screen.getByText(/下次.*满 26 周岁/)).toBeTruthy();
+  expect(screen.getByRole('button', { name: '查看妈妈的生日，满 26 周岁' })).toBeTruthy();
+  home.unmount();
+
+  render(
+    <AppProvider repo={repo} clock={clock}>
+      <BirthdayDetails />
+    </AppProvider>,
+  );
+  await screen.findByText('出生年份 · 2000 年');
+  expect(screen.getByText(/农历生日.*满 26 周岁/)).toBeTruthy();
+});
+
 test('滚轮跳转具体日期同步月份、选中状态和详情，保留真实今天提醒；重新打开预选最新日期', async () => {
   render(
     <AppProvider repo={memoryRepository([fixture('a')])} clock={clock}>
@@ -460,7 +543,12 @@ test('已有农历生日开启两个都过，明确填写阳历且只保存一�
   fireEvent.press(screen.getByRole('button', { name: '保存修改' }));
   await waitFor(() =>
     expect(save).toHaveBeenCalledWith(
-      { name: '亲友a', lunar: { month: 12, day: 10, isLeap: false }, solar: { month: 1, day: 11 } },
+      {
+        name: '亲友a',
+        lunar: { month: 12, day: 10, isLeap: false },
+        solar: { month: 1, day: 11 },
+        birthYear: null,
+      },
       'birthday',
     ),
   );
@@ -487,7 +575,7 @@ test('仅阳历独立编辑，月份变化收敛到有效日期，平年闰日�
   fireEvent.press(screen.getByRole('button', { name: '保存修改' }));
   await waitFor(() =>
     expect(save).toHaveBeenCalledWith(
-      { name: '亲友a', lunar: null, solar: { month: 2, day: 29 } },
+      { name: '亲友a', lunar: null, solar: { month: 2, day: 29 }, birthYear: null },
       'birthday',
     ),
   );

@@ -1,5 +1,6 @@
 import {
   birthdayDates,
+  birthdayAgeText,
   birthdayTitle,
   upcoming,
   type Birthday,
@@ -71,6 +72,7 @@ function futureBirthdayOccurrences(
     name: person.name,
     lunar: kind === 'lunar' ? person.lunar : null,
     solar: kind === 'solar' ? person.solar : null,
+    birthYear: person.birthYear,
   };
   if (!single.lunar && !single.solar) return [];
   return upcoming(calendar, single, today, MAX_SCHEDULED_REMINDERS + 1)
@@ -114,7 +116,9 @@ function birthdayReminders(
     itemId: person.id,
     date: occurrence.solar,
     triggerAt: beijingTriggerAt(occurrence.solar, settings),
-    title: `今天是${birthdayTitle(person.name)}`,
+    title: `今天是${birthdayTitle(person.name)}${
+      birthdayAgeText(person, occurrence) ? `，${birthdayAgeText(person, occurrence)}` : ''
+    }`,
     body: `${birthdayDates(person, occurrence.kinds)} · 记得送上一句祝福。`,
   }));
 }

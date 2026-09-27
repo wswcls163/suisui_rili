@@ -62,6 +62,7 @@
     "build:web": "expo export --platform web",
     "build:bundles": "expo export --platform android --platform ios --output-dir dist-native",
     "verify:calendar": "tsx scripts/verify-calendar.ts",
+    "verify:layout": "tsx scripts/verify-responsive-layout.ts",
     "format": "prettier --write app src tests scripts *.json *.js",
     "format:check": "prettier --check app src tests scripts *.json *.js"
   },

@@ -22,6 +22,7 @@ type BirthdayRow = {
   is_leap: boolean | null;
   solar_month: number | null;
   solar_day: number | null;
+  birth_year?: number | null;
   start_date?: string | null;
   note?: string | null;
   display_mode?: 'days' | 'anniversary';
@@ -48,6 +49,7 @@ function fromRow(row: BirthdayRow): RemoteItem {
               ? null
               : { month: row.lunar_month, day: row.lunar_day, isLeap: row.is_leap },
           solar: row.solar_month === null ? null : { month: row.solar_month, day: row.solar_day },
+          birthYear: row.birth_year ?? null,
         });
   if (!row.id || !row.created_at || !row.updated_at || !Number.isInteger(row.version) || row.version < 1)
     throw new Error('云端返回了无效的事项数据');
@@ -76,6 +78,7 @@ function payload(mutation: SyncMutation) {
       is_leap: null,
       solar_month: null,
       solar_day: null,
+      birth_year: null,
     };
   }
   const birthday = mutation.payload as Exclude<CalendarItem, Countup>;
@@ -87,6 +90,7 @@ function payload(mutation: SyncMutation) {
     is_leap: birthday.lunar?.isLeap ?? null,
     solar_month: birthday.solar?.month ?? null,
     solar_day: birthday.solar?.day ?? null,
+    birth_year: birthday.birthYear,
     start_date: null,
     note: '',
     display_mode: 'days',
@@ -127,8 +131,17 @@ export class SupabaseBirthdayGateway implements RemoteBirthdayGateway {
     throw error;
   }
 
+  private async requireBirthYears(): Promise<void> {
+    const { error } = await this.client.from('birthdays').select('birth_year').limit(1);
+    if (!error) return;
+    if (error.code === '42703' || error.code === 'PGRST204')
+      throw new Error('云端尚未支持“出生年份”，请先应用最新数据库迁移');
+    throw error;
+  }
+
   async list(ownerKey: string): Promise<RemoteItem[]> {
     const userId = await this.requireOwner(ownerKey);
+    await this.requireBirthYears();
     const { data, error } = await this.client
       .from('birthdays')
       .select('*')
@@ -140,6 +153,7 @@ export class SupabaseBirthdayGateway implements RemoteBirthdayGateway {
 
   async apply(mutation: SyncMutation): Promise<ApplyMutationResult> {
     await this.requireOwner(mutation.ownerKey);
+    await this.requireBirthYears();
     if (
       mutation.payload &&
       itemType(mutation.payload) === 'countup' &&
@@ -165,6 +179,13 @@ export class SupabaseBirthdayGateway implements RemoteBirthdayGateway {
       result.record.display_mode !== 'anniversary'
     )
       throw new Error('云端尚未支持“每年纪念”，请先应用最新数据库迁移');
+    if (
+      result.status === 'applied' &&
+      mutation.payload &&
+      itemType(mutation.payload) === 'birthday' &&
+      result.record.birth_year !== (mutation.payload as Exclude<CalendarItem, Countup>).birthYear
+    )
+      throw new Error('云端尚未支持“出生年份”，请先应用最新数据库迁移');
     return { status: result.status, record: fromRow(result.record) };
   }
 }

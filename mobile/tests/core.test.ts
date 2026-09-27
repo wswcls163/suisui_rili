@@ -1,5 +1,8 @@
 import {
   birthdayRows,
+  birthdayAge,
+  birthdayAgeText,
+  birthYearFromInput,
   birthdayTitle,
   entriesForMonth,
   normalizeDraft,
@@ -14,6 +17,8 @@ import {
 import { lunarCalendar } from '../src/core/calendar';
 import {
   addDays,
+  chineseFullDate,
+  chineseWeekday,
   dayNumber,
   dateInMonth,
   FIRST_DATE,
@@ -35,7 +40,7 @@ import {
 
 const draft: BirthdayDraft = { name: '妈妈', lunar: { month: 2, day: 1, isLeap: false }, solar: null };
 const person = (id: string, value = draft): Birthday => ({
-  ...value,
+  ...normalizeDraft(value),
   id,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
@@ -309,11 +314,28 @@ describe('阳历生日与两个都过', () => {
       name: '自己',
       lunar: null,
       solar: { month: 1, day: 11 },
+      birthYear: null,
     });
   });
 });
 
 describe('输入和日期', () => {
+  test('出生年份留空兼容旧数据，4 位年份受支持范围和今天年份限制', () => {
+    expect(normalizeDraft(draft).birthYear).toBeNull();
+    expect(birthYearFromInput('', '2026-09-22')).toBeNull();
+    expect(birthYearFromInput('2000', '2026-09-22')).toBe(2000);
+    expect(() => birthYearFromInput('999', '2026-09-22')).toThrow('4 位');
+    expect(() => birthYearFromInput('20x0', '2026-09-22')).toThrow('4 位');
+    expect(() => birthYearFromInput('1900', '2026-09-22')).toThrow('1901—2026');
+    expect(() => birthYearFromInput('2027', '2026-09-22')).toThrow('1901—2026');
+  });
+  test('周岁只按发生年份计算，缺失年份或发生年份早于出生年份时隐藏', () => {
+    const occurrence = solarOccurrenceForYear({ month: 9, day: 22 }, 2026);
+    expect(birthdayAge({ birthYear: 2000 }, occurrence)).toBe(26);
+    expect(birthdayAgeText({ birthYear: 2000 }, occurrence)).toBe('满 26 周岁');
+    expect(birthdayAge({ birthYear: null }, occurrence)).toBeNull();
+    expect(birthdayAge({ birthYear: 2027 }, occurrence)).toBeNull();
+  });
   test.each([
     ['爸爸', '爸爸的生日'],
     ['爸爸生日', '爸爸生日'],
@@ -360,6 +382,14 @@ describe('输入和日期', () => {
     expect(grid[0].slice(0, 3)).toEqual([null, null, '2026-09-01']);
     expect(supported('1900-12-31')).toBe(false);
     expect(supported('2101-01-01')).toBe(false);
+  });
+  test('完整日期星期与设备语言无关，选日天数覆盖闰年、跨月、跨年和边界', () => {
+    expect(chineseWeekday('2026-09-22')).toBe('星期二');
+    expect(chineseFullDate('2026-09-22')).toBe('2026 年 9 月 22 日 星期二');
+    expect(dayNumber('2024-03-01') - dayNumber('2024-02-28')).toBe(2);
+    expect(dayNumber('2026-10-01') - dayNumber('2026-09-30')).toBe(1);
+    expect(dayNumber('2027-01-01') - dayNumber('2026-12-31')).toBe(1);
+    expect(dayNumber('2100-12-31') - dayNumber('1901-01-01')).toBeGreaterThan(0);
   });
 });
 

@@ -55,6 +55,26 @@ describe('系统通知排程', () => {
     expect(current[0].body).toContain('阳历9月11日');
   });
 
+  test('填写出生年份后通知显示发生年份的实足周岁，双生日重合仍只有一条', () => {
+    const lunar = lunarCalendar.lunarOn('2026-09-11');
+    const person = fixture('age', {
+      name: '自己',
+      lunar,
+      solar: { month: 9, day: 11 },
+      birthYear: 2000,
+    });
+    const plan = buildNotificationPlan({
+      calendar: lunarCalendar,
+      people: [person],
+      countups: [],
+      now: Date.parse('2026-09-10T12:00:00+08:00'),
+      settings: enabled,
+    });
+    const current = plan.filter((item) => item.date === '2026-09-11');
+    expect(current).toHaveLength(1);
+    expect(current[0].title).toContain('满 26 周岁');
+  });
+
   test('月历标注的节日和节气进入提醒，同日多节日完整保留', () => {
     const plan = buildNotificationPlan({
       calendar: lunarCalendar,

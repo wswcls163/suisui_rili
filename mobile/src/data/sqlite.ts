@@ -38,6 +38,7 @@ type StoredBirthday = {
   isLeap: number | null;
   solarMonth: number | null;
   solarDay: number | null;
+  birthYear: number | null;
   startDate: string | null;
   note: string;
   displayMode: CountupDisplayMode;
@@ -68,7 +69,10 @@ type StoredConflict = {
 const birthdayColumnsV4 = `ownerKey,id,itemType,name,lunarMonth,lunarDay,isLeap,solarMonth,solarDay,startDate,note,
   createdAt,updatedAt,remoteVersion,deletedAt`;
 
-const birthdayColumns = `ownerKey,id,itemType,name,lunarMonth,lunarDay,isLeap,solarMonth,solarDay,startDate,note,displayMode,
+const birthdayColumnsV5 = `ownerKey,id,itemType,name,lunarMonth,lunarDay,isLeap,solarMonth,solarDay,startDate,note,displayMode,
+  createdAt,updatedAt,remoteVersion,deletedAt`;
+
+const birthdayColumns = `ownerKey,id,itemType,name,lunarMonth,lunarDay,isLeap,solarMonth,solarDay,birthYear,startDate,note,displayMode,
   createdAt,updatedAt,remoteVersion,deletedAt`;
 
 const legacyBirthdayColumns = `ownerKey,id,name,lunarMonth,lunarDay,isLeap,solarMonth,solarDay,
@@ -99,7 +103,7 @@ function birthdayTable(name: string): string {
   );`;
 }
 
-function calendarItemTable(name: string, includeDisplayMode = true): string {
+function calendarItemTable(name: string, includeDisplayMode = true, includeBirthYear = false): string {
   return `CREATE TABLE ${name} (
     ownerKey TEXT NOT NULL,
     id TEXT NOT NULL,
@@ -110,6 +114,7 @@ function calendarItemTable(name: string, includeDisplayMode = true): string {
     isLeap INTEGER,
     solarMonth INTEGER,
     solarDay INTEGER,
+    ${includeBirthYear ? 'birthYear INTEGER,' : ''}
     startDate TEXT,
     note TEXT NOT NULL DEFAULT '' CHECK(length(note) <= 120),
     ${includeDisplayMode ? "displayMode TEXT NOT NULL DEFAULT 'days' CHECK(displayMode IN ('days','anniversary'))," : ''}
@@ -119,7 +124,7 @@ function calendarItemTable(name: string, includeDisplayMode = true): string {
     deletedAt TEXT,
     PRIMARY KEY(ownerKey,id),
     CHECK(
-      (itemType='birthday' ${includeDisplayMode ? "AND displayMode='days'" : ''} AND startDate IS NULL AND
+      (itemType='birthday' ${includeDisplayMode ? "AND displayMode='days'" : ''} ${includeBirthYear ? 'AND (birthYear IS NULL OR birthYear BETWEEN 1901 AND 2100)' : ''} AND startDate IS NULL AND
         ((lunarMonth IS NULL AND lunarDay IS NULL AND isLeap IS NULL) OR
           (lunarMonth IS NOT NULL AND lunarDay IS NOT NULL AND isLeap IS NOT NULL AND
            lunarMonth BETWEEN 1 AND 12 AND lunarDay BETWEEN 1 AND 30 AND isLeap IN (0,1))) AND
@@ -128,7 +133,7 @@ function calendarItemTable(name: string, includeDisplayMode = true): string {
            solarDay BETWEEN 1 AND CASE WHEN solarMonth=2 THEN 29 WHEN solarMonth IN (4,6,9,11) THEN 30 ELSE 31 END)) AND
         (lunarMonth IS NOT NULL OR solarMonth IS NOT NULL))
       OR
-      (itemType='countup' AND startDate IS NOT NULL AND
+      (itemType='countup' ${includeBirthYear ? 'AND birthYear IS NULL' : ''} AND startDate IS NOT NULL AND
         lunarMonth IS NULL AND lunarDay IS NULL AND isLeap IS NULL AND solarMonth IS NULL AND solarDay IS NULL)
     )
   );`;
@@ -137,7 +142,7 @@ function calendarItemTable(name: string, includeDisplayMode = true): string {
 export async function migrateDatabase(db: SqlDatabase): Promise<void> {
   const version =
     (await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version ?? 0;
-  if (version > 5) throw new Error('数据来自更新版本，请先升级应用。现有数据未被修改。');
+  if (version > 6) throw new Error('数据来自更新版本，请先升级应用。现有数据未被修改。');
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   if (version < 2)
     await db.withExclusiveTransactionAsync(async (tx) => {
@@ -202,13 +207,24 @@ export async function migrateDatabase(db: SqlDatabase): Promise<void> {
   if (version < 5)
     await db.withExclusiveTransactionAsync(async (tx) => {
       await tx.execAsync(calendarItemTable('calendar_items_v5'));
-      await tx.execAsync(`INSERT INTO calendar_items_v5 (${birthdayColumns})
+      await tx.execAsync(`INSERT INTO calendar_items_v5 (${birthdayColumnsV5})
         SELECT ownerKey,id,itemType,name,lunarMonth,lunarDay,isLeap,solarMonth,solarDay,startDate,note,'days',
           createdAt,updatedAt,remoteVersion,deletedAt FROM birthdays;
         DROP TABLE birthdays;
         ALTER TABLE calendar_items_v5 RENAME TO birthdays;
         CREATE INDEX birthdays_owner_created ON birthdays(ownerKey,createdAt,id);
         PRAGMA user_version=5;`);
+    });
+  if (version < 6)
+    await db.withExclusiveTransactionAsync(async (tx) => {
+      await tx.execAsync(calendarItemTable('calendar_items_v6', true, true));
+      await tx.execAsync(`INSERT INTO calendar_items_v6 (${birthdayColumns})
+        SELECT ownerKey,id,itemType,name,lunarMonth,lunarDay,isLeap,solarMonth,solarDay,NULL,startDate,note,displayMode,
+          createdAt,updatedAt,remoteVersion,deletedAt FROM birthdays;
+        DROP TABLE birthdays;
+        ALTER TABLE calendar_items_v6 RENAME TO birthdays;
+        CREATE INDEX birthdays_owner_created ON birthdays(ownerKey,createdAt,id);
+        PRAGMA user_version=6;`);
     });
 }
 
@@ -221,6 +237,7 @@ function toBirthday(row: StoredBirthday): Birthday {
     lunar:
       row.lunarMonth === null ? null : { month: row.lunarMonth, day: row.lunarDay, isLeap: row.isLeap === 1 },
     solar: row.solarMonth === null ? null : { month: row.solarMonth, day: row.solarDay },
+    birthYear: row.birthYear,
   });
   return { ...draft, id: row.id, createdAt: row.createdAt, updatedAt: row.updatedAt };
 }
@@ -259,6 +276,7 @@ function birthdayParams(
     birthday?.lunar ? Number(birthday.lunar.isLeap) : null,
     birthday?.solar?.month ?? null,
     birthday?.solar?.day ?? null,
+    birthday?.birthYear ?? null,
     countup?.startDate ?? null,
     countup?.note ?? '',
     countup?.displayMode ?? 'days',
@@ -277,10 +295,10 @@ async function putBirthday(
   deletedAt: string | null = null,
 ) {
   await tx.runAsync(
-    `INSERT INTO birthdays (${birthdayColumns}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `INSERT INTO birthdays (${birthdayColumns}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(ownerKey,id) DO UPDATE SET
       itemType=excluded.itemType,name=excluded.name,lunarMonth=excluded.lunarMonth,lunarDay=excluded.lunarDay,isLeap=excluded.isLeap,
-      solarMonth=excluded.solarMonth,solarDay=excluded.solarDay,startDate=excluded.startDate,note=excluded.note,displayMode=excluded.displayMode,createdAt=excluded.createdAt,
+      solarMonth=excluded.solarMonth,solarDay=excluded.solarDay,birthYear=excluded.birthYear,startDate=excluded.startDate,note=excluded.note,displayMode=excluded.displayMode,createdAt=excluded.createdAt,
       updatedAt=excluded.updatedAt,remoteVersion=excluded.remoteVersion,deletedAt=excluded.deletedAt`,
     ...birthdayParams(ownerKey, row, remoteVersion, deletedAt),
   );

@@ -24,6 +24,7 @@ type StoredItem = {
   name?: string;
   lunar?: Birthday['lunar'];
   solar?: Birthday['solar'];
+  birthYear?: number | null;
   title?: string;
   startDate?: string;
   note?: string;
@@ -153,6 +154,22 @@ export class WebBirthdayRepository implements SyncBirthdayRepository {
             row.displayMode = 'days';
           }),
       );
+    this.db
+      .version(6)
+      .stores({
+        birthdays: 'id,ownerKey,itemType,[ownerKey+birthdayId],[ownerKey+createdAt]',
+        sync_outbox: 'storageKey,ownerKey,itemType,operationId,createdAt',
+        sync_conflicts: 'storageKey,ownerKey,itemType,createdAt',
+      })
+      .upgrade((tx) =>
+        tx
+          .table('birthdays')
+          .where('itemType')
+          .equals('birthday')
+          .modify((row) => {
+            row.birthYear = null;
+          }),
+      );
     this.birthdays = this.db.table('birthdays');
     this.outbox = this.db.table('sync_outbox');
     this.conflictTable = this.db.table('sync_conflicts');
@@ -160,7 +177,7 @@ export class WebBirthdayRepository implements SyncBirthdayRepository {
 
   async initialize(): Promise<void> {
     await this.db.open();
-    if (this.db.backendDB().version > 50) {
+    if (this.db.backendDB().version > 60) {
       this.db.close();
       throw new Error('数据来自更新版本，请先升级应用。现有数据未被修改。');
     }

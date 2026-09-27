@@ -20,6 +20,10 @@ const securityMigration = readFileSync(
   join(root, 'supabase', 'migrations', '202609130001_account_security_hardening.sql'),
   'utf8',
 );
+const birthYearMigration = readFileSync(
+  join(root, 'supabase', 'migrations', '202609220001_birthday_birth_year.sql'),
+  'utf8',
+);
 const deletionFunction = readFileSync(
   join(root, 'supabase', 'functions', 'delete-account', 'index.ts'),
   'utf8',
@@ -95,5 +99,22 @@ test('安全加固禁止客户端绕过同步 RPC 直接写表，并隔离幂等
   assert.match(
     securityMigration,
     /for select to authenticated[\s\S]+auth\.uid\(\)\) is not null[\s\S]+auth\.uid\(\)\) = user_id/i,
+  );
+});
+
+test('出生年份迁移约束范围、进入幂等 RPC，并继续保持只读表和受控写入', () => {
+  assert.match(birthYearMigration, /add column if not exists birth_year smallint/i);
+  assert.match(birthYearMigration, /birth_year is null or birth_year between 1901 and 2100/i);
+  assert.match(birthYearMigration, /item_type = 'countup' and birth_year is null/i);
+  assert.match(birthYearMigration, /\(p_payload->>'birth_year'\)::smallint/i);
+  assert.match(birthYearMigration, /birth_year = excluded\.birth_year/i);
+  assert.match(
+    birthYearMigration,
+    /revoke all privileges on table public\.birthdays from public, anon, authenticated/i,
+  );
+  assert.match(birthYearMigration, /grant select on table public\.birthdays to authenticated/i);
+  assert.match(
+    birthYearMigration,
+    /revoke all on function public\.apply_birthday_mutation[\s\S]+from public, anon/i,
   );
 });

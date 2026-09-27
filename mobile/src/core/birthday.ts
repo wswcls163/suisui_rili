@@ -4,8 +4,15 @@ import { MONTH_NAMES, lunarLabel } from './calendar';
 
 export type SolarBirthday = { month: number; day: number };
 export type LunarBirthday = SolarBirthday & { isLeap: boolean };
-export type BirthdayDraft = { name: string; lunar: LunarBirthday | null; solar: SolarBirthday | null };
-export type Birthday = BirthdayDraft & { id: string; createdAt: string; updatedAt: string };
+export type BirthdayDraft = {
+  name: string;
+  lunar: LunarBirthday | null;
+  solar: SolarBirthday | null;
+  // 只在输入边界允许缺省，确保旧版记录也能规范为明确的 null。
+  birthYear?: number | null;
+};
+export type NormalizedBirthdayDraft = Omit<BirthdayDraft, 'birthYear'> & { birthYear: number | null };
+export type Birthday = NormalizedBirthdayDraft & { id: string; createdAt: string; updatedAt: string };
 export type BirthdayKind = 'lunar' | 'solar';
 export function birthdayTitle(name: string): string {
   return name.endsWith('生日') ? name : `${name}的生日`;
@@ -31,7 +38,20 @@ function normalizeDate(value: unknown, kind: BirthdayKind): LunarBirthday | Sola
   if (typeof input.isLeap !== 'boolean') throw new Error('请确认是否为闰月生日');
   return { month, day, isLeap: input.isLeap };
 }
-export function normalizeDraft(value: unknown): BirthdayDraft {
+export function normalizeBirthYear(value: unknown, maximumYear = 2100): number | null {
+  if (value === undefined || value === null || value === '') return null;
+  if (!Number.isInteger(value)) throw new Error('出生年份应为 4 位整数');
+  const year = Number(value);
+  if (year < 1901 || year > maximumYear) throw new Error(`出生年份应在 1901—${maximumYear} 年之间`);
+  return year;
+}
+export function birthYearFromInput(value: string, today: string): number | null {
+  const input = value.trim();
+  if (!input) return null;
+  if (!/^\d{4}$/.test(input)) throw new Error('出生年份应为 4 位整数');
+  return normalizeBirthYear(Number(input), Number(today.slice(0, 4)));
+}
+export function normalizeDraft(value: unknown, maximumBirthYear = 2100): NormalizedBirthdayDraft {
   if (!value || typeof value !== 'object') throw new Error('请填写生日信息');
   const input = value as Record<string, unknown>;
   if (typeof input.name !== 'string' || !input.name.trim()) throw new Error('请填写姓名或称呼');
@@ -40,7 +60,8 @@ export function normalizeDraft(value: unknown): BirthdayDraft {
   const lunar = input.lunar === null ? null : (normalizeDate(input.lunar, 'lunar') as LunarBirthday);
   const solar = input.solar === null ? null : normalizeDate(input.solar, 'solar');
   if (!lunar && !solar) throw new Error('请至少选择一种生日');
-  return { name, lunar, solar };
+  const birthYear = normalizeBirthYear(input.birthYear, maximumBirthYear);
+  return { name, lunar, solar, birthYear };
 }
 export const EVENT_TYPES = [
   { id: 'birthday', label: '生日', available: true },
@@ -68,6 +89,19 @@ export type Occurrence = {
 };
 export type BirthdayRow = { person: Birthday; next: Occurrence | null; remaining: number | null };
 export type BirthdayEntry = { id: string; person: Birthday; occurrence: Occurrence };
+
+export function birthdayAge(
+  birthday: Pick<BirthdayDraft, 'birthYear'>,
+  occurrence: Occurrence,
+): number | null {
+  if (!Number.isInteger(birthday.birthYear)) return null;
+  const age = Number(occurrence.solar.slice(0, 4)) - Number(birthday.birthYear);
+  return age >= 0 ? age : null;
+}
+export function birthdayAgeText(birthday: Pick<BirthdayDraft, 'birthYear'>, occurrence: Occurrence): string {
+  const age = birthdayAge(birthday, occurrence);
+  return age === null ? '' : `满 ${age} 周岁`;
+}
 
 export function occurrenceForYear(
   calendar: LunarCalendar,

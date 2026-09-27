@@ -68,7 +68,7 @@ for (const engine of ['SQLite', 'IndexedDB'] as const) {
     try {
       await Promise.all([repo.initialize(), repo.initialize()]);
       assert.deepEqual(await repo.list(), []);
-      const first = await repo.create({ ...draft, name: ' 妈妈 ' });
+      const first = await repo.create({ ...draft, name: ' 妈妈 ', birthYear: 1990 });
       await repo.create(draft); // 同名合法
       assert.equal(first.name, '妈妈');
       await repo.close();
@@ -76,6 +76,7 @@ for (const engine of ['SQLite', 'IndexedDB'] as const) {
       assert.equal((await repo.list()).length, 2);
       assert.equal((await repo.list())[0].lunar?.day, 30);
       assert.equal((await repo.list())[0].lunar?.isLeap, true);
+      assert.equal((await repo.list())[0].birthYear, 1990);
       const updated = await repo.update(first.id, {
         ...draft,
         name: '爸爸',
@@ -212,6 +213,77 @@ for (const engine of ['SQLite', 'IndexedDB'] as const) {
   });
 }
 
+for (const engine of ['SQLite', 'IndexedDB'] as const) {
+  test(`${engine}: v5 生日升级后出生年份为空，并可保存、重开和清空`, async () => {
+    const name =
+      engine === 'SQLite' ? join(dir, `birth-year-upgrade-${engine}.db`) : `suisui-birth-year-${Date.now()}`;
+    if (engine === 'SQLite') {
+      const old = sqlite(name);
+      await old.execAsync(`CREATE TABLE birthdays (
+        ownerKey TEXT NOT NULL,id TEXT NOT NULL,itemType TEXT NOT NULL,name TEXT NOT NULL,
+        lunarMonth INTEGER,lunarDay INTEGER,isLeap INTEGER,solarMonth INTEGER,solarDay INTEGER,
+        startDate TEXT,note TEXT NOT NULL,displayMode TEXT NOT NULL,createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,remoteVersion INTEGER NOT NULL,deletedAt TEXT,PRIMARY KEY(ownerKey,id));
+        INSERT INTO birthdays VALUES (
+          'guest','legacy-birthday','birthday','妈妈',2,30,0,NULL,NULL,NULL,'','days',
+          '2026-01-01T00:00:00Z','2026-01-02T00:00:00Z',0,NULL);
+        CREATE TABLE sync_outbox (
+          ownerKey TEXT NOT NULL,birthdayId TEXT NOT NULL,operationId TEXT NOT NULL,
+          kind TEXT NOT NULL,baseVersion INTEGER NOT NULL,payload TEXT,createdAt TEXT NOT NULL,
+          itemType TEXT NOT NULL,PRIMARY KEY(ownerKey,birthdayId));
+        CREATE TABLE sync_conflicts (
+          ownerKey TEXT NOT NULL,birthdayId TEXT NOT NULL,localPayload TEXT,remotePayload TEXT NOT NULL,
+          createdAt TEXT NOT NULL,itemType TEXT NOT NULL,PRIMARY KEY(ownerKey,birthdayId));
+        PRAGMA user_version=5;`);
+      await old.closeAsync();
+    } else {
+      const old = new Dexie(name);
+      old.version(5).stores({
+        birthdays: 'id,ownerKey,itemType,[ownerKey+birthdayId],[ownerKey+createdAt]',
+        sync_outbox: 'storageKey,ownerKey,itemType,operationId,createdAt',
+        sync_conflicts: 'storageKey,ownerKey,itemType,createdAt',
+      });
+      await old.table('birthdays').add({
+        id: 'guest\0legacy-birthday',
+        birthdayId: 'legacy-birthday',
+        ownerKey: 'guest',
+        itemType: 'birthday',
+        name: '妈妈',
+        lunar: { month: 2, day: 30, isLeap: false },
+        solar: null,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-02T00:00:00Z',
+        remoteVersion: 0,
+        deletedAt: null,
+      });
+      old.close();
+    }
+
+    const make = () =>
+      engine === 'SQLite'
+        ? new SqliteBirthdayRepository(
+            async () => sqlite(name),
+            () => 'new',
+          )
+        : new WebBirthdayRepository(name, () => 'new');
+    let repo = make();
+    try {
+      const [legacyBirthday] = await repo.list();
+      assert.equal(legacyBirthday.birthYear, null);
+      const withYear = await repo.update(legacyBirthday.id, { ...legacyBirthday, birthYear: 1988 });
+      assert.equal(withYear.birthYear, 1988);
+      await repo.close();
+      repo = make();
+      assert.equal((await repo.list())[0].birthYear, 1988);
+      await repo.update(legacyBirthday.id, { ...withYear, birthYear: null });
+      assert.equal((await repo.list())[0].birthYear, null);
+    } finally {
+      await repo.close();
+      if (engine === 'IndexedDB') await Dexie.delete(name);
+    }
+  });
+}
+
 test('SQLite: 迁移事务连同版本号回滚，重新打开可以恢复初始化', async () => {
   const file = join(dir, 'migration.db');
   let db = sqlite(file, 'CREATE INDEX');
@@ -221,7 +293,7 @@ test('SQLite: 迁移事务连同版本号回滚，重新打开可以恢复初始
   await db.closeAsync();
   db = sqlite(file);
   await migrateDatabase(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 5);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 6);
   await db.closeAsync();
 });
 test('SQLite: 写入事务失败保留旧记录，数据库约束防止非法原始值', async () => {
@@ -248,7 +320,7 @@ test('SQLite: 更高版本拒绝初始化，已有数据和版本号不变', asy
   const file = join(dir, 'future.db');
   const db = sqlite(file);
   await db.execAsync(
-    "CREATE TABLE future_data(value TEXT); INSERT INTO future_data VALUES ('keep me'); PRAGMA user_version=6;",
+    "CREATE TABLE future_data(value TEXT); INSERT INTO future_data VALUES ('keep me'); PRAGMA user_version=7;",
   );
   const repo = new SqliteBirthdayRepository(
     async () => sqlite(file),
@@ -259,13 +331,13 @@ test('SQLite: 更高版本拒绝初始化，已有数据和版本号不变', asy
     (await db.getFirstAsync<{ value: string }>('SELECT value FROM future_data'))?.value,
     'keep me',
   );
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 6);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 7);
   await db.closeAsync();
 });
 test('IndexedDB: 更高版本拒绝写入，保留已有记录', async () => {
   const name = `suisui-future-${Date.now()}`;
   const future = new Dexie(name);
-  future.version(6).stores({ birthdays: 'id,createdAt', extra: 'id' });
+  future.version(7).stores({ birthdays: 'id,createdAt', extra: 'id' });
   await future.open();
   await future.table('extra').add({ id: 'keep' });
   future.close();
@@ -332,6 +404,7 @@ for (const engine of ['SQLite', 'IndexedDB'] as const) {
         updatedAt: legacy.updatedAt,
         lunar: { month: 12, day: 9, isLeap: false },
         solar: null,
+        birthYear: null,
       });
       const both = await repo.update(old.id, { ...old, solar: { month: 1, day: 11 } });
       assert.equal(both.createdAt, legacy.createdAt);
@@ -350,11 +423,13 @@ for (const engine of ['SQLite', 'IndexedDB'] as const) {
         name: '双生日',
         lunar: { month: 2, day: 30, isLeap: true },
         solar: { month: 2, day: 29 },
+        birthYear: 1995,
       });
       await repo.close();
       repo = make();
       assert.equal((await repo.list()).length, 2);
       assert.deepEqual((await repo.list()).find((p) => p.id === 'new')?.solar, { month: 2, day: 29 });
+      assert.equal((await repo.list()).find((p) => p.id === 'new')?.birthYear, 1995);
       await repo.remove('new');
       await repo.remove(old.id);
       assert.deepEqual(await repo.list(), []);
@@ -426,6 +501,7 @@ test('SQLite: 约束拒绝不完整日期、两套都为空及无效阳历月日
     'UPDATE birthdays SET lunarMonth=NULL,lunarDay=NULL,isLeap=NULL,solarMonth=NULL,solarDay=NULL',
     'UPDATE birthdays SET solarMonth=2,solarDay=30',
     'UPDATE birthdays SET solarMonth=4,solarDay=31',
+    'UPDATE birthdays SET birthYear=1900',
   ])
     await assert.rejects(db.execAsync(sql));
   assert.deepEqual(await repo.list(), [original]);
@@ -564,6 +640,7 @@ for (const engine of ['SQLite', 'IndexedDB'] as const) {
         name: '妈妈',
         lunar: { month: 2, day: 30, isLeap: false },
         solar: null,
+        birthYear: null,
         createdAt: '2026-01-01T00:00:00.000Z',
         updatedAt: '2026-01-01T00:00:00.000Z',
         version: 1,

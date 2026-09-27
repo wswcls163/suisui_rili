@@ -97,6 +97,7 @@ export function itemFingerprint(value: CalendarItem): string {
         name: (value as Birthday).name.trim(),
         lunar: (value as Birthday).lunar,
         solar: (value as Birthday).solar,
+        birthYear: (value as Birthday).birthYear,
       });
 }
 

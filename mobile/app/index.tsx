@@ -14,6 +14,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useBirthdays } from '../src/state/AppProvider';
 import {
   adjustmentText,
+  birthdayAgeText,
   birthdayTitle,
   birthdayDates,
   occurrenceLabel,
@@ -22,7 +23,7 @@ import {
 } from '../src/core/birthday';
 import { lunarCalendar, lunarLabel } from '../src/core/calendar';
 import { festivalsOn } from '../src/core/festivals';
-import { supported } from '../src/core/dates';
+import { chineseFullDate, dayNumber, supported } from '../src/core/dates';
 import { anniversaryProgress, timeNoteProgressText, type Countup } from '../src/core/countup';
 import { MonthCalendar } from '../src/components/MonthCalendar';
 import { DateCalculatorDialog } from '../src/components/DateCalculatorDialog';
@@ -42,9 +43,11 @@ const tabCopy: Record<HomeTab, { eyebrow: string; title: string }> = {
 };
 
 export function homeLayoutWidth(width: number, platform: string, search: string) {
-  return platform === 'web' && new URLSearchParams(search).get('preview') === 'phone'
-    ? PHONE_PREVIEW_WIDTH
-    : width;
+  if (platform !== 'web') return width;
+  const params = new URLSearchParams(search);
+  if (params.get('preview') !== 'phone') return width;
+  const requested = Number(params.get('previewWidth'));
+  return [320, 390, PHONE_PREVIEW_WIDTH].includes(requested) ? requested : PHONE_PREVIEW_WIDTH;
 }
 
 export function homeTabFromParam(value: string | string[] | undefined): HomeTab {
@@ -56,7 +59,9 @@ function PersonRow({ row }: { row: BirthdayRow }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`查看${birthdayTitle(row.person.name)}`}
+      accessibilityLabel={`查看${birthdayTitle(row.person.name)}${
+        row.next && birthdayAgeText(row.person, row.next) ? `，${birthdayAgeText(row.person, row.next)}` : ''
+      }`}
       onPress={() => router.push({ pathname: '/birthday/[id]', params: { id: row.person.id } })}
       style={({ pressed }) => [styles.person, pressed && { backgroundColor: '#FAF8F4' }]}
     >
@@ -64,7 +69,12 @@ function PersonRow({ row }: { row: BirthdayRow }) {
       <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
         <Text style={styles.personName}>{birthdayTitle(row.person.name)}</Text>
         <Text style={common.muted}>{birthdayDates(row.person)}</Text>
-        {row.next && <Text style={common.muted}>下次 · {occurrenceLabel(row.next)}</Text>}
+        {row.next && (
+          <Text style={common.muted}>
+            下次 · {occurrenceLabel(row.next)}
+            {birthdayAgeText(row.person, row.next) ? ` · ${birthdayAgeText(row.person, row.next)}` : ''}
+          </Text>
+        )}
       </View>
       <View style={{ alignItems: 'flex-end', gap: 4 }}>
         <Text style={[styles.remaining, row.remaining === 0 && { color: colors.accent }]}>
@@ -177,11 +187,14 @@ function TodayReminder({
             <Pressable
               key={person.id}
               accessibilityRole="button"
-              accessibilityLabel={`今天：${birthdayTitle(person.name)}`}
+              accessibilityLabel={`今天：${birthdayTitle(person.name)}${
+                next && birthdayAgeText(person, next) ? `，${birthdayAgeText(person, next)}` : ''
+              }`}
               onPress={() => router.push({ pathname: '/birthday/[id]', params: { id: person.id } })}
             >
               <Text style={{ fontSize: 13, lineHeight: 22, color: '#EBE7E1' }}>
                 {birthdayTitle(person.name)} · {birthdayDates(person, next?.kinds)}
+                {next && birthdayAgeText(person, next) ? ` · ${birthdayAgeText(person, next)}` : ''}
                 {next?.kinds.length === 2 ? '（农历与阳历生日同一天）' : ''}
                 {next?.adjustments
                   .map((code) => `（${adjustmentText(code, person.lunar?.month ?? 0)}）`)
@@ -211,6 +224,7 @@ export default function Home() {
   const phonePreview = layoutWidth !== width;
   const wide = layoutWidth >= 900;
   const narrow = layoutWidth < 600;
+  const veryNarrow = layoutWidth < 360;
   const [tab, setTab] = useState<HomeTab>(() => homeTabFromParam(params.tab));
   const [calculatingDate, setCalculatingDate] = useState(
     () => (Array.isArray(params.tool) ? params.tool[0] : params.tool) === 'calculator',
@@ -223,6 +237,7 @@ export default function Home() {
   const selected = entries.filter((entry) => entry.occurrence.solar === state.selectedDate);
   const selectedLunar = lunarCalendar.lunarOn(state.selectedDate);
   const selectedFestivals = festivalsOn(state.selectedDate);
+  const selectedDistance = dayNumber(state.selectedDate) - dayNumber(state.today);
   const todayFestivals = supported(state.today) ? festivalsOn(state.today) : [];
   const create = () => router.push('/new');
   return (
@@ -231,7 +246,7 @@ export default function Home() {
         contentContainerStyle={[
           common.content,
           narrow && styles.mobileContent,
-          phonePreview && styles.phonePreviewContent,
+          phonePreview && { maxWidth: layoutWidth },
         ]}
       >
         <View style={[common.between, !narrow && { marginBottom: 6 }]}>
@@ -363,14 +378,24 @@ export default function Home() {
             )}
             {tab === 'calendar' ? (
               <View style={styles.section}>
-                <View style={styles.calendarToolbar}>
-                  <Text style={[common.muted, styles.todayText]}>
-                    今天 {state.today.replaceAll('-', '.')}　
-                    {supported(state.today)
-                      ? `农历${lunarLabel(lunarCalendar.lunarOn(state.today))}`
-                      : '设备日期超出历法支持范围'}{' '}
-                    · 北京时间
-                  </Text>
+                <View style={[styles.calendarToolbar, veryNarrow && styles.calendarToolbarVeryNarrow]}>
+                  <View
+                    accessible
+                    accessibilityLabel={`今天，${chineseFullDate(state.today)}，${
+                      supported(state.today)
+                        ? `农历${lunarLabel(lunarCalendar.lunarOn(state.today))}`
+                        : '设备日期超出历法支持范围'
+                    }，北京时间`}
+                    style={styles.todayText}
+                  >
+                    <Text style={styles.todayDate}>今天 {chineseFullDate(state.today)}</Text>
+                    <Text style={common.muted}>
+                      {supported(state.today)
+                        ? `农历${lunarLabel(lunarCalendar.lunarOn(state.today))}`
+                        : '设备日期超出历法支持范围'}{' '}
+                      · 北京时间
+                    </Text>
+                  </View>
                   <Button
                     label="日期计算"
                     icon="calculator-outline"
@@ -411,6 +436,9 @@ export default function Home() {
                         <Text style={common.muted}>
                           {selectedLunar.year} 农历年 · {lunarLabel(selectedLunar)}
                         </Text>
+                        {selectedDistance > 0 && (
+                          <Text style={styles.futureDistance}>距离今天还有 {selectedDistance} 天</Text>
+                        )}
                       </View>
                       <Pressable
                         accessibilityRole="button"
@@ -441,7 +469,11 @@ export default function Home() {
                         <Pressable
                           key={id}
                           accessibilityRole="button"
-                          accessibilityLabel={`查看${birthdayTitle(person.name)}详情`}
+                          accessibilityLabel={`查看${birthdayTitle(person.name)}详情${
+                            birthdayAgeText(person, occurrence)
+                              ? `，${birthdayAgeText(person, occurrence)}`
+                              : ''
+                          }`}
                           onPress={() =>
                             router.push({ pathname: '/birthday/[id]', params: { id: person.id } })
                           }
@@ -450,7 +482,12 @@ export default function Home() {
                           <Avatar name={person.name} id={person.id} size={38} />
                           <View style={{ flex: 1, gap: 5 }}>
                             <Text style={styles.personName}>{birthdayTitle(person.name)}</Text>
-                            <Text style={common.muted}>{birthdayDates(person, occurrence.kinds)}</Text>
+                            <Text style={common.muted}>
+                              {birthdayDates(person, occurrence.kinds)}
+                              {birthdayAgeText(person, occurrence)
+                                ? ` · ${birthdayAgeText(person, occurrence)}`
+                                : ''}
+                            </Text>
                             {occurrence.kinds.length === 2 && (
                               <Text style={[common.muted, { color: colors.green }]}>
                                 农历与阳历生日 · 同一天
@@ -569,13 +606,15 @@ export default function Home() {
 }
 const styles = StyleSheet.create({
   mobileContent: { padding: 12, gap: 14, paddingBottom: 32 },
-  phonePreviewContent: { maxWidth: PHONE_PREVIEW_WIDTH },
   pageIntro: { flexWrap: 'wrap', gap: 20 },
   pageIntroNarrow: { alignItems: 'stretch', gap: 12 },
   pageTitleNarrow: { fontSize: 26 },
   section: { gap: 16 },
   calendarToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  todayText: { flex: 1, minWidth: 0 },
+  calendarToolbarVeryNarrow: { flexDirection: 'column', alignItems: 'stretch' },
+  todayText: { flex: 1, minWidth: 0, gap: 3 },
+  todayDate: { color: colors.ink, fontSize: 14, lineHeight: 21, fontWeight: '600' },
+  futureDistance: { color: colors.accent, fontSize: 13, fontWeight: '600' },
   sectionDescription: { flex: 1, minWidth: 0 },
   selectedDayCard: { gap: 20 },
   festivalTag: { backgroundColor: colors.tint, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 },

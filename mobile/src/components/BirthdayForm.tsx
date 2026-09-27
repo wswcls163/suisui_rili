@@ -7,7 +7,9 @@ import {
   type SolarBirthday,
   EVENT_TYPES,
   adjustmentText,
+  birthdayAgeText,
   birthdayDates,
+  birthYearFromInput,
   occurrenceLabel,
   solarBirthdayDays,
   normalizeDraft,
@@ -39,6 +41,7 @@ export function BirthdayForm({
     person?.solar ? (person.lunar ? 'both' : 'solar') : 'lunar',
   );
   const [name, setName] = useState(person?.name ?? '');
+  const [birthYearInput, setBirthYearInput] = useState(person?.birthYear ? String(person.birthYear) : '');
   const [lunar, setLunar] = useState(
     person?.lunar ?? (person ? { month: 0, day: 0, isLeap: false } : lunarCalendar.lunarOn(selectedDate)),
   );
@@ -58,19 +61,31 @@ export function BirthdayForm({
         name: '生日预览',
         lunar: kind === 'lunar' ? lunar : null,
         solar: kind === 'solar' ? solar : null,
+        birthYear: /^\d{4}$/.test(birthYearInput)
+          ? Number(birthYearInput) <= Number(today.slice(0, 4)) && Number(birthYearInput) >= 1901
+            ? Number(birthYearInput)
+            : null
+          : null,
       };
       try {
-        return { kind, next: upcoming(lunarCalendar, value, today)[0], dates: birthdayDates(value) };
+        const next = upcoming(lunarCalendar, value, today)[0];
+        return {
+          kind,
+          next,
+          dates: birthdayDates(value),
+          age: next ? birthdayAgeText(value, next) : '',
+        };
       } catch {
-        return { kind, next: undefined, dates: '' };
+        return { kind, next: undefined, dates: '', age: '' };
       }
     });
-  }, [mode, lunar, solar, today]);
+  }, [mode, lunar, solar, birthYearInput, today]);
   const submit = async () => {
     if (saving || busy) return;
     try {
       requireBirthdayType(type);
-      const normalized = normalizeDraft(draft);
+      const birthYear = birthYearFromInput(birthYearInput, today);
+      const normalized = normalizeDraft({ ...draft, birthYear }, Number(today.slice(0, 4)));
       setSaving(true);
       setError('');
       await onSave(normalized, type);
@@ -129,6 +144,26 @@ export function BirthdayForm({
               editable={!saving && !busy}
               onSubmitEditing={() => void submit()}
             />
+          </View>
+          <View style={{ gap: 9 }}>
+            <Text style={styles.label}>出生年份（可选）</Text>
+            <TextInput
+              accessibilityLabel="出生年份（可选）"
+              value={birthYearInput}
+              onChangeText={(value) => {
+                setBirthYearInput(value);
+                setError('');
+              }}
+              placeholder={`例如：${Math.max(1901, Number(today.slice(0, 4)) - 30)}`}
+              placeholderTextColor="#A0A5A1"
+              style={common.input}
+              keyboardType="number-pad"
+              inputMode="numeric"
+              maxLength={4}
+              editable={!saving && !busy}
+              onSubmitEditing={() => void submit()}
+            />
+            <Text style={common.muted}>填写后会在生日当天自动显示实足周岁；留空则只记录生日。</Text>
           </View>
           <View style={{ gap: 10 }}>
             <Text style={styles.label}>想过哪种生日？</Text>
@@ -236,7 +271,7 @@ export function BirthdayForm({
               )}
             </View>
           )}
-          {previews.map(({ kind, next, dates }) => (
+          {previews.map(({ kind, next, dates, age }) => (
             <View key={kind} style={styles.preview}>
               <Text style={common.eyebrow}>
                 {mode === 'both' ? `下次${kind === 'lunar' ? '农历' : '阳历'}生日` : '下次生日'}
@@ -253,6 +288,7 @@ export function BirthdayForm({
                 {next
                   ? ` · ${next.solar === today ? '就是今天' : `${dayNumber(next.solar) - dayNumber(today)} 天后`}`
                   : ''}
+                {age ? ` · ${age}` : ''}
               </Text>
               {next?.adjustments.map((code) => (
                 <Text key={code} style={[common.muted, { color: colors.accent, marginTop: 6 }]}>

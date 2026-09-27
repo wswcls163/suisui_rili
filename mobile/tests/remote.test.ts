@@ -86,8 +86,65 @@ test('云端读写先核对当前会话归属，列表同时显式限定用户',
   const eq = jest.fn(() => ({ order }));
   const verified = new SupabaseBirthdayGateway({
     auth: verifiedAuth(),
-    from: jest.fn(() => ({ select: () => ({ eq }) })),
+    from: jest.fn(() => ({
+      select: (columns: string) =>
+        columns === 'birth_year' ? { limit: async () => ({ error: null }) } : { eq },
+    })),
   } as never);
   await expect(verified.list('user:account')).resolves.toHaveLength(1);
   expect(eq).toHaveBeenCalledWith('user_id', 'account');
+});
+
+test('出生年份字段缺失时同步明确失败，迁移后上传和读取都保留年份', async () => {
+  const birthdayMutation: SyncMutation = {
+    ...mutation,
+    itemType: 'birthday',
+    payload: {
+      id: record.id,
+      name: '妈妈',
+      lunar: null,
+      solar: { month: 9, day: 22 },
+      birthYear: 2000,
+      createdAt: record.created_at,
+      updatedAt: record.updated_at,
+    },
+  };
+  const unavailableRpc = jest.fn();
+  const unavailable = new SupabaseBirthdayGateway({
+    auth: verifiedAuth(),
+    from: () => ({
+      select: () => ({ limit: async () => ({ error: { code: 'PGRST204', message: 'missing' } }) }),
+    }),
+    rpc: unavailableRpc,
+  } as never);
+  await expect(unavailable.apply(birthdayMutation)).rejects.toThrow('出生年份');
+  expect(unavailableRpc).not.toHaveBeenCalled();
+
+  const rpc = jest.fn(async () => ({
+    data: {
+      status: 'applied',
+      record: {
+        ...record,
+        item_type: 'birthday',
+        name: '妈妈',
+        solar_month: 9,
+        solar_day: 22,
+        birth_year: 2000,
+        start_date: null,
+      },
+    },
+    error: null,
+  }));
+  const supported = new SupabaseBirthdayGateway({
+    auth: verifiedAuth(),
+    from: () => ({ select: () => ({ limit: async () => ({ error: null }) }) }),
+    rpc,
+  } as never);
+  await expect(supported.apply(birthdayMutation)).resolves.toMatchObject({
+    record: { birthYear: 2000 },
+  });
+  expect(rpc).toHaveBeenCalledWith(
+    'apply_birthday_mutation',
+    expect.objectContaining({ p_payload: expect.objectContaining({ birth_year: 2000 }) }),
+  );
 });

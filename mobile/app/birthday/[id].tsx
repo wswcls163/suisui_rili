@@ -5,6 +5,7 @@ import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useBirthdays } from '../../src/state/AppProvider';
 import {
   adjustmentText,
+  birthdayAgeText,
   birthdayTitle,
   birthdayDates,
   occurrenceLabel,
@@ -78,6 +79,9 @@ export default function BirthdayDetails() {
                 <Avatar name={person.name} id={person.id} size={72} />
                 <Text style={common.title}>{birthdayTitle(person.name)}</Text>
                 <Text style={common.body}>{birthdayDates(person)}</Text>
+                {person.birthYear !== null && (
+                  <Text style={common.muted}>出生年份 · {person.birthYear} 年</Text>
+                )}
                 <Text style={common.muted}>
                   {person.lunar && person.solar
                     ? '两个生日分别提醒，同一天重合时只提醒一次'
@@ -103,6 +107,7 @@ export default function BirthdayDetails() {
                         <Text style={common.muted}>
                           {occurrenceLabel(item)}
                           {index === 0 ? ' · 下次' : ''}
+                          {birthdayAgeText(person, item) ? ` · ${birthdayAgeText(person, item)}` : ''}
                         </Text>
                         <Text style={[common.heading, { color: index === 0 ? colors.accent : colors.ink }]}>
                           {item.solar.replaceAll('-', '.')}
