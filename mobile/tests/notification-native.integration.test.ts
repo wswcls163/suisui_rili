@@ -5,6 +5,13 @@ const projectRoot = path.resolve(__dirname, '..');
 
 test('Android 配置声明精确闹钟并使用不可变渠道的新版本标识', () => {
   const app = JSON.parse(fs.readFileSync(path.join(projectRoot, 'app.json'), 'utf8'));
+  const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
+  const packageLock = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package-lock.json'), 'utf8'));
+  expect(app.expo.version).toBe('0.3.0');
+  expect(app.expo.android.versionCode).toBe(3);
+  expect(packageJson.version).toBe('0.3.0');
+  expect(packageLock.version).toBe('0.3.0');
+  expect(packageLock.packages[''].version).toBe('0.3.0');
   expect(app.expo.android.permissions).toContain('android.permission.SCHEDULE_EXACT_ALARM');
   expect(JSON.stringify(app)).not.toContain('android.permission.USE_FULL_SCREEN_INTENT');
   const notificationsPlugin = app.expo.plugins.find(
