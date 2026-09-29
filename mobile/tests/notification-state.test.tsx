@@ -13,23 +13,44 @@ const clock = { now: () => now };
 
 const readyDiagnostics = {
   permission: 'granted' as const,
+  appNotificationsEnabled: true,
   exactAlarm: 'available' as const,
+  fullScreen: 'available' as const,
   channel: 'ready' as const,
+  channelImportance: 4,
+  soundEnabled: false,
+  vibrationEnabled: false,
+  floatingBanner: 'manual-check' as const,
   scheduledCount: 60,
+  registeredCount: 60,
+  lastTestScheduledAt: 0,
+  lastTestTriggerAt: 0,
+  lastDeliveryAt: 0,
+  lastDeliveryIdentifier: '',
 };
 
 function schedulerMethods() {
   return {
     getDiagnostics: jest.fn(async () => readyDiagnostics),
-    scheduleTest: jest.fn(async () => 'suisui-notification-test'),
+    sendImmediateTest: jest.fn(async () => 'suisui-native-immediate-test'),
+    scheduleDelayedTest: jest.fn(async () => ({
+      identifier: 'suisui-native-delayed-test',
+      triggerAt: now + 60_000,
+    })),
     openNotificationSettings: jest.fn(async () => {}),
     openExactAlarmSettings: jest.fn(async () => {}),
+    openFullScreenIntentSettings: jest.fn(async () => {}),
     openBatterySettings: jest.fn(async () => {}),
   };
 }
 
 test('开启后保存本机设置并按数据变化重排节日、生日和周年通知', async () => {
-  let stored: NotificationSettings = { enabled: false, hour: 9, minute: 0 };
+  let stored: NotificationSettings = {
+    enabled: false,
+    fullScreenEnabled: false,
+    hour: 9,
+    minute: 0,
+  };
   const preferences: NotificationPreferences = {
     load: jest.fn(async () => stored),
     save: jest.fn(async (settings) => {
@@ -65,7 +86,12 @@ test('开启后保存本机设置并按数据变化重排节日、生日和周�
 
   await act(() => result.current.setEnabled(true));
   await waitFor(() => expect(result.current.status).toBe('ready'));
-  expect(preferences.save).toHaveBeenLastCalledWith({ enabled: true, hour: 9, minute: 0 });
+  expect(preferences.save).toHaveBeenLastCalledWith({
+    enabled: true,
+    fullScreenEnabled: false,
+    hour: 9,
+    minute: 0,
+  });
   expect(scheduler.ensurePermission).toHaveBeenCalled();
   expect(scheduler.replace).toHaveBeenLastCalledWith(
     expect.arrayContaining([
@@ -76,6 +102,7 @@ test('开启后保存本机设置并按数据变化重排节日、生日和周�
         title: '今天有多个重要日子',
       }),
     ]),
+    false,
   );
   const firstPlan = (scheduler.replace as jest.Mock).mock.calls.at(-1)?.[0];
   expect(firstPlan).toHaveLength(60);
@@ -94,7 +121,7 @@ test('开启后保存本机设置并按数据变化重排节日、生日和周�
 
 test('拒绝通知权限时不开启开关并给出可操作提示', async () => {
   const preferences: NotificationPreferences = {
-    load: jest.fn(async () => ({ enabled: false, hour: 9, minute: 0 })),
+    load: jest.fn(async () => ({ enabled: false, fullScreenEnabled: false, hour: 9, minute: 0 })),
     save: jest.fn(async () => {}),
   };
   const scheduler: NotificationScheduler = {
@@ -124,7 +151,7 @@ test('拒绝通知权限时不开启开关并给出可操作提示', async () =>
 
 test('精确闹钟不可用时保留已排程提醒并提供诊断，1 分钟测试仍可安排', async () => {
   const preferences: NotificationPreferences = {
-    load: jest.fn(async () => ({ enabled: true, hour: 9, minute: 0 })),
+    load: jest.fn(async () => ({ enabled: true, fullScreenEnabled: true, hour: 9, minute: 0 })),
     save: jest.fn(async () => {}),
   };
   const scheduler: NotificationScheduler = {
@@ -137,9 +164,14 @@ test('精确闹钟不可用时保留已排程提醒并提供诊断，1 分钟测
     })),
     replace: jest.fn(async (reminders) => reminders.length),
     clear: jest.fn(async () => {}),
-    scheduleTest: jest.fn(async () => 'suisui-notification-test'),
+    sendImmediateTest: jest.fn(async () => 'suisui-native-immediate-test'),
+    scheduleDelayedTest: jest.fn(async () => ({
+      identifier: 'suisui-native-delayed-test',
+      triggerAt: now + 60_000,
+    })),
     openNotificationSettings: jest.fn(async () => {}),
     openExactAlarmSettings: jest.fn(async () => {}),
+    openFullScreenIntentSettings: jest.fn(async () => {}),
     openBatterySettings: jest.fn(async () => {}),
   };
   const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -153,14 +185,45 @@ test('精确闹钟不可用时保留已排程提醒并提供诊断，1 分钟测
 
   await waitFor(() => expect(result.current.status).toBe('ready'));
   await waitFor(() => expect(result.current.diagnostics.exactAlarm).toBe('unavailable'));
-  expect(scheduler.replace).toHaveBeenCalled();
+  expect(scheduler.replace).toHaveBeenCalledWith(expect.any(Array), true);
 
-  await act(() => result.current.scheduleTestNotification());
-  expect(scheduler.scheduleTest).toHaveBeenCalledWith(60);
-  expect(result.current.testMessage).toContain('锁屏');
+  await act(() => result.current.scheduleDelayedTestNotification());
+  expect(scheduler.scheduleDelayedTest).toHaveBeenCalledWith(60, true);
+  expect(result.current.testMessage).toContain('原生任务已登记');
 
   await act(() => result.current.openExactAlarmSettings());
   expect(scheduler.openExactAlarmSettings).toHaveBeenCalled();
+
+  await act(() => result.current.openFullScreenIntentSettings());
+  expect(scheduler.openFullScreenIntentSettings).toHaveBeenCalled();
+});
+
+test('锁屏全屏未明确开启时拒绝安排全屏测试', async () => {
+  const preferences: NotificationPreferences = {
+    load: jest.fn(async () => ({ enabled: true, fullScreenEnabled: false, hour: 9, minute: 0 })),
+    save: jest.fn(async () => {}),
+  };
+  const scheduler: NotificationScheduler = {
+    supported: true,
+    getPermission: jest.fn(async () => 'granted'),
+    ensurePermission: jest.fn(async () => 'granted'),
+    replace: jest.fn(async (reminders) => reminders.length),
+    clear: jest.fn(async () => {}),
+    ...schedulerMethods(),
+  };
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <AppProvider repo={memoryRepository()} clock={clock}>
+      <NotificationProvider preferences={preferences} scheduler={scheduler} clock={clock}>
+        {children}
+      </NotificationProvider>
+    </AppProvider>
+  );
+  const { result } = renderHook(useNotifications, { wrapper });
+  await waitFor(() => expect(result.current.status).toBe('ready'));
+
+  await act(() => result.current.scheduleDelayedTestNotification());
+  expect(result.current.error).toContain('先明确开启');
+  expect(scheduler.scheduleDelayedTest).not.toHaveBeenCalled();
 });
 
 test('从系统设置或后台返回前台时重新诊断并重排，恢复新授予的精确能力', async () => {
@@ -170,7 +233,7 @@ test('从系统设置或后台返回前台时重新诊断并重排，恢复新�
     return { remove: jest.fn() };
   });
   const preferences: NotificationPreferences = {
-    load: jest.fn(async () => ({ enabled: true, hour: 9, minute: 0 })),
+    load: jest.fn(async () => ({ enabled: true, fullScreenEnabled: false, hour: 9, minute: 0 })),
     save: jest.fn(async () => {}),
   };
   const scheduler: NotificationScheduler = {

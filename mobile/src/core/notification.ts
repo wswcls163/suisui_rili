@@ -12,11 +12,17 @@ import { anniversaryDate, type Countup } from './countup';
 import { addDays, LAST_DATE, todayInBeijing } from './dates';
 import { festivalsOn } from './festivals';
 
-export const DEFAULT_NOTIFICATION_SETTINGS = Object.freeze({ enabled: false, hour: 9, minute: 0 });
+export const DEFAULT_NOTIFICATION_SETTINGS = Object.freeze({
+  enabled: false,
+  fullScreenEnabled: false,
+  hour: 9,
+  minute: 0,
+});
 export const MAX_SCHEDULED_REMINDERS = 60;
 
 export type NotificationSettings = {
   enabled: boolean;
+  fullScreenEnabled: boolean;
   hour: number;
   minute: number;
 };
@@ -42,6 +48,10 @@ export function normalizeNotificationSettings(value: unknown): NotificationSetti
   const input = value as Record<string, unknown>;
   return {
     enabled: typeof input.enabled === 'boolean' ? input.enabled : DEFAULT_NOTIFICATION_SETTINGS.enabled,
+    fullScreenEnabled:
+      typeof input.fullScreenEnabled === 'boolean'
+        ? input.fullScreenEnabled
+        : DEFAULT_NOTIFICATION_SETTINGS.fullScreenEnabled,
     hour: integerInRange(input.hour, 0, 23) ? Number(input.hour) : DEFAULT_NOTIFICATION_SETTINGS.hour,
     minute: integerInRange(input.minute, 0, 59) ? Number(input.minute) : DEFAULT_NOTIFICATION_SETTINGS.minute,
   };

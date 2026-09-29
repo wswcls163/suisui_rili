@@ -1,1 +1,35 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+  <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+  <application>
+    <activity
+      android:name="com.suisui.notificationreliability.SuisuiReminderActivity"
+      android:excludeFromRecents="true"
+      android:exported="false"
+      android:noHistory="true"
+      android:showWhenLocked="true"
+      android:taskAffinity=""
+      android:theme="@android:style/Theme.Material.Light.NoActionBar"
+      android:turnScreenOn="true" />
+
+    <receiver
+      android:name="com.suisui.notificationreliability.SuisuiAlarmReceiver"
+      android:exported="false" />
+
+    <receiver
+      android:name="com.suisui.notificationreliability.SuisuiScheduleRestoreReceiver"
+      android:directBootAware="false"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.REBOOT" />
+        <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+      </intent-filter>
+    </receiver>
+  </application>
+</manifest>

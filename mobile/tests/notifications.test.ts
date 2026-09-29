@@ -7,7 +7,7 @@ import {
 } from '../src/core/notification';
 import { countupFixture, fixture } from './helpers';
 
-const enabled = { enabled: true, hour: 9, minute: 0 };
+const enabled = { enabled: true, fullScreenEnabled: false, hour: 9, minute: 0 };
 
 describe('系统通知排程', () => {
   test('生日当天九点提醒，错过当天时间后自动安排下一年', () => {
@@ -208,6 +208,7 @@ describe('系统通知排程', () => {
   test('设置读取时修复无效值，通知时间始终按北京时间换算', () => {
     expect(normalizeNotificationSettings({ enabled: true, hour: 25, minute: -1 })).toEqual({
       enabled: true,
+      fullScreenEnabled: false,
       hour: 9,
       minute: 0,
     });

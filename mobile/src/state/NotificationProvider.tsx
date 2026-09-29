@@ -28,19 +28,33 @@ type NotificationContextValue = {
   testing: boolean;
   testMessage: string;
   setEnabled(enabled: boolean): Promise<void>;
+  setFullScreenEnabled(enabled: boolean): Promise<void>;
   setTime(hour: number, minute: number): Promise<void>;
   refreshDiagnostics(): Promise<void>;
-  scheduleTestNotification(): Promise<void>;
+  sendImmediateTestNotification(): Promise<void>;
+  scheduleDelayedTestNotification(): Promise<void>;
   openNotificationSettings(): Promise<void>;
   openExactAlarmSettings(): Promise<void>;
+  openFullScreenIntentSettings(): Promise<void>;
   openBatterySettings(): Promise<void>;
 };
 
 const EMPTY_DIAGNOSTICS: NotificationDiagnostics = {
   permission: 'undetermined',
+  appNotificationsEnabled: false,
   exactAlarm: 'unknown',
+  fullScreen: 'unknown',
   channel: 'missing',
+  channelImportance: null,
+  soundEnabled: null,
+  vibrationEnabled: null,
+  floatingBanner: 'manual-check',
   scheduledCount: 0,
+  registeredCount: 0,
+  lastTestScheduledAt: 0,
+  lastTestTriggerAt: 0,
+  lastDeliveryAt: 0,
+  lastDeliveryIdentifier: '',
 };
 
 const fallback: NotificationContextValue = {
@@ -53,11 +67,14 @@ const fallback: NotificationContextValue = {
   testing: false,
   testMessage: '',
   setEnabled: async () => {},
+  setFullScreenEnabled: async () => {},
   setTime: async () => {},
   refreshDiagnostics: async () => {},
-  scheduleTestNotification: async () => {},
+  sendImmediateTestNotification: async () => {},
+  scheduleDelayedTestNotification: async () => {},
   openNotificationSettings: async () => {},
   openExactAlarmSettings: async () => {},
+  openFullScreenIntentSettings: async () => {},
   openBatterySettings: async () => {},
 };
 
@@ -90,9 +107,20 @@ export function NotificationProvider({
     if (!scheduler.supported) {
       setDiagnostics({
         permission: 'granted',
+        appNotificationsEnabled: true,
         exactAlarm: 'not-applicable',
+        fullScreen: 'not-applicable',
         channel: 'not-applicable',
+        channelImportance: null,
+        soundEnabled: null,
+        vibrationEnabled: null,
+        floatingBanner: 'not-applicable',
         scheduledCount: 0,
+        registeredCount: 0,
+        lastTestScheduledAt: 0,
+        lastTestTriggerAt: 0,
+        lastDeliveryAt: 0,
+        lastDeliveryIdentifier: '',
       });
       return;
     }
@@ -171,7 +199,7 @@ export function NotificationProvider({
         }
         return;
       }
-      const count = await scheduler.replace(plan);
+      const count = await scheduler.replace(plan, settings.fullScreenEnabled);
       if (current === runId.current) {
         setError('');
         setScheduledCount(count);
@@ -224,7 +252,20 @@ export function NotificationProvider({
     [persist, refreshDiagnostics, scheduler, settings],
   );
 
-  const scheduleTestNotification = useCallback(async () => {
+  const setFullScreenEnabled = useCallback(
+    async (enabled: boolean) => {
+      setError('');
+      try {
+        await persist({ ...settings, fullScreenEnabled: enabled });
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : '锁屏全屏设置保存失败，请重试');
+        setStatus('error');
+      }
+    },
+    [persist, settings],
+  );
+
+  const sendImmediateTestNotification = useCallback(async () => {
     setTesting(true);
     setTestMessage('');
     setError('');
@@ -238,15 +279,48 @@ export function NotificationProvider({
         setError('系统通知权限未开启，请先进入通知设置允许提醒。');
         return;
       }
-      await scheduler.scheduleTest(60);
-      setTestMessage('测试通知已安排在 1 分钟后。现在可以锁屏或从最近任务划掉应用。');
+      const identifier = await scheduler.sendImmediateTest();
+      setTestMessage(
+        `测试横幅已交给系统，标识符：${identifier}。若没有看到横幅，请检查通知栏和系统“悬浮通知”设置。`,
+      );
       await refreshDiagnostics();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '测试通知安排失败，请重试');
+      setError(reason instanceof Error ? reason.message : '测试横幅发送失败，请重试');
     } finally {
       setTesting(false);
     }
   }, [refreshDiagnostics, scheduler]);
+
+  const scheduleDelayedTestNotification = useCallback(async () => {
+    setTesting(true);
+    setTestMessage('');
+    setError('');
+    try {
+      if (!scheduler.supported) {
+        setTestMessage('电脑预览不会发送系统通知，请在安装新版本后用手机测试。');
+        return;
+      }
+      if (!settings.fullScreenEnabled) {
+        setError('请先明确开启“锁屏时全屏提醒”，再安排锁屏测试。');
+        return;
+      }
+      if ((await scheduler.ensurePermission()) !== 'granted') {
+        setStatus('denied');
+        setError('系统通知权限未开启，请先进入通知设置允许提醒。');
+        return;
+      }
+      const result = await scheduler.scheduleDelayedTest(60, true);
+      const expected = new Date(result.triggerAt).toLocaleTimeString('zh-CN', { hour12: false });
+      setTestMessage(
+        `原生任务已登记，预计 ${expected} 触发；标识符：${result.identifier}。现在可锁屏或划掉最近任务。`,
+      );
+      await refreshDiagnostics();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '锁屏测试安排失败，请重试');
+    } finally {
+      setTesting(false);
+    }
+  }, [refreshDiagnostics, scheduler, settings.fullScreenEnabled]);
 
   const runSettingsAction = useCallback(async (action: () => Promise<void>) => {
     setError('');
@@ -263,6 +337,10 @@ export function NotificationProvider({
   );
   const openExactAlarmSettings = useCallback(
     () => runSettingsAction(scheduler.openExactAlarmSettings),
+    [runSettingsAction, scheduler],
+  );
+  const openFullScreenIntentSettings = useCallback(
+    () => runSettingsAction(scheduler.openFullScreenIntentSettings),
     [runSettingsAction, scheduler],
   );
   const openBatterySettings = useCallback(
@@ -293,11 +371,14 @@ export function NotificationProvider({
       testing,
       testMessage,
       setEnabled,
+      setFullScreenEnabled,
       setTime,
       refreshDiagnostics,
-      scheduleTestNotification,
+      sendImmediateTestNotification,
+      scheduleDelayedTestNotification,
       openNotificationSettings,
       openExactAlarmSettings,
+      openFullScreenIntentSettings,
       openBatterySettings,
     }),
     [
@@ -305,12 +386,15 @@ export function NotificationProvider({
       error,
       openBatterySettings,
       openExactAlarmSettings,
+      openFullScreenIntentSettings,
       openNotificationSettings,
       refreshDiagnostics,
-      scheduleTestNotification,
+      scheduleDelayedTestNotification,
+      sendImmediateTestNotification,
       scheduledCount,
       scheduler.supported,
       setEnabled,
+      setFullScreenEnabled,
       setTime,
       settings,
       status,

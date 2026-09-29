@@ -17,16 +17,20 @@ export function NotificationSettingsCard() {
       ? '通知渠道已关闭，系统不会显示提醒。'
       : notifications.diagnostics.channel === 'low-priority'
         ? '通知渠道优先级不足，可能没有顶部横幅。'
-        : notifications.diagnostics.channel === 'silent'
-          ? '通知渠道的声音或振动已被关闭。'
-          : notifications.diagnostics.channel === 'missing'
-            ? '通知渠道尚未建立，请重新检测。'
-            : '';
+        : notifications.diagnostics.channel === 'missing'
+          ? '通知渠道尚未建立，请重新检测。'
+          : '';
   const exactWarning =
     notifications.diagnostics.exactAlarm === 'unavailable'
       ? '“闹钟和提醒”权限未开启，Android 可能延迟送达。'
       : notifications.diagnostics.exactAlarm === 'unknown'
         ? '当前安装包无法检测精确提醒权限，请安装包含可靠性诊断的新版本。'
+        : '';
+  const fullScreenWarning =
+    settings.fullScreenEnabled && notifications.diagnostics.fullScreen === 'unavailable'
+      ? '锁屏全屏权限未开启，锁屏时会降级为普通通知。'
+      : settings.fullScreenEnabled && notifications.diagnostics.fullScreen === 'unknown'
+        ? '当前安装包无法检测锁屏全屏权限。'
         : '';
   const statusText = notifications.error
     ? notifications.error
@@ -38,8 +42,9 @@ export function NotificationSettingsCard() {
           ? '系统通知权限未开启，请到手机设置中允许岁岁日历发送通知。'
           : notifications.status === 'ready'
             ? channelWarning ||
+              fullScreenWarning ||
               exactWarning ||
-              `已安排 ${notifications.scheduledCount} 条提醒，系统排程核对通过。`
+              `已安排 ${notifications.scheduledCount} 条提醒，原生登记回读通过。`
             : '正在更新系统提醒…';
   return (
     <View style={[common.card, styles.card]}>
@@ -91,6 +96,21 @@ export function NotificationSettingsCard() {
         </View>
       </View>
 
+      <View style={styles.fullScreenSetting}>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Text style={styles.label}>锁屏时全屏提醒</Text>
+          <Text style={common.muted}>明确开启后，息屏或锁屏时尝试亮屏显示完整提醒；不会绕过锁屏密码。</Text>
+        </View>
+        <Switch
+          accessibilityLabel="锁屏时全屏提醒开关"
+          disabled={!settings.enabled || busy}
+          value={settings.fullScreenEnabled}
+          onValueChange={(enabled) => void notifications.setFullScreenEnabled(enabled)}
+          trackColor={{ false: '#D7DAD5', true: '#DDA99D' }}
+          thumbColor={settings.fullScreenEnabled ? colors.accent : '#FFF'}
+        />
+      </View>
+
       <View style={[styles.status, notifications.error && styles.errorStatus]}>
         <Icon
           name={notifications.error ? 'alert-circle-outline' : 'information-circle-outline'}
@@ -106,8 +126,15 @@ export function NotificationSettingsCard() {
         <Text style={styles.label}>送达诊断</Text>
         <DiagnosticRow
           label="通知权限"
-          value={permissionText(notifications.diagnostics.permission)}
-          ready={notifications.diagnostics.permission === 'granted'}
+          value={
+            notifications.diagnostics.appNotificationsEnabled
+              ? permissionText(notifications.diagnostics.permission)
+              : '应用通知已关闭'
+          }
+          ready={
+            notifications.diagnostics.permission === 'granted' &&
+            notifications.diagnostics.appNotificationsEnabled
+          }
         />
         <DiagnosticRow
           label="顶部横幅渠道"
@@ -118,6 +145,34 @@ export function NotificationSettingsCard() {
           }
         />
         <DiagnosticRow
+          label="系统悬浮/横幅开关"
+          value={
+            notifications.diagnostics.floatingBanner === 'manual-check'
+              ? '需到系统设置确认'
+              : '手机安装包中确认'
+          }
+          ready={notifications.diagnostics.floatingBanner === 'not-applicable'}
+        />
+        <DiagnosticRow
+          label="通知声音"
+          value={informationSwitchText(notifications.diagnostics.soundEnabled, '默认静音')}
+          ready
+        />
+        <DiagnosticRow
+          label="通知振动"
+          value={informationSwitchText(notifications.diagnostics.vibrationEnabled, '默认关闭')}
+          ready
+        />
+        <DiagnosticRow
+          label="锁屏全屏权限"
+          value={fullScreenText(notifications.diagnostics.fullScreen, settings.fullScreenEnabled)}
+          ready={
+            !settings.fullScreenEnabled ||
+            notifications.diagnostics.fullScreen === 'available' ||
+            notifications.diagnostics.fullScreen === 'not-applicable'
+          }
+        />
+        <DiagnosticRow
           label="准时提醒"
           value={exactAlarmText(notifications.diagnostics.exactAlarm)}
           ready={
@@ -125,14 +180,35 @@ export function NotificationSettingsCard() {
             notifications.diagnostics.exactAlarm === 'not-applicable'
           }
         />
+        <DiagnosticRow
+          label="原生系统登记"
+          value={`${notifications.diagnostics.registeredCount} 个任务可回读`}
+          ready={notifications.diagnostics.registeredCount >= notifications.diagnostics.scheduledCount}
+        />
+        <DiagnosticRow
+          label="最近一次原生投递"
+          value={deliveryText(
+            notifications.diagnostics.lastDeliveryAt,
+            notifications.diagnostics.lastDeliveryIdentifier,
+          )}
+          ready={notifications.diagnostics.lastDeliveryAt > 0}
+        />
         <View style={styles.actionGrid}>
           <Button
-            label="1 分钟后测试通知"
+            label="立即测试顶部横幅"
+            icon="notifications-outline"
+            busy={notifications.testing}
+            variant="secondary"
+            style={styles.actionButton}
+            onPress={() => void notifications.sendImmediateTestNotification()}
+          />
+          <Button
+            label="1 分钟后锁屏测试"
             icon="timer-outline"
             busy={notifications.testing}
             variant="secondary"
             style={styles.actionButton}
-            onPress={() => void notifications.scheduleTestNotification()}
+            onPress={() => void notifications.scheduleDelayedTestNotification()}
           />
           {notifications.supported ? (
             <>
@@ -153,6 +229,17 @@ export function NotificationSettingsCard() {
                   onPress={() => void notifications.openExactAlarmSettings()}
                 />
               )}
+              {settings.fullScreenEnabled &&
+                (notifications.diagnostics.fullScreen === 'unavailable' ||
+                  notifications.diagnostics.fullScreen === 'unknown') && (
+                  <Button
+                    label="锁屏全屏设置"
+                    icon="phone-portrait-outline"
+                    variant="secondary"
+                    style={styles.actionButton}
+                    onPress={() => void notifications.openFullScreenIntentSettings()}
+                  />
+                )}
               <Button
                 label="电池与后台设置"
                 icon="battery-half-outline"
@@ -176,8 +263,10 @@ export function NotificationSettingsCard() {
           </Text>
         ) : null}
         <Text style={common.muted}>
-          测试时可立即锁屏或划掉应用；不要在系统设置中点“强行停止”。Android
-          强行停止会撤销本应用继续接收和触发本地提醒的资格，重新打开应用后才会恢复排程。部分品牌手机还需允许自启动，并把电池策略设为“不限制”。
+          通知默认无声、无振动。部分 Android
+          品牌会把静默渠道同时视为“不悬浮”，应用无法读取厂商开关；若立即测试只进入通知栏，请在“通知渠道设置”中开启悬浮或横幅。锁屏全屏受
+          Android
+          权限和厂商策略限制，不可用时会降级为普通通知。不要在系统设置中点“强行停止”；强行停止后必须重新打开应用才能恢复。
         </Text>
       </View>
     </View>
@@ -200,15 +289,34 @@ function permissionText(value: 'granted' | 'denied' | 'undetermined'): string {
   return '尚未询问';
 }
 
-function channelText(
-  value: 'ready' | 'missing' | 'blocked' | 'low-priority' | 'silent' | 'not-applicable',
-): string {
-  if (value === 'ready') return '高优先级 · 声音和振动';
+function channelText(value: 'ready' | 'missing' | 'blocked' | 'low-priority' | 'not-applicable'): string {
+  if (value === 'ready') return '高优先级';
   if (value === 'blocked') return '已关闭';
   if (value === 'low-priority') return '优先级不足';
-  if (value === 'silent') return '声音或振动关闭';
   if (value === 'not-applicable') return '手机安装包中检测';
   return '尚未建立';
+}
+
+function informationSwitchText(value: boolean | null, disabledText: string): string {
+  if (value === null) return '手机安装包中检测';
+  return value ? '用户已开启' : disabledText;
+}
+
+function fullScreenText(
+  value: 'available' | 'unavailable' | 'not-applicable' | 'unknown',
+  enabled: boolean,
+): string {
+  if (!enabled) return '应用内未开启';
+  if (value === 'available') return '系统允许';
+  if (value === 'unavailable') return '系统未授权';
+  if (value === 'not-applicable') return '手机安装包中检测';
+  return '无法检测';
+}
+
+function deliveryText(deliveredAt: number, identifier: string): string {
+  if (deliveredAt <= 0) return '尚无投递记录';
+  const time = new Date(deliveredAt).toLocaleTimeString('zh-CN', { hour12: false });
+  return `${time} · ${identifier || '未知标识'}`;
 }
 
 function exactAlarmText(value: 'available' | 'unavailable' | 'not-applicable' | 'unknown'): string {
@@ -259,6 +367,14 @@ const styles = StyleSheet.create({
   timeSection: { gap: 9 },
   label: { color: colors.ink, fontSize: 13, fontWeight: '600' },
   timeFields: { flexDirection: 'row', gap: 10 },
+  fullScreenSetting: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 14,
+    backgroundColor: '#F8F7F3',
+    padding: 14,
+  },
   status: {
     flexDirection: 'row',
     alignItems: 'flex-start',
