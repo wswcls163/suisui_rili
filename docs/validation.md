@@ -96,9 +96,9 @@
 
 修复后启用 `important-dates-v2` 高优先级渠道，要求声音、振动和公开锁屏显示；新增原生精确闹钟能力检测及通知渠道、精确提醒、电池优化设置入口；每次重排后读取系统任务核对数量；新增独立、可重复去重的“1 分钟后测试通知”。Expo 接收器的开机、快速重启和应用升级恢复动作纳入静态集成测试。普通重要日期不申请全屏通知权限：Android 14 与应用商店只允许核心闹钟/通话用途默认使用全屏意图，本应用改为合规的顶部横幅与锁屏通知。
 
-自动化覆盖九一八计划、北京时间边界、60 条上限、权限拒绝、精确闹钟不可用、渠道降级、测试通知、系统排程数量核对、重复重排去重和重启/版本升级恢复声明。以下项目必须在包含新原生模块的下一版 APK 上逐项验证，本轮未构建或发布 APK：
+自动化覆盖九一八计划、北京时间边界、60 条上限、权限拒绝、精确闹钟不可用、渠道降级、测试通知、系统排程数量核对、重复重排去重和重启/版本升级恢复声明。包含新原生模块的 `0.3.0` APK 已完成本地构建和静态校验，以下送达行为仍必须在真机逐项验证：
 
-本轮验证结果：229 项 Jest、36 项 SQLite/IndexedDB/同步/Supabase 结构集成测试、73,049 天历法与 2,475 个农历月份及 4,800 条节气核验全部通过；TypeScript、ESLint、Prettier、Web 导出、Android/iOS Hermes 资源导出通过。Expo 自动链接能发现 `suisui-notification-reliability`，并在 JDK 17、Android SDK 36 和 Kotlin 2.1.20 环境单独执行 `:suisui-notification-reliability:compileDebugKotlin` 成功。本轮只编译原生模块，没有组装或发布 APK。
+本轮验证结果：229 项 Jest、36 项 SQLite/IndexedDB/同步/Supabase 结构集成测试、73,049 天历法与 2,475 个农历月份及 4,800 条节气核验全部通过；TypeScript、ESLint、Prettier、Web 导出、Android/iOS Hermes 资源导出通过。Expo 自动链接能发现 `suisui-notification-reliability`，并在 JDK 17、Android SDK 36 和 Kotlin 2.1.20 环境单独执行 `:suisui-notification-reliability:compileDebugKotlin` 成功；随后 `0.3.0` release 完整构建中的该模块 Kotlin、Java 和 lint 任务也全部通过。
 
 | 场景            | 操作与通过标准                                                               | 状态                   |
 | --------------- | ---------------------------------------------------------------------------- | ---------------------- |
@@ -116,6 +116,12 @@
 
 ## 手机端构建与待验收
 
+Android release 测试 APK 已于 2026-09-29 完成第三次完整构建。本次版本为 `0.3.0`、Android 版本号为 `3`，源码对应提交 `d983684`，通知可靠性实现对应提交 `fd57d66`。构建使用 Node.js 24.19.0、JDK 17、Android SDK / Build Tools 36 和 NDK 27.1，并按锁文件复制到 `C:\s30` 短英文路径重新安装依赖、预生成 Android 工程；`app:assembleRelease` 共执行 831 个任务，JS bundle 包含 1,441 个模块和 31 个资源文件。
+
+`0.3.0` 产物位于被 Git 忽略的 `releases/suisui-calendar-0.3.0-test.apk`，大小 107,869,369 字节，SHA-256 为 `FF2FF7A4386A34892BA15DF705C7346C5B105E916F277D39A44133C04D149122`。包名为 `com.suisui.calendar`，版本名 `0.3.0`、版本号 `3`、最低 Android API 24、目标 API 36，同时包含 `arm64-v8a`、`armeabi-v7a`、`x86`、`x86_64`。APK 通过 4 字节 ZIP 对齐和 APK Signature Scheme v2 验证；v1、v3、v3.1 和 v4 未启用。签名证书 SHA-256 为 `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`，与 `0.1.0`、`0.2.0` 完全一致，因此可覆盖安装并保留应用数据。
+
+最终合并清单确认包含 `POST_NOTIFICATIONS`、`SCHEDULE_EXACT_ALARM`、`RECEIVE_BOOT_COMPLETED`，并包含 `BOOT_COMPLETED` 与 `MY_PACKAGE_REPLACED` 恢复动作；不包含录音及外部存储读写权限。Release 构建已编译并链接 `suisui-notification-reliability` 模块。上述结果证明安装包结构、权限、签名和静态集成正确，不代替前台、锁屏、划掉最近任务、重启、厂商省电及强行停止边界的真机送达验收。
+
 Android release 测试 APK 已于 2026-09-15 完成第二次完整构建。本次发布版本为 `0.2.0`、Android 版本号为 `2`，可覆盖安装签名相同的 `0.1.0`，并包含手机首页紧凑布局、左侧功能菜单、独立日期计算、时光记、节日与生日及周年合并提醒、同步边界修复和账号安全加固。Expo SDK 57 的依赖补丁已按 Doctor 推荐更新，21/21 项配置检查通过。
 
 本次构建使用 JDK 17、Android SDK 36、Build Tools 36.0.0、NDK 27.1.12297006 和 Node.js 24.19.0。由于 Windows 下的 JDK / Gradle / Expo 工具链不能稳定处理中文或过长工程路径，构建输入按 npm 锁文件复制到 `C:\s20` 短路径后重新安装依赖，未移动或改名正式源码。`app:assembleRelease` 共执行 794 个任务并成功结束，JS bundle 包含 1,440 个模块和 31 个资源文件。
@@ -130,13 +136,13 @@ Android release 测试 APK 曾于 2026-09-09 在 Windows 本地完成首次完�
 
 | 设备验收项                                       | 状态                                 |
 | ------------------------------------------------ | ------------------------------------ |
-| Android 通用 APK 编译、对齐、签名与包信息校验    | 已通过                               |
+| Android 通用 APK 编译、对齐、签名与包信息校验    | 0.3.0 已通过                         |
 | Android 真机安装、启动与冷启动                   | 待连接并授权 USB 调试后执行          |
 | expo-sqlite 原生桥接、杀进程后数据保留、升级迁移 | 待执行                               |
 | 断网启动与完整 CRUD                              | 待执行                               |
 | 真实邮箱验证、密码重置、手机与电脑跨设备同步     | 待 Supabase 开发项目与测试账号后执行 |
 | 前后台切换、手机跨午夜及设备时间变化             | 待执行（业务时钟模拟测试已通过）     |
-| 节日、生日与周年系统通知，合并内容及锁屏后送达   | 0.2.0 APK 已生成，待真机授权后执行   |
+| 节日、生日与周年系统通知，合并内容及锁屏后送达   | 0.3.0 APK 已生成，待真机授权后执行   |
 | 安全区域、键盘遮挡、系统返回、字体放大、横竖屏   | 待执行（Web 窄屏检查已通过）         |
 | 正式签名、渠道与发布包                           | 待确定后执行                         |
 

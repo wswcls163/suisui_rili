@@ -98,6 +98,6 @@ test('Android 发布版本在 Expo 与 npm 配置中保持一致', async () => {
   assert.equal(appConfig.expo.version, packageConfig.version);
   assert.equal(packageLock.version, packageConfig.version);
   assert.equal(packageLock.packages[''].version, packageConfig.version);
-  assert.equal(appConfig.expo.version, '0.2.0');
-  assert.equal(appConfig.expo.android.versionCode, 2);
+  assert.equal(appConfig.expo.version, '0.3.0');
+  assert.equal(appConfig.expo.android.versionCode, 3);
 });
