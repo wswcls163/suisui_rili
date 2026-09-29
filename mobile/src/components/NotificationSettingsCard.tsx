@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Switch, Text, View } from 'react-native';
 import { notificationTimeText } from '../core/notification';
 import { useNotifications } from '../state/NotificationProvider';
-import { ChoiceField, colors, common, Icon } from './ui';
+import { Button, ChoiceField, colors, common, Icon } from './ui';
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => `${String(hour).padStart(2, '0')} 时`);
 const MINUTES = Array.from({ length: 60 }, (_, minute) => `${String(minute).padStart(2, '0')} 分`);
@@ -12,6 +12,22 @@ export function NotificationSettingsCard() {
   const { settings } = notifications;
   const busy = notifications.status === 'loading' || notifications.status === 'scheduling';
   const time = notificationTimeText(settings);
+  const channelWarning =
+    notifications.diagnostics.channel === 'blocked'
+      ? '通知渠道已关闭，系统不会显示提醒。'
+      : notifications.diagnostics.channel === 'low-priority'
+        ? '通知渠道优先级不足，可能没有顶部横幅。'
+        : notifications.diagnostics.channel === 'silent'
+          ? '通知渠道的声音或振动已被关闭。'
+          : notifications.diagnostics.channel === 'missing'
+            ? '通知渠道尚未建立，请重新检测。'
+            : '';
+  const exactWarning =
+    notifications.diagnostics.exactAlarm === 'unavailable'
+      ? '“闹钟和提醒”权限未开启，Android 可能延迟送达。'
+      : notifications.diagnostics.exactAlarm === 'unknown'
+        ? '当前安装包无法检测精确提醒权限，请安装包含可靠性诊断的新版本。'
+        : '';
   const statusText = notifications.error
     ? notifications.error
     : !settings.enabled
@@ -21,7 +37,9 @@ export function NotificationSettingsCard() {
         : notifications.status === 'denied'
           ? '系统通知权限未开启，请到手机设置中允许岁岁日历发送通知。'
           : notifications.status === 'ready'
-            ? `已安排 ${notifications.scheduledCount} 条提醒，记录变化后会自动更新。`
+            ? channelWarning ||
+              exactWarning ||
+              `已安排 ${notifications.scheduledCount} 条提醒，系统排程核对通过。`
             : '正在更新系统提醒…';
   return (
     <View style={[common.card, styles.card]}>
@@ -33,7 +51,7 @@ export function NotificationSettingsCard() {
           <Text accessibilityRole="header" style={common.heading}>
             重要日期提醒
           </Text>
-          <Text style={common.muted}>应用关闭或锁屏后，也能按时收到提醒</Text>
+          <Text style={common.muted}>后台、划掉最近任务或锁屏后由系统送达（强行停止除外）</Text>
         </View>
         <Switch
           accessibilityLabel="重要日期提醒开关"
@@ -83,8 +101,121 @@ export function NotificationSettingsCard() {
           {statusText}
         </Text>
       </View>
+
+      <View style={styles.diagnostics}>
+        <Text style={styles.label}>送达诊断</Text>
+        <DiagnosticRow
+          label="通知权限"
+          value={permissionText(notifications.diagnostics.permission)}
+          ready={notifications.diagnostics.permission === 'granted'}
+        />
+        <DiagnosticRow
+          label="顶部横幅渠道"
+          value={channelText(notifications.diagnostics.channel)}
+          ready={
+            notifications.diagnostics.channel === 'ready' ||
+            notifications.diagnostics.channel === 'not-applicable'
+          }
+        />
+        <DiagnosticRow
+          label="准时提醒"
+          value={exactAlarmText(notifications.diagnostics.exactAlarm)}
+          ready={
+            notifications.diagnostics.exactAlarm === 'available' ||
+            notifications.diagnostics.exactAlarm === 'not-applicable'
+          }
+        />
+        <View style={styles.actionGrid}>
+          <Button
+            label="1 分钟后测试通知"
+            icon="timer-outline"
+            busy={notifications.testing}
+            variant="secondary"
+            style={styles.actionButton}
+            onPress={() => void notifications.scheduleTestNotification()}
+          />
+          {notifications.supported ? (
+            <>
+              <Button
+                label="通知渠道设置"
+                icon="notifications-outline"
+                variant="secondary"
+                style={styles.actionButton}
+                onPress={() => void notifications.openNotificationSettings()}
+              />
+              {(notifications.diagnostics.exactAlarm === 'unavailable' ||
+                notifications.diagnostics.exactAlarm === 'unknown') && (
+                <Button
+                  label="准时提醒设置"
+                  icon="alarm-outline"
+                  variant="secondary"
+                  style={styles.actionButton}
+                  onPress={() => void notifications.openExactAlarmSettings()}
+                />
+              )}
+              <Button
+                label="电池与后台设置"
+                icon="battery-half-outline"
+                variant="secondary"
+                style={styles.actionButton}
+                onPress={() => void notifications.openBatterySettings()}
+              />
+              <Button
+                label="重新检测"
+                icon="refresh-outline"
+                variant="quiet"
+                style={styles.actionButton}
+                onPress={() => void notifications.refreshDiagnostics()}
+              />
+            </>
+          ) : null}
+        </View>
+        {notifications.testMessage ? (
+          <Text accessibilityLiveRegion="polite" style={styles.testMessage}>
+            {notifications.testMessage}
+          </Text>
+        ) : null}
+        <Text style={common.muted}>
+          测试时可立即锁屏或划掉应用；不要在系统设置中点“强行停止”。Android
+          强行停止会撤销本应用继续接收和触发本地提醒的资格，重新打开应用后才会恢复排程。部分品牌手机还需允许自启动，并把电池策略设为“不限制”。
+        </Text>
+      </View>
     </View>
   );
+}
+
+function DiagnosticRow({ label, value, ready }: { label: string; value: string; ready: boolean }) {
+  return (
+    <View style={styles.diagnosticRow}>
+      <View style={[styles.dot, { backgroundColor: ready ? colors.green : colors.accent }]} />
+      <Text style={[common.body, { flex: 1 }]}>{label}</Text>
+      <Text style={[common.muted, !ready && { color: colors.accent }]}>{value}</Text>
+    </View>
+  );
+}
+
+function permissionText(value: 'granted' | 'denied' | 'undetermined'): string {
+  if (value === 'granted') return '已允许';
+  if (value === 'denied') return '已拒绝';
+  return '尚未询问';
+}
+
+function channelText(
+  value: 'ready' | 'missing' | 'blocked' | 'low-priority' | 'silent' | 'not-applicable',
+): string {
+  if (value === 'ready') return '高优先级 · 声音和振动';
+  if (value === 'blocked') return '已关闭';
+  if (value === 'low-priority') return '优先级不足';
+  if (value === 'silent') return '声音或振动关闭';
+  if (value === 'not-applicable') return '手机安装包中检测';
+  return '尚未建立';
+}
+
+function exactAlarmText(value: 'available' | 'unavailable' | 'not-applicable' | 'unknown'): string {
+  if (value === 'available') return '可准时触发';
+  if (value === 'unavailable') return '未授权，可能延迟';
+  if (value === 'not-applicable') return '手机安装包中检测';
+  return '当前版本无法检测';
 }
 
 function ReminderRule({
@@ -137,4 +268,22 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   errorStatus: { backgroundColor: '#FCEDEA' },
+  diagnostics: { gap: 10 },
+  diagnosticRow: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 },
+  actionButton: { minWidth: 148, flexGrow: 1 },
+  testMessage: {
+    color: colors.green,
+    fontSize: 13,
+    lineHeight: 21,
+    borderRadius: 10,
+    backgroundColor: '#EDF3EE',
+    padding: 10,
+  },
 });

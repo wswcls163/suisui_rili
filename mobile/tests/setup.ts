@@ -29,13 +29,28 @@ jest.mock('expo-secure-store', () => {
   };
 });
 jest.mock('expo-notifications', () => ({
-  AndroidImportance: { HIGH: 6 },
-  SchedulableTriggerInputTypes: { DATE: 'date' },
+  AndroidImportance: { NONE: 2, LOW: 4, DEFAULT: 5, HIGH: 6 },
+  AndroidNotificationVisibility: { PUBLIC: 1 },
+  SchedulableTriggerInputTypes: { DATE: 'date', TIME_INTERVAL: 'timeInterval' },
   setNotificationHandler: jest.fn(),
   setNotificationChannelAsync: jest.fn(async () => null),
-  getPermissionsAsync: jest.fn(async () => ({ granted: true })),
-  requestPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  getNotificationChannelAsync: jest.fn(async () => ({
+    id: 'important-dates-v2',
+    importance: 6,
+    sound: 'default',
+    enableVibrate: true,
+  })),
+  getPermissionsAsync: jest.fn(async () => ({ granted: true, status: 'granted' })),
+  requestPermissionsAsync: jest.fn(async () => ({ granted: true, status: 'granted' })),
   getAllScheduledNotificationsAsync: jest.fn(async () => []),
   cancelScheduledNotificationAsync: jest.fn(async () => {}),
   scheduleNotificationAsync: jest.fn(async ({ identifier }: { identifier?: string }) => identifier ?? 'test'),
+}));
+jest.mock('../src/notifications/nativeReliability', () => ({
+  nativeNotificationReliability: {
+    exactAlarmCapability: jest.fn(async () => 'available'),
+    openExactAlarmSettings: jest.fn(async () => {}),
+    openNotificationSettings: jest.fn(async () => {}),
+    openBatterySettings: jest.fn(async () => {}),
+  },
 }));

@@ -41,7 +41,7 @@
         {
           "icon": "./assets/android-icon-monochrome.png",
           "color": "#B8523E",
-          "defaultChannel": "important-dates"
+          "defaultChannel": "important-dates-v2"
         }
       ],
       [

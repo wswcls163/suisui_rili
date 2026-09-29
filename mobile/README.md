@@ -20,7 +20,9 @@ npm run web
 
 生日方式可选“只过农历”“只过阳历”“两个都过”。例如编辑已有的农历腊月初九生日，选择“两个都过”并另填阳历 1 月 11 日，两套日期就会独立预览、逐年计算和提醒。同一天重合时只计一次，生日簿仍保留一个人。旧记录升级后保持原有农历规则，不根据姓名猜测阳历日期；阳历 2 月 29 日在平年提前到 28 日，原始日期保持不变。
 
-“设置”页提供设备本地的重要日期提醒，默认关闭。开启后会请求系统通知权限，月历标注的节日、节气、纪念日，以及生日与“每年纪念”都会在当天按设定的北京时间提醒，默认 09:00；普通“记录天数”不发送通知。同一天出现多项内容时只发送一条合并通知，并完整列出当天的重要日子。修改记录、切换时间或重新打开应用后会自动重排最近 60 条提醒。电脑预览只用于检查设置界面，不会真的发送系统通知；开关与时间设置不通过 Supabase 同步，每台手机需分别开启。
+“设置”页提供设备本地的重要日期提醒，默认关闭。开启后会请求系统通知权限，月历标注的节日、节气、纪念日，以及生日与“每年纪念”都会在当天按设定的北京时间提醒，默认 09:00；普通“记录天数”不发送通知。同一天出现多项内容时只发送一条合并通知，并完整列出当天的重要日子。修改记录、切换时间或重新打开应用后会自动重排最近 60 条提醒，并核对系统实际保存数量。
+
+手机设置页会诊断通知权限、顶部横幅渠道和 Android“闹钟和提醒”权限，并提供对应设置入口。可点“1 分钟后测试通知”，随后锁屏或从最近任务划掉应用检查顶部横幅、声音和振动。正常后台与锁屏由系统送达；系统设置里的“强行停止”会冻结所有本地提醒，重新打开应用后才能恢复。部分品牌手机还需允许自启动并把电池策略设为“不限制”。普通日历提醒遵守平台政策，不申请全屏通知。电脑预览只用于检查设置界面，不会真的发送系统通知；开关与时间设置不通过 Supabase 同步，每台手机需分别开启。
 
 ## 配置邮箱账号与同步
 
@@ -90,20 +92,20 @@ npm audit --registry=https://registry.npmjs.org/
 
 ## 修改代码的位置
 
-| 要修改的内容                       | 位置                                                                                   |
-| ---------------------------------- | -------------------------------------------------------------------------------------- |
-| 页面与导航                         | `app/`、`src/components/NavigationDrawer.tsx`                                          |
-| 月历、生日表单、共用样式和小组件   | `src/components/`                                                                      |
-| 临时日期计算、年月日滚轮与跳转弹窗 | `src/components/DateCalculatorDialog.tsx`、`src/components/DateJumpDialog.tsx`         |
-| 输入校验、年度生日与时光记规则     | `src/core/birthday.ts`、`src/core/countup.ts`                                          |
-| 系统通知规则、排程与设备设置       | `src/core/notification.ts`、`src/notifications/`、`src/state/NotificationProvider.tsx` |
-| 常见节日、纪念日规则与同日节气组合 | `src/core/festivals.ts`                                                                |
-| 历法库与核验口径                   | `src/core/calendar.ts`                                                                 |
-| 日期运算、北京时间与前台时钟       | `src/core/dates.ts`、`src/core/clock.ts`                                               |
-| 共享生日状态与手机生命周期         | `src/state/AppProvider.tsx`                                                            |
-| 邮箱认证、会话存储与回调           | `src/auth/`、`src/state/AuthProvider.tsx`                                              |
-| 离线队列、云端适配与同步状态       | `src/sync/`、`src/state/SyncProvider.tsx`                                              |
-| SQLite、IndexedDB 和版本迁移       | `src/data/`                                                                            |
+| 要修改的内容                       | 位置                                                                                                                               |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 页面与导航                         | `app/`、`src/components/NavigationDrawer.tsx`                                                                                      |
+| 月历、生日表单、共用样式和小组件   | `src/components/`                                                                                                                  |
+| 临时日期计算、年月日滚轮与跳转弹窗 | `src/components/DateCalculatorDialog.tsx`、`src/components/DateJumpDialog.tsx`                                                     |
+| 输入校验、年度生日与时光记规则     | `src/core/birthday.ts`、`src/core/countup.ts`                                                                                      |
+| 系统通知规则、排程与设备设置       | `src/core/notification.ts`、`src/notifications/`、`src/state/NotificationProvider.tsx`、`modules/suisui-notification-reliability/` |
+| 常见节日、纪念日规则与同日节气组合 | `src/core/festivals.ts`                                                                                                            |
+| 历法库与核验口径                   | `src/core/calendar.ts`                                                                                                             |
+| 日期运算、北京时间与前台时钟       | `src/core/dates.ts`、`src/core/clock.ts`                                                                                           |
+| 共享生日状态与手机生命周期         | `src/state/AppProvider.tsx`                                                                                                        |
+| 邮箱认证、会话存储与回调           | `src/auth/`、`src/state/AuthProvider.tsx`                                                                                          |
+| 离线队列、云端适配与同步状态       | `src/sync/`、`src/state/SyncProvider.tsx`                                                                                          |
+| SQLite、IndexedDB 和版本迁移       | `src/data/`                                                                                                                        |
 
 Supabase 数据库迁移与注销函数位于 `supabase/`。仓库不包含任何项目密钥；未配置环境变量时账号功能保持关闭。系统通知使用 `expo-notifications` 的本地一次性排程，不依赖远端推送服务。新增功能按实际职责扩展，不预先建立空业务表、通用事件引擎或多层服务。图标源文件与生成脚本在 `assets/icon.svg`、`scripts/generate-icons.mjs`；修改后运行 `node scripts/generate-icons.mjs`。
 

@@ -93,6 +93,45 @@ describe('系统通知排程', () => {
     });
   });
 
+  test('九一八事变在北京时间提醒边界前进入计划，边界后不再伪装成已安排', () => {
+    const before = buildNotificationPlan({
+      calendar: lunarCalendar,
+      people: [],
+      countups: [],
+      now: Date.parse('2026-09-18T08:59:59+08:00'),
+      settings: enabled,
+    });
+    expect(before.find((item) => item.date === '2026-09-18')).toMatchObject({
+      identifier: 'suisui-festival-2026-09-18',
+      triggerAt: Date.parse('2026-09-18T09:00:00+08:00'),
+      title: '今天是九一八事变',
+    });
+
+    const atBoundary = buildNotificationPlan({
+      calendar: lunarCalendar,
+      people: [],
+      countups: [],
+      now: Date.parse('2026-09-18T09:00:00+08:00'),
+      settings: enabled,
+    });
+    expect(atBoundary.some((item) => item.date === '2026-09-18')).toBe(false);
+  });
+
+  test('提醒总量达到 60 条时仍按时间优先保留最近的九一八事变', () => {
+    const people = Array.from({ length: 70 }, (_, index) =>
+      fixture(`limit-${index}`, { lunar: null, solar: { month: 12, day: 1 } }),
+    );
+    const plan = buildNotificationPlan({
+      calendar: lunarCalendar,
+      people,
+      countups: [],
+      now: Date.parse('2026-09-17T23:59:00+08:00'),
+      settings: enabled,
+    });
+    expect(plan).toHaveLength(MAX_SCHEDULED_REMINDERS);
+    expect(plan[0]).toMatchObject({ date: '2026-09-18', title: '今天是九一八事变' });
+  });
+
   test('节日与生日同日时合并为一条通知', () => {
     const plan = buildNotificationPlan({
       calendar: lunarCalendar,
@@ -175,5 +214,6 @@ describe('系统通知排程', () => {
     expect(beijingTriggerAt('2026-09-10', { hour: 9, minute: 5 })).toBe(
       Date.parse('2026-09-10T09:05:00+08:00'),
     );
+    expect(beijingTriggerAt('2026-09-18', { hour: 9, minute: 0 })).toBe(Date.parse('2026-09-18T01:00:00Z'));
   });
 });

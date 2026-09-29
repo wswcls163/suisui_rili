@@ -1,5 +1,6 @@
 import React from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
+import { AppState, type AppStateStatus } from 'react-native';
 import type { NotificationSettings } from '../src/core/notification';
 import type { NotificationPreferences } from '../src/notifications/preferences';
 import type { NotificationScheduler } from '../src/notifications/scheduler';
@@ -9,6 +10,23 @@ import { countupFixture, fixture, memoryRepository } from './helpers';
 
 const now = Date.parse('2026-09-09T12:00:00+08:00');
 const clock = { now: () => now };
+
+const readyDiagnostics = {
+  permission: 'granted' as const,
+  exactAlarm: 'available' as const,
+  channel: 'ready' as const,
+  scheduledCount: 60,
+};
+
+function schedulerMethods() {
+  return {
+    getDiagnostics: jest.fn(async () => readyDiagnostics),
+    scheduleTest: jest.fn(async () => 'suisui-notification-test'),
+    openNotificationSettings: jest.fn(async () => {}),
+    openExactAlarmSettings: jest.fn(async () => {}),
+    openBatterySettings: jest.fn(async () => {}),
+  };
+}
 
 test('开启后保存本机设置并按数据变化重排节日、生日和周年通知', async () => {
   let stored: NotificationSettings = { enabled: false, hour: 9, minute: 0 };
@@ -24,6 +42,7 @@ test('开启后保存本机设置并按数据变化重排节日、生日和周�
     ensurePermission: jest.fn(async () => 'granted'),
     replace: jest.fn(async (reminders) => reminders.length),
     clear: jest.fn(async () => {}),
+    ...schedulerMethods(),
   };
   const repo = memoryRepository(
     [fixture('birthday', { lunar: null, solar: { month: 9, day: 10 } })],
@@ -84,6 +103,7 @@ test('拒绝通知权限时不开启开关并给出可操作提示', async () =>
     ensurePermission: jest.fn(async () => 'denied'),
     replace: jest.fn(async () => 0),
     clear: jest.fn(async () => {}),
+    ...schedulerMethods(),
   };
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <AppProvider repo={memoryRepository()} clock={clock}>
@@ -100,4 +120,88 @@ test('拒绝通知权限时不开启开关并给出可操作提示', async () =>
   expect(result.current.settings.enabled).toBe(false);
   expect(result.current.error).toContain('手机设置');
   expect(preferences.save).not.toHaveBeenCalled();
+});
+
+test('精确闹钟不可用时保留已排程提醒并提供诊断，1 分钟测试仍可安排', async () => {
+  const preferences: NotificationPreferences = {
+    load: jest.fn(async () => ({ enabled: true, hour: 9, minute: 0 })),
+    save: jest.fn(async () => {}),
+  };
+  const scheduler: NotificationScheduler = {
+    supported: true,
+    getPermission: jest.fn(async () => 'granted'),
+    ensurePermission: jest.fn(async () => 'granted'),
+    getDiagnostics: jest.fn(async () => ({
+      ...readyDiagnostics,
+      exactAlarm: 'unavailable' as const,
+    })),
+    replace: jest.fn(async (reminders) => reminders.length),
+    clear: jest.fn(async () => {}),
+    scheduleTest: jest.fn(async () => 'suisui-notification-test'),
+    openNotificationSettings: jest.fn(async () => {}),
+    openExactAlarmSettings: jest.fn(async () => {}),
+    openBatterySettings: jest.fn(async () => {}),
+  };
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <AppProvider repo={memoryRepository()} clock={clock}>
+      <NotificationProvider preferences={preferences} scheduler={scheduler} clock={clock}>
+        {children}
+      </NotificationProvider>
+    </AppProvider>
+  );
+  const { result } = renderHook(useNotifications, { wrapper });
+
+  await waitFor(() => expect(result.current.status).toBe('ready'));
+  await waitFor(() => expect(result.current.diagnostics.exactAlarm).toBe('unavailable'));
+  expect(scheduler.replace).toHaveBeenCalled();
+
+  await act(() => result.current.scheduleTestNotification());
+  expect(scheduler.scheduleTest).toHaveBeenCalledWith(60);
+  expect(result.current.testMessage).toContain('锁屏');
+
+  await act(() => result.current.openExactAlarmSettings());
+  expect(scheduler.openExactAlarmSettings).toHaveBeenCalled();
+});
+
+test('从系统设置或后台返回前台时重新诊断并重排，恢复新授予的精确能力', async () => {
+  let onAppStateChange: ((state: AppStateStatus) => void) | undefined;
+  const appStateSpy = jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, listener) => {
+    onAppStateChange = listener;
+    return { remove: jest.fn() };
+  });
+  const preferences: NotificationPreferences = {
+    load: jest.fn(async () => ({ enabled: true, hour: 9, minute: 0 })),
+    save: jest.fn(async () => {}),
+  };
+  const scheduler: NotificationScheduler = {
+    supported: true,
+    getPermission: jest.fn(async () => 'granted'),
+    ensurePermission: jest.fn(async () => 'granted'),
+    replace: jest.fn(async (reminders) => reminders.length),
+    clear: jest.fn(async () => {}),
+    ...schedulerMethods(),
+  };
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <AppProvider repo={memoryRepository()} clock={clock}>
+      <NotificationProvider preferences={preferences} scheduler={scheduler} clock={clock}>
+        {children}
+      </NotificationProvider>
+    </AppProvider>
+  );
+
+  try {
+    const { result } = renderHook(useNotifications, { wrapper });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await waitFor(() => expect(onAppStateChange).toBeDefined());
+    const replaceCount = (scheduler.replace as jest.Mock).mock.calls.length;
+
+    act(() => onAppStateChange?.('active'));
+
+    await waitFor(() =>
+      expect((scheduler.replace as jest.Mock).mock.calls.length).toBeGreaterThan(replaceCount),
+    );
+    expect(scheduler.getDiagnostics).toHaveBeenCalled();
+  } finally {
+    appStateSpy.mockRestore();
+  }
 });

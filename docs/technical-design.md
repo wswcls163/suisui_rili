@@ -1,6 +1,6 @@
 # 岁岁日历 · 技术方案
 
-版本：V1.5｜日期：2026-09-27｜状态：生日、可选出生年份与周岁、未来选日距离、时光记、节日合并提醒、全局功能菜单、账号同步与本地系统通知代码已实现；出生年份云端迁移已部署到开发项目并完成真实账号同步，Android 新版本待重新构建和真机验收
+版本：V1.6｜日期：2026-09-29｜状态：生日、可选出生年份与周岁、未来选日距离、时光记、节日合并提醒、通知可靠性诊断、全局功能菜单、账号同步与本地系统通知代码已实现；出生年份云端迁移已部署到开发项目并完成真实账号同步，Android 新版本待重新构建和真机验收
 
 依据：[产品设计文档](product-design.md) 与 [交互 Demo](../demo/README.md)。本方案面向第一期生日功能，重点是手机端交付、便于修改，以及为后续功能保留清晰的接入位置。
 
@@ -156,9 +156,15 @@ mobile/
 
 系统通知由 `core/notification.ts` 生成纯计划，业务层不依赖 Expo。计划始终把 `YYYY-MM-DD + 用户设定时分` 转为 UTC+08:00 的绝对时间：从 `festivalsOn` 逐日取得月历标注，生日的农历和阳历分别逐年计算，时光记只消费 `displayMode: anniversary` 并每年处理 2 月 29 日回退，`days` 不产生通知。所有候选项按 `YYYY-MM-DD` 分组；同日多个节日、生日或周年统一生成一条 `combined` 通知并完整拼接正文。计划按触发时间排序并截取最近 60 条，既为用户预排后续日期，也保留在 iOS 待处理通知上限之内。
 
-`notifications/scheduler.ts` 使用 `expo-notifications` 创建 Android 高优先级通知通道，请求通知权限，并以确定性标识安排一次性日期通知。重排前只取消 `content.data.owner === 'suisui-calendar'` 的本应用通知，不影响同一原生容器可能存在的其他排程；串行队列避免连续修改时间或事项时旧任务覆盖新任务。Android 清单申请精确闹钟能力，实际送达仍受用户通知权限、系统省电策略和设备时钟影响。
+`notifications/scheduler.ts` 使用 `expo-notifications` 创建 Android 高优先级通知通道，请求通知权限，并以确定性标识安排一次性日期通知。重排前只取消 `content.data.owner === 'suisui-calendar'` 的正常提醒，不影响同一原生容器中的诊断通知或其他排程；串行队列避免连续修改时间或事项时旧任务覆盖新任务。每次重排后重新读取系统待处理列表，只有计划中的全部标识确实存在才报告成功，避免“调用成功但系统未保存”被误显示为已安排。
 
-`NotificationProvider` 在数据加载、事项变化、通知时间变化和应用重新启动时重建计划。总开关默认关闭，首次开启才弹系统权限；设置用 SecureStore 保存在当前手机，不加入业务数据库或 Supabase。Web 使用 localStorage 与无发送能力的替身，仅展示 443 像素手机界面。通知无需后台任务持续运行：原生系统接管已经排好的日期通知。
+Android 渠道使用 `important-dates-v2`。渠道属性在首次创建后不可由应用强制改回，因此更换标识可避开旧版渠道已被降级或静音的历史状态；用户仍拥有最终控制权。渠道请求高优先级、默认声音、振动和公开锁屏显示，用于常规 heads-up 横幅，不申请 `USE_FULL_SCREEN_INTENT`。全屏通知受 Android 14 与应用商店政策限制，只适用于核心闹钟/通话场景，生日与纪念日不满足这一产品边界。
+
+`modules/suisui-notification-reliability` 是随 Expo 自动链接的轻量 Android 原生模块，只补充 `expo-notifications` 没有暴露给 JavaScript 的系统能力：通过 `AlarmManager.canScheduleExactAlarms()` 检测 Android 12+“闹钟和提醒”特殊权限，并打开精确闹钟、指定通知渠道和电池优化设置。Expo 57 在该权限不可用时会把一次性通知退化为 `setAndAllowWhileIdle`，旧界面无法暴露这一退化；现在诊断显示“可能延迟”，但不会删除仍有机会送达的不精确计划。1 分钟测试使用独立所有者和固定标识，重复操作先取消旧测试再安排新任务。
+
+Expo Notifications 自带的 Android 接收器监听 `BOOT_COMPLETED`、厂商快速重启动作和 `MY_PACKAGE_REPLACED`，恢复已持久化的排程；应用每次冷启动也会依据最新业务数据重新生成并去重。绝对触发时间始终由 `+08:00` 生成，切换手机时区不会改变目标北京时间。正常后台、系统回收进程、最近任务划掉和锁屏不依赖 JavaScript 常驻；Android“强行停止”会冻结应用及其接收器，属于平台不可绕过边界，重新打开应用后才恢复。
+
+`NotificationProvider` 在数据加载、事项变化、通知时间变化、恢复前台和应用重新启动时重建计划。从“闹钟和提醒”设置返回会重新诊断并重排，使刚授予的精确能力立刻作用于后续通知。总开关默认关闭，首次开启才弹系统权限；设置用 SecureStore 保存在当前手机，不加入业务数据库或 Supabase。Web 使用 localStorage 与无发送能力的替身，仅展示 443 像素手机界面。通知无需后台任务持续运行：原生系统接管已经排好的日期通知。
 
 ## 7. 手机界面与 Demo 迁移
 
@@ -191,7 +197,7 @@ mobile/
 | 倒数日等       | 时光记已支持天数与固定周年纪念；目标倒数仍需增加独立规则，并向月历输出统一展示结果                                                                                       |
 | 桌面小组件     | 复用生日计算结果，分别评估 Android / iOS 的展示、数据共享与刷新机制                                                                                                      |
 
-本地通知按 [Expo SDK 57 Notifications 文档](https://docs.expo.dev/versions/v57.0.0/sdk/notifications/) 实现。电脑预览和自动测试只能验证计划与界面；通知权限、锁屏或杀进程后的送达、Android 精确闹钟权限、重启恢复和厂商省电策略仍必须在目标真机验证。不为未来能力预先创建空业务表或安装无关模块。
+本地通知按 [Expo SDK 57 Notifications 文档](https://docs.expo.dev/versions/v57.0.0/sdk/notifications/) 实现，并遵循 [Android 精确闹钟说明](https://developer.android.com/develop/background-work/services/alarms)与 [Android 14 全屏通知限制](https://developer.android.com/about/versions/14/behavior-changes-14)。电脑预览和自动测试只能验证计划、原生声明、排程核对和界面；顶部横幅、声音、振动、锁屏、最近任务划掉、重启恢复和厂商省电策略仍必须在目标真机验证。不为未来能力预先创建空业务表或安装无关模块。
 
 ## 9. 测试与验收
 
