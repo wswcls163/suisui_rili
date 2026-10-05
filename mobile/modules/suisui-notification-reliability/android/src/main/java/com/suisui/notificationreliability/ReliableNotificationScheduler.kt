@@ -39,8 +39,9 @@ internal class ReliableNotificationScheduler(private val context: Context) {
     return isRegistered(request.identifier)
   }
 
-  fun restoreAll(now: Long = System.currentTimeMillis()) {
-    store.all().forEach { request ->
+  fun restoreAll(now: Long = System.currentTimeMillis()): Int {
+    val requests = store.all()
+    requests.forEach { request ->
       if (request.triggerAt < now - MISSED_REMINDER_GRACE_MS) {
         cancelAlarm(request.identifier)
         store.remove(request.identifier)
@@ -48,6 +49,7 @@ internal class ReliableNotificationScheduler(private val context: Context) {
         scheduleAlarm(request, maxOf(request.triggerAt, now + RESTORE_DELAY_MS))
       }
     }
+    return registered().size
   }
 
   fun scheduled(): List<ReliableNotificationRecord> = store.all()

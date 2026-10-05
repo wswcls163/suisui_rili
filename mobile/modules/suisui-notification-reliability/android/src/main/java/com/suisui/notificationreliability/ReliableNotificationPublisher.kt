@@ -55,8 +55,10 @@ internal class ReliableNotificationPublisher(private val context: Context) {
       .setCategory(if (request.fullScreen) NotificationCompat.CATEGORY_ALARM else NotificationCompat.CATEGORY_REMINDER)
       .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
       .setAutoCancel(true)
-      .setSilent(true)
       .setContentIntent(contentIntent())
+
+    // 渠道本身已经关闭声音和振动。不要再设置通知级静默，否则 ColorOS 会加上
+    // FLAG_SILENT，并把 HIGH 通知实际降为 DEFAULT，导致顶部横幅无法出现。
 
     if (request.fullScreen && canUseFullScreenIntent()) {
       builder.setFullScreenIntent(fullScreenIntent(request), true)

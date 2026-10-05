@@ -187,6 +187,7 @@ test('重要日期提醒作为独立侧边栏页面，不混入账号内容', ()
   expect(screen.getByRole('header', { name: '重要日期提醒' })).toBeTruthy();
   expect(screen.getByText('节日与节气')).toBeTruthy();
   expect(screen.getByText('当天 09:00 · 重叠合并')).toBeTruthy();
+  expect(screen.getByText('提醒目前已关闭。开启后会弹出系统授权，点击“允许”后自动生效。')).toBeTruthy();
   expect(screen.getByRole('button', { name: '打开功能菜单' })).toBeTruthy();
   expect(screen.queryByText('账号服务尚未配置')).toBeNull();
 });

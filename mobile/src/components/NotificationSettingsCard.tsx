@@ -35,7 +35,7 @@ export function NotificationSettingsCard() {
   const statusText = notifications.error
     ? notifications.error
     : !settings.enabled
-      ? '提醒目前已关闭。开启时手机会请求系统通知权限。'
+      ? '提醒目前已关闭。开启后会弹出系统授权，点击“允许”后自动生效。'
       : !notifications.supported
         ? `电脑预览：将于 ${time} 提醒；真正的系统通知需在手机安装包中开启。`
         : notifications.status === 'denied'
@@ -56,7 +56,7 @@ export function NotificationSettingsCard() {
           <Text accessibilityRole="header" style={common.heading}>
             重要日期提醒
           </Text>
-          <Text style={common.muted}>后台、划掉最近任务或锁屏后由系统送达（强行停止除外）</Text>
+          <Text style={common.muted}>正常后台或锁屏后由系统送达；部分手机划掉最近任务等同强行停止</Text>
         </View>
         <Switch
           accessibilityLabel="重要日期提醒开关"
@@ -263,10 +263,8 @@ export function NotificationSettingsCard() {
           </Text>
         ) : null}
         <Text style={common.muted}>
-          通知默认无声、无振动。部分 Android
-          品牌会把静默渠道同时视为“不悬浮”，应用无法读取厂商开关；若立即测试只进入通知栏，请在“通知渠道设置”中开启悬浮或横幅。锁屏全屏受
-          Android
-          权限和厂商策略限制，不可用时会降级为普通通知。不要在系统设置中点“强行停止”；强行停止后必须重新打开应用才能恢复。
+          通知默认无声、无振动。若立即测试只进入通知栏，请在“通知渠道设置”中开启悬浮或横幅。锁屏全屏受 Android
+          权限和厂商策略限制，不可用时会降级为普通通知。部分厂商系统会把从最近任务划掉应用当作强行停止，并取消全部已排提醒；请使用返回桌面代替划掉，并在系统中允许自启动与后台运行。被强行停止后必须重新打开应用才能恢复提醒。
         </Text>
       </View>
     </View>

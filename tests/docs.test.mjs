@@ -87,7 +87,7 @@ test('Android 验证记录区分测试包生成与真机验收', async () => {
   assert.match(content, /包名 `com\.suisui\.calendar`/);
   assert.match(content, /Android Debug 证书/);
   assert.match(content, /Android 通用 APK 编译[\s\S]*已通过/);
-  assert.match(content, /Android 真机安装、启动与冷启动[\s\S]*待连接/);
+  assert.match(content, /Android 真机安装、启动与冷启动[\s\S]*0\.3\.2 已覆盖安装并启动/);
 });
 
 test('Android 发布版本在 Expo 与 npm 配置中保持一致', async () => {
@@ -98,6 +98,6 @@ test('Android 发布版本在 Expo 与 npm 配置中保持一致', async () => {
   assert.equal(appConfig.expo.version, packageConfig.version);
   assert.equal(packageLock.version, packageConfig.version);
   assert.equal(packageLock.packages[''].version, packageConfig.version);
-  assert.equal(appConfig.expo.version, '0.3.1');
-  assert.equal(appConfig.expo.android.versionCode, 4);
+  assert.equal(appConfig.expo.version, '0.3.2');
+  assert.equal(appConfig.expo.android.versionCode, 5);
 });

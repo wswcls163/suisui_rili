@@ -312,7 +312,7 @@ export function NotificationProvider({
       const result = await scheduler.scheduleDelayedTest(60, true);
       const expected = new Date(result.triggerAt).toLocaleTimeString('zh-CN', { hour12: false });
       setTestMessage(
-        `原生任务已登记，预计 ${expected} 触发；标识符：${result.identifier}。现在可锁屏或划掉最近任务。`,
+        `原生任务已登记，预计 ${expected} 触发；标识符：${result.identifier}。现在可返回桌面并锁屏；部分厂商系统划掉最近任务会取消提醒。`,
       );
       await refreshDiagnostics();
     } catch (reason) {

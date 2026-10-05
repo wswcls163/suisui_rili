@@ -7,11 +7,11 @@ test('Android 配置声明精确闹钟并使用不可变渠道的新版本标识
   const app = JSON.parse(fs.readFileSync(path.join(projectRoot, 'app.json'), 'utf8'));
   const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
   const packageLock = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package-lock.json'), 'utf8'));
-  expect(app.expo.version).toBe('0.3.1');
-  expect(app.expo.android.versionCode).toBe(4);
-  expect(packageJson.version).toBe('0.3.1');
-  expect(packageLock.version).toBe('0.3.1');
-  expect(packageLock.packages[''].version).toBe('0.3.1');
+  expect(app.expo.version).toBe('0.3.2');
+  expect(app.expo.android.versionCode).toBe(5);
+  expect(packageJson.version).toBe('0.3.2');
+  expect(packageLock.version).toBe('0.3.2');
+  expect(packageLock.packages[''].version).toBe('0.3.2');
   expect(app.expo.android.permissions).toContain('android.permission.SCHEDULE_EXACT_ALARM');
   expect(app.expo.android.permissions).toContain('android.permission.USE_FULL_SCREEN_INTENT');
   expect(app.expo.android.permissions).toContain('android.permission.WAKE_LOCK');
@@ -74,6 +74,8 @@ test('原生清单注册闹钟投递、重启恢复、锁屏 Activity 和所需�
   expect(manifest).toContain('android:turnScreenOn="true"');
   expect(manifest).toContain('android.intent.action.BOOT_COMPLETED');
   expect(manifest).toContain('android.intent.action.MY_PACKAGE_REPLACED');
+  expect(manifest).toContain('android.intent.action.PACKAGE_REPLACED');
+  expect(manifest).toContain('android:scheme="package"');
 });
 
 test('原生调度同时实现精确空闲、降级空闲、稳定取消和最多 60 条生产提醒', () => {
@@ -101,7 +103,9 @@ test('原生调度同时实现精确空闲、降级空闲、稳定取消和最�
   expect(receiver).toContain('recordDelivery(identifier)');
   expect(publisher).toContain('setFullScreenIntent');
   expect(publisher).toContain('CATEGORY_ALARM');
-  expect(publisher).toContain('setSilent(true)');
+  expect(publisher).toContain('setSound(null, attributes)');
+  expect(publisher).toContain('enableVibration(false)');
+  expect(publisher).not.toContain('.setSilent(');
 });
 
 test('Expo 通知依赖在重启、快速重启和应用升级后接收恢复事件', () => {
