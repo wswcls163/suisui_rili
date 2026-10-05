@@ -164,7 +164,7 @@ Android 不再依赖 Expo 的一次性日期触发链路。`notifications/schedu
 
 新渠道为 `important-dates-popup-v3`：请求 `HIGH`、公开锁屏可见性，渠道默认无声、无振动。0.3.1 同时调用 `NotificationCompat.Builder.setSilent(true)`，ColorOS 16 的通知记录因此带有 `FLAG_SILENT`，虽然渠道仍为 importance 4 且 `mShowBanner=true`，最终通知却被降为 `mImportance=DEFAULT`、`numInterrupt=0`。0.3.2 移除通知级静默标记，只由渠道关闭声音和振动，从而继续无声无振动，同时允许系统按 HIGH 级别决定横幅。厂商悬浮开关仍没有统一读取 API，设置页必须要求用户人工确认，不能伪报为已允许。
 
-Android 通知内容使用模块内的 `RemoteViews` 和 `NotificationCompat.DecoratedCustomViewStyle`，分别设置 48dp 折叠内容、76dp 顶部横幅内容和展开内容，避免把横幅布局直接塞进较矮的折叠区域而发生裁切。卡片只负责品牌绿色背景、日历图标、提醒类型、日期徽标、标题、正文和展开操作；基础 `setContentTitle` / `setContentText` 继续保留为系统兼容回退。点击卡片或展开操作都进入应用。Android 12 及以上会强制保留系统通知装饰，外层圆角、应用名、时间和可用高度由 Android 或 ColorOS 决定，因此电脑设置页只提供内容层级与紧凑尺寸预览，不能作为最终像素级真机截图。
+Android 通知内容使用模块内的 `RemoteViews` 和 `NotificationCompat.DecoratedCustomViewStyle`，分别设置 48dp 折叠内容、76dp 顶部横幅内容和展开内容，避免把横幅布局直接塞进较矮的折叠区域而发生裁切。合并通知由公共 `importantDateTitle` 规则把具体日期内容提升为主标题：两项以内完整显示，超过两项先显示前两项并追加“等重要日子”；顶部横幅为主标题保留两行，正文详情留在展开态。卡片只负责品牌绿色背景、日历图标、提醒类型、日期徽标、标题、正文和展开操作；基础 `setContentTitle` / `setContentText` 继续保留为系统兼容回退。点击卡片或展开操作都进入应用。Android 12 及以上会强制保留系统通知装饰，外层圆角、应用名、时间和可用高度由 Android 或 ColorOS 决定，因此电脑设置页只提供内容层级与紧凑尺寸预览，不能作为最终像素级真机截图。
 
 设置页把测试拆为两层：“立即测试顶部横幅”直接调用 `NotificationManager.notify`，验证通知许可、渠道与可见展示；“1 分钟后锁屏测试”使用与生产提醒相同的 AlarmManager、持久化和广播链路，登记后显示预计触发时间、稳定标识与回读结果。诊断同时展示应用通知总开关、渠道 importance、声音、振动、精确提醒、原生任务数量、最近测试登记和最近原生投递。
 

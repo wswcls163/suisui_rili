@@ -176,7 +176,7 @@ function festivalReminders(today: string, now: number, settings: NotificationSet
           itemId: date,
           date,
           triggerAt,
-          title: `今天是${names.join('、')}`,
+          title: importantDateTitle(names),
           body: '日历上的重要日子，愿今天有值得记住的时刻。',
         });
       }
@@ -191,6 +191,13 @@ function reminderSubject(reminder: ScheduledReminder): string {
   return reminder.title.startsWith('今天是') ? reminder.title.slice(3) : reminder.title;
 }
 
+export function importantDateTitle(subjects: string[]): string {
+  const visible = subjects.map((subject) => subject.trim()).filter(Boolean);
+  if (visible.length === 0) return '今天没有重要日期提醒';
+  if (visible.length <= 2) return `今天是${visible.join(' · ')}`;
+  return `今天是${visible.slice(0, 2).join(' · ')}等重要日子`;
+}
+
 function mergeRemindersOnSameDate(reminders: ScheduledReminder[]): ScheduledReminder[] {
   const grouped = new Map<string, ScheduledReminder[]>();
   for (const reminder of reminders) {
@@ -200,14 +207,15 @@ function mergeRemindersOnSameDate(reminders: ScheduledReminder[]): ScheduledRemi
   }
   return [...grouped.entries()].map(([date, values]) => {
     if (values.length === 1) return values[0];
+    const subjects = values.map(reminderSubject);
     return {
       identifier: `suisui-combined-${date}`,
       kind: 'combined',
       itemId: date,
       date,
       triggerAt: values[0].triggerAt,
-      title: '今天有多个重要日子',
-      body: `${values.map(reminderSubject).join('、')}。都值得好好记住。`,
+      title: importantDateTitle(subjects),
+      body: `${subjects.join('、')}。都值得好好记住。`,
     };
   });
 }

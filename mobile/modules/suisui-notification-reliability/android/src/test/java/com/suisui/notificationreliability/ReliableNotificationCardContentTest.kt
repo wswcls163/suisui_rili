@@ -10,7 +10,7 @@ class ReliableNotificationCardContentTest {
 
     assertEquals("今日提醒", content.label)
     assertEquals("10月5日", content.dateBadge)
-    assertEquals("今天有多个重要日子", content.title)
+    assertEquals("今天是中秋节 · 妈妈的生日", content.title)
   }
 
   @Test
@@ -33,7 +33,7 @@ class ReliableNotificationCardContentTest {
     identifier = "preview",
     owner = ReliableNotificationStore.OWNER_DIAGNOSTIC,
     triggerAt = 0,
-    title = "今天有多个重要日子",
+    title = "今天是中秋节 · 妈妈的生日",
     body = "妈妈的生日、中秋节。都值得好好记住。",
     kind = kind,
     itemId = "preview",

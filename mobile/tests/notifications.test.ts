@@ -85,7 +85,7 @@ describe('系统通知排程', () => {
     });
     expect(plan.find((item) => item.date === '2020-10-01')).toMatchObject({
       kind: 'festival',
-      title: '今天是中秋节、国庆节',
+      title: '今天是中秋节 · 国庆节',
     });
     expect(plan.find((item) => item.date === '2020-10-08')).toMatchObject({
       kind: 'festival',
@@ -145,7 +145,7 @@ describe('系统通知排程', () => {
     expect(current[0]).toMatchObject({
       identifier: 'suisui-combined-2026-09-10',
       kind: 'combined',
-      title: '今天有多个重要日子',
+      title: '今天是教师节 · 老师的生日',
     });
     expect(current[0].body).toContain('教师节');
     expect(current[0].body).toContain('老师的生日');
@@ -200,7 +200,10 @@ describe('系统通知排程', () => {
       true,
     );
     const sharedBirthday = plan.find((item) => item.date === '2026-12-01');
-    expect(sharedBirthday).toMatchObject({ kind: 'combined', title: '今天有多个重要日子' });
+    expect(sharedBirthday).toMatchObject({
+      kind: 'combined',
+      title: '今天是亲友00的生日 · 亲友01的生日等重要日子',
+    });
     expect(sharedBirthday?.body).toContain('亲友00的生日');
     expect(sharedBirthday?.body).toContain('亲友69的生日');
   });

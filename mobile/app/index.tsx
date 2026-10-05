@@ -25,6 +25,7 @@ import { lunarCalendar, lunarLabel } from '../src/core/calendar';
 import { festivalsOn } from '../src/core/festivals';
 import { chineseFullDate, dayNumber, supported } from '../src/core/dates';
 import { anniversaryProgress, timeNoteProgressText, type Countup } from '../src/core/countup';
+import { importantDateTitle } from '../src/core/notification';
 import { MonthCalendar } from '../src/components/MonthCalendar';
 import { DateCalculatorDialog } from '../src/components/DateCalculatorDialog';
 import { Avatar, Button, colors, common, Icon } from '../src/components/ui';
@@ -139,14 +140,9 @@ function TodayReminder({
   const hasBirthdays = rows.length > 0;
   const hasFestivals = festivals.length > 0;
   const hasReminder = hasBirthdays || hasFestivals;
-  const heading =
-    hasBirthdays && hasFestivals
-      ? '今天有多个重要日子'
-      : hasFestivals
-        ? `今天是${festivals.join('、')}`
-        : hasBirthdays
-          ? `今天有 ${rows.length} 位亲友过生日`
-          : '今天没有重要日期提醒';
+  const heading = hasReminder
+    ? importantDateTitle([...festivals, ...rows.map((row) => birthdayTitle(row.person.name))])
+    : '今天没有重要日期提醒';
   const icon = hasFestivals ? (hasBirthdays ? 'notifications-outline' : 'flag-outline') : 'gift-outline';
   return (
     <View

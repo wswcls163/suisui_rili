@@ -43,20 +43,16 @@
       android:layout_height="wrap_content"
       android:layout_marginTop="2dp"
       android:ellipsize="end"
-      android:maxLines="1"
+      android:maxLines="2"
       android:textColor="#FFFFFFFF"
       android:textSize="16sp"
       android:textStyle="bold" />
 
     <TextView
       android:id="@+id/suisui_notification_body"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:layout_marginTop="1dp"
-      android:ellipsize="end"
-      android:maxLines="1"
-      android:textColor="#E8F1EC"
-      android:textSize="11sp" />
+      android:layout_width="1dp"
+      android:layout_height="1dp"
+      android:visibility="gone" />
   </LinearLayout>
 
   <TextView

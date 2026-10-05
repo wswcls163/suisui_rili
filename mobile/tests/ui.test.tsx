@@ -355,7 +355,7 @@ test('生日簿、今天提醒、选日事项和详情统一显示实足周岁',
       <Home />
     </AppProvider>,
   );
-  await screen.findByText('今天有 1 位亲友过生日');
+  await screen.findByText('今天是妈妈的生日');
   expect(screen.getAllByText(/满 26 周岁/).length).toBeGreaterThanOrEqual(2);
   expect(screen.getByRole('button', { name: '今天：妈妈的生日，满 26 周岁' })).toBeTruthy();
   expect(screen.getByRole('button', { name: '查看妈妈的生日详情，满 26 周岁' })).toBeTruthy();
@@ -379,7 +379,7 @@ test('滚轮跳转具体日期同步月份、选中状态和详情，保留真�
       <Home />
     </AppProvider>,
   );
-  await screen.findByText('今天有 1 位亲友过生日');
+  await screen.findByText('今天是亲友a的生日');
   fireEvent.press(screen.getByRole('button', { name: '跳转日期' }));
   fireEvent.press(screen.getByRole('button', { name: '2024 年' }));
   fireEvent.press(screen.getByRole('button', { name: '2 月' }));
@@ -389,7 +389,7 @@ test('滚轮跳转具体日期同步月份、选中状态和详情，保留真�
     true,
   );
   expect(screen.getByRole('button', { name: '在 2024-02-29 新建事项' })).toBeTruthy();
-  expect(screen.getByText('今天有 1 位亲友过生日')).toBeTruthy();
+  expect(screen.getByText('今天是亲友a的生日')).toBeTruthy();
   expect(screen.queryByRole('button', { name: '跳转' })).toBeNull();
   fireEvent.press(screen.getByRole('button', { name: '跳转日期' }));
   expect(screen.getByLabelText('日期').props.accessibilityValue.now).toBe(29);
@@ -439,7 +439,7 @@ test('小年与节气同日时保留数量提示，选日展示全部名称', as
   expect(screen.getAllByText('北方小年')).toHaveLength(2);
   expect(within(date).getByText('+1')).toBeTruthy();
   expect(screen.getByText('大寒')).toBeTruthy();
-  expect(screen.getByText('今天是北方小年、大寒')).toBeTruthy();
+  expect(screen.getByText('今天是北方小年 · 大寒')).toBeTruthy();
   expect(screen.getByText('节日与节气 · 北方小年、大寒')).toBeTruthy();
 });
 
@@ -653,7 +653,7 @@ test('双生日同一天在提醒、月历和事项中只算一人，生日簿�
       <Home />
     </AppProvider>,
   );
-  await screen.findByText('今天有 1 位亲友过生日');
+  await screen.findByText('今天是亲友a的生日');
   const day = screen.getByRole('button', { name: /2026-09-04.*1 位生日.*农历与阳历生日/ });
   expect(within(day).queryByText(/\+1/)).toBeNull();
   expect(within(day).getAllByTestId('birthday-cake')).toHaveLength(1);
@@ -722,7 +722,7 @@ test('首页首次使用为空，无虚构亲友；同日多人全部提醒', as
       <Home />
     </AppProvider>,
   );
-  await screen.findByText('今天有 2 位亲友过生日');
+  await screen.findByText('今天是亲友a的生日 · 亲友b的生日');
   expect(screen.getByRole('button', { name: '今天：亲友a的生日' })).toBeTruthy();
   expect(screen.getByRole('button', { name: '今天：亲友b的生日' })).toBeTruthy();
 });
@@ -739,7 +739,7 @@ test('首页把同日节日和生日放在同一张重要日期提醒卡中', as
     </AppProvider>,
   );
   const reminder = await screen.findByTestId('today-reminder');
-  expect(within(reminder).getByText('今天有多个重要日子')).toBeTruthy();
+  expect(within(reminder).getByText('今天是教师节 · 老师的生日')).toBeTruthy();
   expect(within(reminder).getByText('节日与节气 · 教师节')).toBeTruthy();
   expect(within(reminder).getByRole('button', { name: '今天：老师的生日' })).toBeTruthy();
 });
@@ -782,7 +782,7 @@ test('首页按标签直接展示对应内容，时光记不再跨标签预览�
   expect(screen.getByRole('header', { name: '生日簿' })).toBeTruthy();
   expect(screen.getByRole('button', { name: '查看妈妈的生日' })).toBeTruthy();
   expect(screen.queryByRole('button', { name: '日期计算' })).toBeNull();
-  expect(screen.queryByText('今天有 1 位亲友过生日')).toBeNull();
+  expect(screen.queryByText('今天是妈妈的生日')).toBeNull();
 
   fireEvent.press(screen.getByRole('tab', { name: '时光记 1' }));
   expect(screen.getByRole('header', { name: '时光记' })).toBeTruthy();

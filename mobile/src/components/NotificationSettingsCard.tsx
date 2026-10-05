@@ -296,11 +296,11 @@ function NotificationStylePreview() {
             <Text style={styles.previewLabel}>今日提醒</Text>
             <Text style={styles.previewDate}>今天</Text>
           </View>
-          <Text numberOfLines={1} style={styles.previewTitle}>
-            今天有多个重要日子
+          <Text numberOfLines={2} style={styles.previewTitle}>
+            今天是中秋节 · 妈妈的生日
           </Text>
           <Text numberOfLines={1} style={styles.previewBody}>
-            妈妈的生日、中秋节 · 都值得好好记住
+            中秋节、妈妈的生日。都值得好好记住。
           </Text>
         </View>
       </View>
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
   },
   previewSection: { gap: 9 },
   notificationPreview: {
-    minHeight: 92,
+    minHeight: 102,
     borderRadius: 18,
     backgroundColor: '#3F6858',
     padding: 13,
