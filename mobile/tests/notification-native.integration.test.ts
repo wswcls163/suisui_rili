@@ -106,6 +106,45 @@ test('原生调度同时实现精确空闲、降级空闲、稳定取消和最�
   expect(publisher).toContain('setSound(null, attributes)');
   expect(publisher).toContain('enableVibration(false)');
   expect(publisher).not.toContain('.setSilent(');
+  expect(publisher).toContain('setCustomContentView(collapsedCard)');
+  expect(publisher).toContain('setCustomHeadsUpContentView(compactCard)');
+  expect(publisher).toContain('setCustomBigContentView(expandedCard)');
+  expect(publisher).toContain('DecoratedCustomViewStyle');
+});
+
+test('原生顶部横幅和展开通知使用岁岁日历品牌卡片资源', () => {
+  const resourceRoot = path.join(
+    projectRoot,
+    'modules',
+    'suisui-notification-reliability',
+    'android',
+    'src',
+    'main',
+    'res',
+  );
+  const compact = fs.readFileSync(
+    path.join(resourceRoot, 'layout', 'suisui_notification_compact.xml'),
+    'utf8',
+  );
+  const collapsed = fs.readFileSync(
+    path.join(resourceRoot, 'layout', 'suisui_notification_collapsed.xml'),
+    'utf8',
+  );
+  const expanded = fs.readFileSync(
+    path.join(resourceRoot, 'layout', 'suisui_notification_expanded.xml'),
+    'utf8',
+  );
+  const background = fs.readFileSync(
+    path.join(resourceRoot, 'drawable', 'suisui_notification_card_background.xml'),
+    'utf8',
+  );
+  const strings = fs.readFileSync(path.join(resourceRoot, 'values', 'strings.xml'), 'utf8');
+  expect(compact).toContain('@drawable/suisui_notification_card_background');
+  expect(collapsed).toContain('android:layout_height="48dp"');
+  expect(compact).toContain('@+id/suisui_notification_date');
+  expect(expanded).toContain('@string/suisui_notification_open_calendar');
+  expect(strings).toContain('查看完整日历');
+  expect(background).toContain('#3F6858');
 });
 
 test('Expo 通知依赖在重启、快速重启和应用升级后接收恢复事件', () => {

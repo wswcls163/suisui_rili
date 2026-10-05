@@ -1,6 +1,6 @@
 # 岁岁日历 · 技术方案
 
-版本：V1.8｜日期：2026-09-30｜状态：生日、可选出生年份与周岁、未来选日距离、时光记、节日合并提醒、原生可靠排程、无声横幅与可选锁屏全屏提醒、全局功能菜单、账号同步均已实现；Android 0.3.1 已完成 ColorOS 16 真机诊断，0.3.2（版本号 5）修复横幅降级并明确厂商强停边界
+版本：V1.9｜日期：2026-10-05｜状态：生日、可选出生年份与周岁、未来选日距离、时光记、节日合并提醒、原生可靠排程、品牌通知卡片、无声横幅与可选锁屏全屏提醒、全局功能菜单、账号同步均已实现；Android 0.3.2 已修复横幅降级并明确厂商强停边界，品牌通知卡片待下一测试包真机验收
 
 依据：[产品设计文档](product-design.md) 与 [交互 Demo](../demo/README.md)。本方案面向第一期生日功能，重点是手机端交付、便于修改，以及为后续功能保留清晰的接入位置。
 
@@ -163,6 +163,8 @@ Android 不再依赖 Expo 的一次性日期触发链路。`notifications/schedu
 `SuisuiAlarmReceiver` 在触发后直接调用 `NotificationManager`，不要求 JavaScript、React Native 或应用进程预先运行，并持久化最近一次原生投递时间。`SuisuiScheduleRestoreReceiver` 监听 `BOOT_COMPLETED`、厂商快速重启、`MY_PACKAGE_REPLACED` 和限定为本包的 `PACKAGE_REPLACED`，重建仍在有效期内的系统闹钟并记录恢复结果；24 小时内错过的提醒会在恢复后补触发，更早的过期任务清理。正常后台、系统回收和锁屏均由原生链路负责；Android“强行停止”仍会冻结闹钟和接收器，重新打开应用后才能恢复，这是平台不可绕过的边界。标准 Android 的最近任务划掉不等同强行停止，但 OnePlus PJE110 的 ColorOS 16 实测会执行 `o-stop(40)`、设置 `stopped=true` 并取消该 UID 的全部 61 个闹钟；同机覆盖安装时系统虽生成更新广播记录，也没有启动应用进程执行接收器。这类设备必须返回桌面而不是划掉，并在升级后打开一次应用；应用只能在获得系统执行机会后恢复，不能自行越过厂商强停策略。
 
 新渠道为 `important-dates-popup-v3`：请求 `HIGH`、公开锁屏可见性，渠道默认无声、无振动。0.3.1 同时调用 `NotificationCompat.Builder.setSilent(true)`，ColorOS 16 的通知记录因此带有 `FLAG_SILENT`，虽然渠道仍为 importance 4 且 `mShowBanner=true`，最终通知却被降为 `mImportance=DEFAULT`、`numInterrupt=0`。0.3.2 移除通知级静默标记，只由渠道关闭声音和振动，从而继续无声无振动，同时允许系统按 HIGH 级别决定横幅。厂商悬浮开关仍没有统一读取 API，设置页必须要求用户人工确认，不能伪报为已允许。
+
+Android 通知内容使用模块内的 `RemoteViews` 和 `NotificationCompat.DecoratedCustomViewStyle`，分别设置 48dp 折叠内容、76dp 顶部横幅内容和展开内容，避免把横幅布局直接塞进较矮的折叠区域而发生裁切。卡片只负责品牌绿色背景、日历图标、提醒类型、日期徽标、标题、正文和展开操作；基础 `setContentTitle` / `setContentText` 继续保留为系统兼容回退。点击卡片或展开操作都进入应用。Android 12 及以上会强制保留系统通知装饰，外层圆角、应用名、时间和可用高度由 Android 或 ColorOS 决定，因此电脑设置页只提供内容层级与紧凑尺寸预览，不能作为最终像素级真机截图。
 
 设置页把测试拆为两层：“立即测试顶部横幅”直接调用 `NotificationManager.notify`，验证通知许可、渠道与可见展示；“1 分钟后锁屏测试”使用与生产提醒相同的 AlarmManager、持久化和广播链路，登记后显示预计触发时间、稳定标识与回读结果。诊断同时展示应用通知总开关、渠道 importance、声音、振动、精确提醒、原生任务数量、最近测试登记和最近原生投递。
 

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/suisui_notification_card"
+  android:layout_width="match_parent"
+  android:layout_height="wrap_content"
+  android:background="@drawable/suisui_notification_card_background"
+  android:orientation="vertical"
+  android:paddingStart="14dp"
+  android:paddingTop="13dp"
+  android:paddingEnd="14dp"
+  android:paddingBottom="13dp">
+
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+
+    <ImageView
+      android:layout_width="38dp"
+      android:layout_height="38dp"
+      android:background="@drawable/suisui_notification_icon_background"
+      android:contentDescription="@null"
+      android:padding="8dp"
+      android:src="@drawable/ic_suisui_notification_card" />
+
+    <TextView
+      android:id="@+id/suisui_notification_label"
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:layout_marginStart="10dp"
+      android:layout_weight="1"
+      android:textColor="#CFE2D9"
+      android:textSize="12sp"
+      android:textStyle="bold" />
+
+    <TextView
+      android:id="@+id/suisui_notification_date"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:background="@drawable/suisui_notification_date_background"
+      android:maxLines="1"
+      android:textColor="#FFFFFFFF"
+      android:textSize="11sp"
+      android:textStyle="bold" />
+  </LinearLayout>
+
+  <TextView
+    android:id="@+id/suisui_notification_title"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="10dp"
+    android:ellipsize="end"
+    android:maxLines="2"
+    android:textColor="#FFFFFFFF"
+    android:textSize="18sp"
+    android:textStyle="bold" />
+
+  <TextView
+    android:id="@+id/suisui_notification_body"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="5dp"
+    android:ellipsize="end"
+    android:maxLines="3"
+    android:textColor="#E8F1EC"
+    android:textSize="13sp" />
+
+  <TextView
+    android:id="@+id/suisui_notification_action"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_gravity="end"
+    android:layout_marginTop="10dp"
+    android:background="@drawable/suisui_notification_action_background"
+    android:text="@string/suisui_notification_open_calendar"
+    android:textColor="#FFFFFFFF"
+    android:textSize="12sp"
+    android:textStyle="bold" />
+</LinearLayout>

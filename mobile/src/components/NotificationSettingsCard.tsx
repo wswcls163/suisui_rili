@@ -69,6 +69,8 @@ export function NotificationSettingsCard() {
         />
       </View>
 
+      <NotificationStylePreview />
+
       <View style={styles.rules}>
         <ReminderRule icon="flag-outline" label="节日与节气" value={`当天 ${time} · 重叠合并`} />
         <ReminderRule icon="gift-outline" label="生日" value={`当天 ${time}`} />
@@ -281,6 +283,32 @@ function DiagnosticRow({ label, value, ready }: { label: string; value: string; 
   );
 }
 
+function NotificationStylePreview() {
+  return (
+    <View style={styles.previewSection}>
+      <Text style={styles.label}>顶部横幅样式预览</Text>
+      <View accessible accessibilityLabel="顶部横幅样式预览卡片" style={styles.notificationPreview}>
+        <View style={styles.previewIcon}>
+          <Icon name="calendar-outline" color="#FFF" size={25} />
+        </View>
+        <View style={styles.previewContent}>
+          <View style={styles.previewMeta}>
+            <Text style={styles.previewLabel}>今日提醒</Text>
+            <Text style={styles.previewDate}>今天</Text>
+          </View>
+          <Text numberOfLines={1} style={styles.previewTitle}>
+            今天有多个重要日子
+          </Text>
+          <Text numberOfLines={1} style={styles.previewBody}>
+            妈妈的生日、中秋节 · 都值得好好记住
+          </Text>
+        </View>
+      </View>
+      <Text style={common.muted}>实际外层圆角、应用名称和高度由手机系统统一控制，展开后可查看更多内容。</Text>
+    </View>
+  );
+}
+
 function permissionText(value: 'granted' | 'denied' | 'undetermined'): string {
   if (value === 'granted') return '已允许';
   if (value === 'denied') return '已拒绝';
@@ -353,6 +381,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  previewSection: { gap: 9 },
+  notificationPreview: {
+    minHeight: 92,
+    borderRadius: 18,
+    backgroundColor: '#3F6858',
+    padding: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    shadowColor: '#23392F',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  previewIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#6E9183',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewContent: { flex: 1, gap: 2 },
+  previewMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  previewLabel: { color: '#CFE2D9', fontSize: 11, lineHeight: 16, fontWeight: '700' },
+  previewDate: {
+    color: '#FFF',
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '700',
+    borderRadius: 9,
+    backgroundColor: '#557B6C',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  previewTitle: { color: '#FFF', fontSize: 16, lineHeight: 22, fontWeight: '700' },
+  previewBody: { color: '#E8F1EC', fontSize: 11, lineHeight: 16 },
   rules: { borderRadius: 14, backgroundColor: '#F8F7F3', paddingHorizontal: 14 },
   rule: {
     minHeight: 46,

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/suisui_notification_card"
+  android:layout_width="match_parent"
+  android:layout_height="48dp"
+  android:background="@drawable/suisui_notification_card_background"
+  android:gravity="center_vertical"
+  android:orientation="horizontal"
+  android:paddingStart="8dp"
+  android:paddingEnd="8dp">
+
+  <ImageView
+    android:layout_width="32dp"
+    android:layout_height="32dp"
+    android:background="@drawable/suisui_notification_icon_background"
+    android:contentDescription="@null"
+    android:padding="7dp"
+    android:src="@drawable/ic_suisui_notification_card" />
+
+  <LinearLayout
+    android:layout_width="0dp"
+    android:layout_height="match_parent"
+    android:layout_marginStart="8dp"
+    android:layout_weight="1"
+    android:gravity="center_vertical"
+    android:orientation="vertical">
+
+    <TextView
+      android:id="@+id/suisui_notification_label"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:ellipsize="end"
+      android:maxLines="1"
+      android:textColor="#CFE2D9"
+      android:textSize="10sp"
+      android:textStyle="bold" />
+
+    <TextView
+      android:id="@+id/suisui_notification_title"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:ellipsize="end"
+      android:maxLines="1"
+      android:textColor="#FFFFFFFF"
+      android:textSize="13sp"
+      android:textStyle="bold" />
+  </LinearLayout>
+
+  <TextView
+    android:id="@+id/suisui_notification_date"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="6dp"
+    android:background="@drawable/suisui_notification_date_background"
+    android:maxLines="1"
+    android:textColor="#FFFFFFFF"
+    android:textSize="10sp"
+    android:textStyle="bold" />
+
+  <TextView
+    android:id="@+id/suisui_notification_body"
+    android:layout_width="1dp"
+    android:layout_height="1dp"
+    android:visibility="invisible" />
+
+  <TextView
+    android:id="@+id/suisui_notification_action"
+    android:layout_width="1dp"
+    android:layout_height="1dp"
+    android:visibility="invisible" />
+</LinearLayout>

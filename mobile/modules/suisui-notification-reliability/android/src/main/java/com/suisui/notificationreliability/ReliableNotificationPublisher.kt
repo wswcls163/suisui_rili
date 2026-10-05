@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.media.AudioAttributes
 import android.os.Build
 import android.os.PowerManager
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 
 internal class ReliableNotificationPublisher(private val context: Context) {
@@ -41,21 +42,28 @@ internal class ReliableNotificationPublisher(private val context: Context) {
 
   fun post(request: ReliableNotificationRecord): Boolean {
     ensureChannel()
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && !notificationManager.areNotificationsEnabled()) {
+    if (!notificationManager.areNotificationsEnabled()) {
       return false
     }
 
+    val contentIntent = contentIntent()
+    val collapsedCard = notificationCard(request, R.layout.suisui_notification_collapsed, contentIntent)
+    val compactCard = notificationCard(request, R.layout.suisui_notification_compact, contentIntent)
+    val expandedCard = notificationCard(request, R.layout.suisui_notification_expanded, contentIntent)
     val builder = NotificationCompat.Builder(context, CHANNEL_ID)
       .setSmallIcon(notificationIcon())
       .setColor(Color.rgb(184, 82, 62))
       .setContentTitle(request.title)
       .setContentText(request.body)
-      .setStyle(NotificationCompat.BigTextStyle().bigText(request.body))
+      .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+      .setCustomContentView(collapsedCard)
+      .setCustomHeadsUpContentView(compactCard)
+      .setCustomBigContentView(expandedCard)
       .setPriority(NotificationCompat.PRIORITY_HIGH)
       .setCategory(if (request.fullScreen) NotificationCompat.CATEGORY_ALARM else NotificationCompat.CATEGORY_REMINDER)
       .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
       .setAutoCancel(true)
-      .setContentIntent(contentIntent())
+      .setContentIntent(contentIntent)
 
     // 渠道本身已经关闭声音和振动。不要再设置通知级静默，否则 ColorOS 会加上
     // FLAG_SILENT，并把 HIGH 通知实际降为 DEFAULT，导致顶部横幅无法出现。
@@ -91,8 +99,25 @@ internal class ReliableNotificationPublisher(private val context: Context) {
     )
   }
 
-  fun appNotificationsEnabled(): Boolean =
-    Build.VERSION.SDK_INT < Build.VERSION_CODES.N || notificationManager.areNotificationsEnabled()
+  fun appNotificationsEnabled(): Boolean = notificationManager.areNotificationsEnabled()
+
+  private fun notificationCard(
+    request: ReliableNotificationRecord,
+    layoutId: Int,
+    contentIntent: PendingIntent?,
+  ): RemoteViews {
+    val content = ReliableNotificationCardContent.from(request)
+    return RemoteViews(context.packageName, layoutId).apply {
+      setTextViewText(R.id.suisui_notification_label, content.label)
+      setTextViewText(R.id.suisui_notification_date, content.dateBadge)
+      setTextViewText(R.id.suisui_notification_title, content.title)
+      setTextViewText(R.id.suisui_notification_body, content.body)
+      contentIntent?.let {
+        setOnClickPendingIntent(R.id.suisui_notification_card, it)
+        setOnClickPendingIntent(R.id.suisui_notification_action, it)
+      }
+    }
+  }
 
   private fun contentIntent(): PendingIntent? {
     val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
