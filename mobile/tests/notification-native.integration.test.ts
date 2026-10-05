@@ -7,11 +7,11 @@ test('Android 配置声明精确闹钟并使用不可变渠道的新版本标识
   const app = JSON.parse(fs.readFileSync(path.join(projectRoot, 'app.json'), 'utf8'));
   const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
   const packageLock = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package-lock.json'), 'utf8'));
-  expect(app.expo.version).toBe('0.3.2');
-  expect(app.expo.android.versionCode).toBe(5);
-  expect(packageJson.version).toBe('0.3.2');
-  expect(packageLock.version).toBe('0.3.2');
-  expect(packageLock.packages[''].version).toBe('0.3.2');
+  expect(app.expo.version).toBe('0.3.3');
+  expect(app.expo.android.versionCode).toBe(6);
+  expect(packageJson.version).toBe('0.3.3');
+  expect(packageLock.version).toBe('0.3.3');
+  expect(packageLock.packages[''].version).toBe('0.3.3');
   expect(app.expo.android.permissions).toContain('android.permission.SCHEDULE_EXACT_ALARM');
   expect(app.expo.android.permissions).toContain('android.permission.USE_FULL_SCREEN_INTENT');
   expect(app.expo.android.permissions).toContain('android.permission.WAKE_LOCK');
