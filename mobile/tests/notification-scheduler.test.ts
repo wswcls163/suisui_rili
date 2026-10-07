@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { nativeNotificationReliability } from '../src/notifications/nativeReliability';
-import { CHANNEL_ID, notificationScheduler } from '../src/notifications/scheduler';
+import { notificationScheduler } from '../src/notifications/scheduler';
 
 const reminder = {
   identifier: 'suisui-festival-2026-09-18',
@@ -149,7 +149,7 @@ test('iOS 延时测试也必须从系统排程回读，不能只凭 API 未抛�
   });
 });
 
-test('通知设置始终打开新的静默横幅渠道', async () => {
+test('通知设置打开应用级通知与横幅页面', async () => {
   await notificationScheduler.openNotificationSettings();
-  expect(nativeNotificationReliability.openNotificationSettings).toHaveBeenCalledWith(CHANNEL_ID);
+  expect(nativeNotificationReliability.openNotificationSettings).toHaveBeenCalledWith();
 });

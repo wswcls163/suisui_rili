@@ -2,7 +2,7 @@
   "expo": {
     "name": "岁岁日历",
     "slug": "suisui-calendar",
-    "version": "0.3.3",
+    "version": "0.3.5",
     "scheme": "suisui",
     "orientation": "default",
     "icon": "./assets/icon.png",
@@ -12,7 +12,7 @@
       "bundleIdentifier": "com.suisui.calendar"
     },
     "android": {
-      "versionCode": 6,
+      "versionCode": 8,
       "permissions": [
         "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.USE_FULL_SCREEN_INTENT",
@@ -45,7 +45,7 @@
         {
           "icon": "./assets/android-icon-monochrome.png",
           "color": "#B8523E",
-          "defaultChannel": "important-dates-popup-v3"
+          "defaultChannel": "important-dates-popup-v5"
         }
       ],
       [

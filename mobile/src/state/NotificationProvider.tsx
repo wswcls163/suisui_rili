@@ -281,7 +281,7 @@ export function NotificationProvider({
       }
       const identifier = await scheduler.sendImmediateTest();
       setTestMessage(
-        `测试横幅已交给系统，标识符：${identifier}。若没有看到横幅，请检查通知栏和系统“悬浮通知”设置。`,
+        `测试横幅已交给系统，标识符：${identifier}。若没有弹出，请点击“系统通知与横幅设置”，勾选“横幅”后再试。`,
       );
       await refreshDiagnostics();
     } catch (reason) {

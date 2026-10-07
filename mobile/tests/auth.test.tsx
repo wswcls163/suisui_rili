@@ -185,9 +185,11 @@ test('重要日期提醒作为独立侧边栏页面，不混入账号内容', ()
     </AuthProvider>,
   );
   expect(screen.getByRole('header', { name: '重要日期提醒' })).toBeTruthy();
-  expect(screen.getByLabelText('顶部横幅样式预览卡片')).toBeTruthy();
-  expect(screen.getByText('今天是中秋节 · 妈妈的生日')).toBeTruthy();
-  expect(screen.getByText('中秋节、妈妈的生日。都值得好好记住。')).toBeTruthy();
+  expect(screen.queryByLabelText('顶部横幅样式预览卡片')).toBeNull();
+  expect(screen.queryByText('顶部横幅样式预览')).toBeNull();
+  expect(screen.getByText(/通知默认使用系统提示音和短振动/)).toBeTruthy();
+  expect(screen.getByText('需在系统中勾选“横幅”')).toBeTruthy();
+  expect(screen.getByText(/勾选“横幅”并保持“静默通知”关闭/)).toBeTruthy();
   expect(screen.getByText('节日与节气')).toBeTruthy();
   expect(screen.getByText('当天 09:00 · 重叠合并')).toBeTruthy();
   expect(screen.getByText('提醒目前已关闭。开启后会弹出系统授权，点击“允许”后自动生效。')).toBeTruthy();

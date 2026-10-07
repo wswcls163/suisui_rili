@@ -69,8 +69,6 @@ export function NotificationSettingsCard() {
         />
       </View>
 
-      <NotificationStylePreview />
-
       <View style={styles.rules}>
         <ReminderRule icon="flag-outline" label="节日与节气" value={`当天 ${time} · 重叠合并`} />
         <ReminderRule icon="gift-outline" label="生日" value={`当天 ${time}`} />
@@ -150,20 +148,20 @@ export function NotificationSettingsCard() {
           label="系统悬浮/横幅开关"
           value={
             notifications.diagnostics.floatingBanner === 'manual-check'
-              ? '需到系统设置确认'
+              ? '需在系统中勾选“横幅”'
               : '手机安装包中确认'
           }
           ready={notifications.diagnostics.floatingBanner === 'not-applicable'}
         />
         <DiagnosticRow
           label="通知声音"
-          value={informationSwitchText(notifications.diagnostics.soundEnabled, '默认静音')}
-          ready
+          value={soundText(notifications.diagnostics.soundEnabled)}
+          ready={notifications.diagnostics.soundEnabled !== false}
         />
         <DiagnosticRow
           label="通知振动"
-          value={informationSwitchText(notifications.diagnostics.vibrationEnabled, '默认关闭')}
-          ready
+          value={informationSwitchText(notifications.diagnostics.vibrationEnabled, '已关闭，可能不弹出')}
+          ready={notifications.diagnostics.vibrationEnabled !== false}
         />
         <DiagnosticRow
           label="锁屏全屏权限"
@@ -215,7 +213,7 @@ export function NotificationSettingsCard() {
           {notifications.supported ? (
             <>
               <Button
-                label="通知渠道设置"
+                label="系统通知与横幅设置"
                 icon="notifications-outline"
                 variant="secondary"
                 style={styles.actionButton}
@@ -265,7 +263,8 @@ export function NotificationSettingsCard() {
           </Text>
         ) : null}
         <Text style={common.muted}>
-          通知默认无声、无振动。若立即测试只进入通知栏，请在“通知渠道设置”中开启悬浮或横幅。锁屏全屏受 Android
+          通知默认使用系统提示音和短振动。若立即测试只进入通知栏，请点击“系统通知与横幅设置”，勾选“横幅”并保持“静默通知”关闭；该系统开关不能由应用替用户自动修改。锁屏全屏受
+          Android
           权限和厂商策略限制，不可用时会降级为普通通知。部分厂商系统会把从最近任务划掉应用当作强行停止，并取消全部已排提醒；请使用返回桌面代替划掉，并在系统中允许自启动与后台运行。被强行停止后必须重新打开应用才能恢复提醒。
         </Text>
       </View>
@@ -279,32 +278,6 @@ function DiagnosticRow({ label, value, ready }: { label: string; value: string; 
       <View style={[styles.dot, { backgroundColor: ready ? colors.green : colors.accent }]} />
       <Text style={[common.body, { flex: 1 }]}>{label}</Text>
       <Text style={[common.muted, !ready && { color: colors.accent }]}>{value}</Text>
-    </View>
-  );
-}
-
-function NotificationStylePreview() {
-  return (
-    <View style={styles.previewSection}>
-      <Text style={styles.label}>顶部横幅样式预览</Text>
-      <View accessible accessibilityLabel="顶部横幅样式预览卡片" style={styles.notificationPreview}>
-        <View style={styles.previewIcon}>
-          <Icon name="calendar-outline" color="#FFF" size={25} />
-        </View>
-        <View style={styles.previewContent}>
-          <View style={styles.previewMeta}>
-            <Text style={styles.previewLabel}>今日提醒</Text>
-            <Text style={styles.previewDate}>今天</Text>
-          </View>
-          <Text numberOfLines={2} style={styles.previewTitle}>
-            今天是中秋节 · 妈妈的生日
-          </Text>
-          <Text numberOfLines={1} style={styles.previewBody}>
-            中秋节、妈妈的生日。都值得好好记住。
-          </Text>
-        </View>
-      </View>
-      <Text style={common.muted}>实际外层圆角、应用名称和高度由手机系统统一控制，展开后可查看更多内容。</Text>
     </View>
   );
 }
@@ -326,6 +299,11 @@ function channelText(value: 'ready' | 'missing' | 'blocked' | 'low-priority' | '
 function informationSwitchText(value: boolean | null, disabledText: string): string {
   if (value === null) return '手机安装包中检测';
   return value ? '用户已开启' : disabledText;
+}
+
+function soundText(value: boolean | null): string {
+  if (value === null) return '手机安装包中检测';
+  return value ? '系统提示音' : '已静音，可能不弹出';
 }
 
 function fullScreenText(
@@ -381,44 +359,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  previewSection: { gap: 9 },
-  notificationPreview: {
-    minHeight: 102,
-    borderRadius: 18,
-    backgroundColor: '#3F6858',
-    padding: 13,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
-    shadowColor: '#23392F',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  previewIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    backgroundColor: '#6E9183',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  previewContent: { flex: 1, gap: 2 },
-  previewMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  previewLabel: { color: '#CFE2D9', fontSize: 11, lineHeight: 16, fontWeight: '700' },
-  previewDate: {
-    color: '#FFF',
-    fontSize: 11,
-    lineHeight: 16,
-    fontWeight: '700',
-    borderRadius: 9,
-    backgroundColor: '#557B6C',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  previewTitle: { color: '#FFF', fontSize: 16, lineHeight: 22, fontWeight: '700' },
-  previewBody: { color: '#E8F1EC', fontSize: 11, lineHeight: 16 },
   rules: { borderRadius: 14, backgroundColor: '#F8F7F3', paddingHorizontal: 14 },
   rule: {
     minHeight: 46,

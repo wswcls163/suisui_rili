@@ -13,7 +13,7 @@ type NativeReliabilityModule = {
   getReliableNotificationDiagnostics(): Promise<string>;
   openExactAlarmSettings(): Promise<void>;
   openFullScreenIntentSettings(): Promise<void>;
-  openNotificationSettings(channelId: string): Promise<void>;
+  openNotificationSettings(): Promise<void>;
   openBatterySettings(): Promise<void>;
 };
 
@@ -116,8 +116,8 @@ export const nativeNotificationReliability = {
   async openFullScreenIntentSettings(): Promise<void> {
     await requireAndroidModule().openFullScreenIntentSettings();
   },
-  async openNotificationSettings(channelId: string): Promise<void> {
-    await requireAndroidModule().openNotificationSettings(channelId);
+  async openNotificationSettings(): Promise<void> {
+    await requireAndroidModule().openNotificationSettings();
   },
   async openBatterySettings(): Promise<void> {
     await requireAndroidModule().openBatterySettings();

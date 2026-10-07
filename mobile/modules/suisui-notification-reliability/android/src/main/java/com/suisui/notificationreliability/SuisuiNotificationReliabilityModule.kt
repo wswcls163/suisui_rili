@@ -44,11 +44,11 @@ class SuisuiNotificationReliabilityModule : Module() {
     AsyncFunction("sendImmediateTestNotification") {
       val now = System.currentTimeMillis()
       val request = ReliableNotificationRecord(
-        identifier = "suisui-native-immediate-test",
+        identifier = "suisui-native-immediate-test-$now",
         owner = ReliableNotificationStore.OWNER_DIAGNOSTIC,
         triggerAt = now,
         title = "岁岁日历横幅测试",
-        body = "这是一条立即发送的静默测试通知。",
+        body = "这是一条立即发送的顶部横幅测试通知。",
         kind = "diagnostic-immediate",
         itemId = "",
         date = "",
@@ -112,11 +112,10 @@ class SuisuiNotificationReliabilityModule : Module() {
       startSettings(intent)
     }
 
-    AsyncFunction("openNotificationSettings") { channelId: String ->
+    AsyncFunction("openNotificationSettings") {
       val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
           putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-          putExtra(Settings.EXTRA_CHANNEL_ID, channelId)
         }
       } else {
         appDetailsIntent()

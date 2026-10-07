@@ -10,7 +10,7 @@ import {
 const OWNER = 'suisui-calendar';
 const TEST_OWNER = 'suisui-calendar-diagnostic';
 const TEST_IDENTIFIER = 'suisui-notification-test';
-export const CHANNEL_ID = 'important-dates-popup-v3';
+export const CHANNEL_ID = 'important-dates-popup-v5';
 
 export type ReminderPermission = 'granted' | 'denied' | 'undetermined';
 export type NotificationChannelStatus = 'ready' | 'missing' | 'blocked' | 'low-priority' | 'not-applicable';
@@ -234,7 +234,7 @@ export const notificationScheduler: NotificationScheduler = {
       identifier: `${TEST_IDENTIFIER}-immediate`,
       content: {
         title: '岁岁日历横幅测试',
-        body: '这是一条立即发送的静默测试通知。',
+        body: '这是一条立即发送的顶部横幅测试通知。',
         data: { owner: TEST_OWNER, kind: 'diagnostic-immediate' },
       },
       trigger: null,
@@ -273,7 +273,7 @@ export const notificationScheduler: NotificationScheduler = {
     }
     return { identifier, triggerAt };
   },
-  openNotificationSettings: () => nativeNotificationReliability.openNotificationSettings(CHANNEL_ID),
+  openNotificationSettings: () => nativeNotificationReliability.openNotificationSettings(),
   openExactAlarmSettings: () => nativeNotificationReliability.openExactAlarmSettings(),
   openFullScreenIntentSettings: () => nativeNotificationReliability.openFullScreenIntentSettings(),
   openBatterySettings: () => nativeNotificationReliability.openBatterySettings(),

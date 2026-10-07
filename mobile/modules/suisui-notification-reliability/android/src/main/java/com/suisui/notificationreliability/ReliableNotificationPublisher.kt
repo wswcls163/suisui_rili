@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.media.AudioAttributes
 import android.os.Build
 import android.os.PowerManager
+import android.provider.Settings
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 
@@ -19,19 +20,19 @@ internal class ReliableNotificationPublisher(private val context: Context) {
   fun ensureChannel() {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
     val attributes = AudioAttributes.Builder()
-      .setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT)
+      .setUsage(AudioAttributes.USAGE_NOTIFICATION)
       .build()
     val channel = NotificationChannel(
       CHANNEL_ID,
       "重要日期弹窗",
       NotificationManager.IMPORTANCE_HIGH,
     ).apply {
-      description = "节日、生日与周年的静默顶部横幅和可选锁屏全屏提醒"
+      description = "节日、生日与周年的顶部横幅和可选锁屏全屏提醒"
       enableLights(true)
       lightColor = Color.rgb(184, 82, 62)
-      setSound(null, attributes)
-      enableVibration(false)
-      vibrationPattern = null
+      setSound(Settings.System.DEFAULT_NOTIFICATION_URI, attributes)
+      enableVibration(true)
+      vibrationPattern = longArrayOf(0L, 220L)
       lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
     }
     notificationManager.createNotificationChannel(channel)
@@ -65,8 +66,14 @@ internal class ReliableNotificationPublisher(private val context: Context) {
       .setAutoCancel(true)
       .setContentIntent(contentIntent)
 
-    // 渠道本身已经关闭声音和振动。不要再设置通知级静默，否则 ColorOS 会加上
-    // FLAG_SILENT，并把 HIGH 通知实际降为 DEFAULT，导致顶部横幅无法出现。
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+      builder.setSound(Settings.System.DEFAULT_NOTIFICATION_URI)
+      builder.setVibrate(longArrayOf(0L, 220L))
+    }
+
+    // 不要设置通知级静默，否则 ColorOS 会加上 FLAG_SILENT，并把 HIGH 通知实际
+    // 降为 DEFAULT。新渠道保留系统提示音和短振动，确保手机处于振动模式时
+    // 厂商系统仍把提醒视为可弹出的通知。
 
     if (request.fullScreen && canUseFullScreenIntent()) {
       builder.setFullScreenIntent(fullScreenIntent(request), true)
@@ -84,8 +91,8 @@ internal class ReliableNotificationPublisher(private val context: Context) {
       return mapOf(
         "exists" to true,
         "importance" to NotificationManager.IMPORTANCE_HIGH,
-        "soundEnabled" to false,
-        "vibrationEnabled" to false,
+        "soundEnabled" to true,
+        "vibrationEnabled" to true,
         "lockscreenVisibility" to NotificationCompat.VISIBILITY_PUBLIC,
       )
     }
@@ -167,7 +174,7 @@ internal class ReliableNotificationPublisher(private val context: Context) {
   }
 
   companion object {
-    const val CHANNEL_ID = "important-dates-popup-v3"
+    const val CHANNEL_ID = "important-dates-popup-v5"
     private const val CONTENT_REQUEST_CODE = 7_310
     private const val WAKE_LOCK_TIMEOUT_MS = 10_000L
 

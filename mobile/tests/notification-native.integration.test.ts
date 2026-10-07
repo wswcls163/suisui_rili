@@ -7,18 +7,18 @@ test('Android 配置声明精确闹钟并使用不可变渠道的新版本标识
   const app = JSON.parse(fs.readFileSync(path.join(projectRoot, 'app.json'), 'utf8'));
   const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
   const packageLock = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package-lock.json'), 'utf8'));
-  expect(app.expo.version).toBe('0.3.3');
-  expect(app.expo.android.versionCode).toBe(6);
-  expect(packageJson.version).toBe('0.3.3');
-  expect(packageLock.version).toBe('0.3.3');
-  expect(packageLock.packages[''].version).toBe('0.3.3');
+  expect(app.expo.version).toBe('0.3.5');
+  expect(app.expo.android.versionCode).toBe(8);
+  expect(packageJson.version).toBe('0.3.5');
+  expect(packageLock.version).toBe('0.3.5');
+  expect(packageLock.packages[''].version).toBe('0.3.5');
   expect(app.expo.android.permissions).toContain('android.permission.SCHEDULE_EXACT_ALARM');
   expect(app.expo.android.permissions).toContain('android.permission.USE_FULL_SCREEN_INTENT');
   expect(app.expo.android.permissions).toContain('android.permission.WAKE_LOCK');
   const notificationsPlugin = app.expo.plugins.find(
     (entry: unknown) => Array.isArray(entry) && entry[0] === 'expo-notifications',
   );
-  expect(notificationsPlugin[1].defaultChannel).toBe('important-dates-popup-v3');
+  expect(notificationsPlugin[1].defaultChannel).toBe('important-dates-popup-v5');
 });
 
 test('本地原生模块提供可靠排程、立即投递、全屏能力和系统设置入口', () => {
@@ -48,8 +48,10 @@ test('本地原生模块提供可靠排程、立即投递、全屏能力和系�
   expect(kotlin).toContain('canUseFullScreenIntent()');
   expect(kotlin).toContain('ACTION_REQUEST_SCHEDULE_EXACT_ALARM');
   expect(kotlin).toContain('ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT');
-  expect(kotlin).toContain('ACTION_CHANNEL_NOTIFICATION_SETTINGS');
+  expect(kotlin).toContain('ACTION_APP_NOTIFICATION_SETTINGS');
+  expect(kotlin).not.toContain('ACTION_CHANNEL_NOTIFICATION_SETTINGS');
   expect(kotlin).toContain('ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS');
+  expect(kotlin).toContain('suisui-native-immediate-test-$now');
 });
 
 test('原生清单注册闹钟投递、重启恢复、锁屏 Activity 和所需权限', () => {
@@ -103,13 +105,16 @@ test('原生调度同时实现精确空闲、降级空闲、稳定取消和最�
   expect(receiver).toContain('recordDelivery(identifier)');
   expect(publisher).toContain('setFullScreenIntent');
   expect(publisher).toContain('CATEGORY_ALARM');
-  expect(publisher).toContain('setSound(null, attributes)');
-  expect(publisher).toContain('enableVibration(false)');
+  expect(publisher).toContain('setSound(Settings.System.DEFAULT_NOTIFICATION_URI, attributes)');
+  expect(publisher).toContain('setUsage(AudioAttributes.USAGE_NOTIFICATION)');
+  expect(publisher).toContain('enableVibration(true)');
+  expect(publisher).toContain('vibrationPattern = longArrayOf(0L, 220L)');
   expect(publisher).not.toContain('.setSilent(');
   expect(publisher).toContain('setCustomContentView(collapsedCard)');
   expect(publisher).toContain('setCustomHeadsUpContentView(compactCard)');
   expect(publisher).toContain('setCustomBigContentView(expandedCard)');
   expect(publisher).toContain('DecoratedCustomViewStyle');
+  expect(publisher).toContain('CHANNEL_ID = "important-dates-popup-v5"');
 });
 
 test('原生顶部横幅和展开通知使用岁岁日历品牌卡片资源', () => {
