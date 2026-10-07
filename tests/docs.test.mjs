@@ -100,6 +100,11 @@ test("Android 验证记录区分测试包生成与真机验收", async () => {
     content,
     /Android 真机安装、启动与冷启动[\s\S]*0\.3\.5 已覆盖安装并启动/,
   );
+  assert.match(
+    content,
+    /用户在真实手机上测试后确认，已测试的核心提醒行为满足当前需求/,
+  );
+  assert.match(content, /尚未逐项取证的场景推定为已通过/);
 });
 
 test("Android 发布版本在 Expo 与 npm 配置中保持一致", async () => {

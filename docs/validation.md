@@ -133,6 +133,8 @@ Android `0.3.5` release 测试 APK 已于 2026-10-06 完成最终构建，Androi
 
 最终包通过 USB 覆盖安装到 OnePlus PJE110、Android 16 / ColorOS 16.0.0 成功；`firstInstallTime` 仍为 2026-09-10，应用数据目录保留，`POST_NOTIFICATIONS` 仍为 `granted=true`。应用内“系统通知与横幅设置”按钮已实际打开 `com.oplus.notificationmanager` 的岁岁日历应用通知页，并显示“静默通知”关闭、“横幅”已勾选。随后在应用前台点击“立即测试顶部横幅”，系统于约 0.5 秒内显示带岁岁日历应用名、深绿色品牌卡片、“重要日期”“今天”和“岁岁日历横幅测试”主标题的真实顶部横幅。关闭厂商“横幅”时，同一渠道只进入通知栏；这证明通知发布链路与品牌样式有效，剩余限制来自用户控制的厂商系统开关，应用不能读取或代为修改。
 
+用户验收反馈（2026-10-07）：用户在真实手机上测试后确认，已测试的核心提醒行为满足当前需求。本条记录只代表用户实际覆盖到的场景，不把普通后台、重启恢复、系统回收、锁屏全屏、其他厂商机型或应用商店合规等尚未逐项取证的场景推定为已通过；这些项目继续保留在上方清单中。
+
 Android `0.3.3` release 测试 APK 已于 2026-10-05 完成最终构建。本次版本号为 `6`，包含三态品牌通知卡片，以及直接显示当天具体节日、生日或周年的通知主标题。JDK 17、Android SDK / Build Tools 36 和 NDK 27.1 环境下，原生模块 `testReleaseUnitTest` 与 `app:assembleRelease` 联合构建成功，共完成 836 个任务。
 
 产物位于被 Git 忽略的 `releases/suisui-calendar-0.3.3-test.apk`，大小 107,905,495 字节，SHA-256 为 `8C3B54BBCF09213A8A86AD35BD063B00C6287350D473D60045F3CEC48046D3D3`。包名为 `com.suisui.calendar`，版本名 `0.3.3`、版本号 `6`、最低 Android API 24、目标 API 36。APK 通过 ZIP 对齐和 APK Signature Scheme v2 验证；签名证书 SHA-256 为 `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`，与旧版一致。
