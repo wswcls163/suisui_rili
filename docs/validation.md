@@ -1,6 +1,6 @@
 # 第一版实现与验证记录
 
-日期：2026-09-08。应用在 `mobile/`，旧 `demo/` 继续保留。
+日期：2026-09-08。正式应用位于 `mobile/`。早期 `demo/` 的历史测试结果仍保留在下文作为当时记录；该原型及其依赖已于 2026-10-07 完整移除，不再属于当前仓库的运行或验证范围。
 
 ## 已实现
 
@@ -30,7 +30,7 @@
 | Web 生产资源导出               | 通过                                                                                                                                                                                                                                                                                                      |
 | Android / iOS Hermes 资源导出  | 通过；不是 APK / IPA，也不是设备运行结果                                                                                                                                                                                                                                                                  |
 | Android 原生工程生成           | `expo prebuild --platform android --no-install` 通过；生成目录不提交                                                                                                                                                                                                                                      |
-| 文档链接与旧 Demo 测试         | 通过；旧 Demo 的模拟逻辑不替代应用验收                                                                                                                                                                                                                                                                    |
+| 文档链接与仓库配置测试         | 通过；检查本地文档链接、统一验证入口和 GitHub Actions 配置                                                                                                                                                                                                                                                |
 
 本地使用 Windows、Node.js 24.19.0，依赖由 npm 锁文件确定。检查命令见[应用 README](../mobile/README.md)。
 
@@ -134,6 +134,8 @@ Android `0.3.5` release 测试 APK 已于 2026-10-06 完成最终构建，Androi
 最终包通过 USB 覆盖安装到 OnePlus PJE110、Android 16 / ColorOS 16.0.0 成功；`firstInstallTime` 仍为 2026-09-10，应用数据目录保留，`POST_NOTIFICATIONS` 仍为 `granted=true`。应用内“系统通知与横幅设置”按钮已实际打开 `com.oplus.notificationmanager` 的岁岁日历应用通知页，并显示“静默通知”关闭、“横幅”已勾选。随后在应用前台点击“立即测试顶部横幅”，系统于约 0.5 秒内显示带岁岁日历应用名、深绿色品牌卡片、“重要日期”“今天”和“岁岁日历横幅测试”主标题的真实顶部横幅。关闭厂商“横幅”时，同一渠道只进入通知栏；这证明通知发布链路与品牌样式有效，剩余限制来自用户控制的厂商系统开关，应用不能读取或代为修改。
 
 用户验收反馈（2026-10-07）：用户在真实手机上测试后确认，已测试的核心提醒行为满足当前需求。本条记录只代表用户实际覆盖到的场景，不把普通后台、重启恢复、系统回收、锁屏全屏、其他厂商机型或应用商店合规等尚未逐项取证的场景推定为已通过；这些项目继续保留在上方清单中。
+
+仓库结构整理（2026-10-07）：正式应用稳定后完整移除早期 `demo/`，共删除 90 个跟踪文件、21,668 行历史原型源码、配置、测试与锁文件，同时清理本地生成目录和依赖；`mobile/` 业务代码保持不变。根级新增跨平台 `npm run verify`，统一执行文档与仓库配置测试、移动端 Jest、SQLite / IndexedDB / 同步集成测试、TypeScript、ESLint、Prettier 和历法核验；GitHub Actions 在 `main` 推送及 Pull Request 上使用 `mobile/.nvmrc`、npm 缓存和 `npm ci --prefix mobile` 后运行同一入口。响应式布局检查仍作为需要本地 Web 服务与 Chrome 的扩展验证，不进入基础 CI。本地使用 Node.js 24.19.0 完整运行统一入口，15 项文档与配置测试、235 项 Jest、36 项存储与同步集成测试、73,049 天历法、2,475 个农历月份及 4,800 条节气核验全部通过，TypeScript、ESLint 和 Prettier 通过。
 
 Android `0.3.3` release 测试 APK 已于 2026-10-05 完成最终构建。本次版本号为 `6`，包含三态品牌通知卡片，以及直接显示当天具体节日、生日或周年的通知主标题。JDK 17、Android SDK / Build Tools 36 和 NDK 27.1 环境下，原生模块 `testReleaseUnitTest` 与 `app:assembleRelease` 联合构建成功，共完成 836 个任务。
 

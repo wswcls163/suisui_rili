@@ -18,11 +18,43 @@ async function markdownFiles(directory) {
 
 const documents = [
   join(root, "README.md"),
-  join(root, "demo", "README.md"),
   join(root, "mobile", "README.md"),
   join(root, "mobile", "tests", "fixtures", "README.md"),
   ...(await markdownFiles(join(root, "docs"))),
 ];
+
+test("仓库已移除旧 Demo 并忽略本机 IDE 配置", async () => {
+  await assert.rejects(access(join(root, "demo")));
+  const gitignore = await readFile(join(root, ".gitignore"), "utf8");
+  assert.match(gitignore, /^\.idea\/$/m);
+});
+
+test("根级统一验证与 GitHub Actions 使用同一入口", async () => {
+  const packageConfig = JSON.parse(
+    await readFile(join(root, "package.json"), "utf8"),
+  );
+  const verify = packageConfig.scripts?.verify ?? "";
+  assert.equal(packageConfig.engines?.node, ">=22.13.0");
+  assert.equal(
+    packageConfig.scripts?.["verify:docs"],
+    "node --test tests/docs.test.mjs",
+  );
+  assert.match(verify, /verify:docs/);
+  assert.match(verify, /--prefix mobile test/);
+  assert.match(verify, /test:storage/);
+  assert.match(verify, /typecheck/);
+  assert.match(verify, /lint/);
+  assert.match(verify, /format:check/);
+  assert.match(verify, /verify:calendar/);
+
+  const workflow = await readFile(
+    join(root, ".github", "workflows", "verify.yml"),
+    "utf8",
+  );
+  assert.match(workflow, /node-version-file: mobile\/\.nvmrc/);
+  assert.match(workflow, /npm ci --prefix mobile/);
+  assert.match(workflow, /npm run verify/);
+});
 
 for (const document of documents) {
   test(`${relative(root, document)} 的本地文件链接有效`, async () => {

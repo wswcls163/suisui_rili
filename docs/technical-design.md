@@ -2,11 +2,11 @@
 
 版本：V2.0｜日期：2026-10-07｜状态：生日、可选出生年份与周岁、未来选日距离、时光记、节日合并提醒、原生可靠排程、品牌通知卡片、带系统提示音与短振动的顶部横幅、可选锁屏全屏提醒、全局功能菜单和账号同步均已实现；Android 0.3.5 已在 ColorOS 16 真机完成覆盖安装与前台顶部横幅验证，用户反馈已测试的核心提醒行为满足当前需求，厂商强停等平台边界仍按验证清单处理
 
-依据：[产品设计文档](product-design.md) 与 [交互 Demo](../demo/README.md)。本方案面向第一期生日功能，重点是手机端交付、便于修改，以及为后续功能保留清晰的接入位置。
+依据：[产品设计文档](product-design.md)。本方案面向第一期生日功能，重点是手机端交付、便于修改，以及为后续功能保留清晰的接入位置。
 
 ## 1. 技术决策与交付范围
 
-正式应用采用 **React Native + Expo + TypeScript + SQLite**，面向 Android 和 iOS，共享业务代码，并分别验证平台行为。应用已放在仓库的 `mobile/` 目录，现有 Web Demo 保留为交互参考。
+正式应用采用 **React Native + Expo + TypeScript + SQLite**，面向 Android 和 iOS，共享业务代码，并分别验证平台行为。应用位于仓库的 `mobile/` 目录；早期 Web 交互原型已于 2026-10-07 移除，避免继续维护两套界面与生日规则。
 
 按后续确认的交付顺序，**手机优先，同时提供可实际操作的电脑浏览器预览**。浏览器通过 React Native Web 复用界面和业务规则，用 IndexedDB 保存本机数据；手机使用 SQLite。未登录数据留在各自设备，登录同一账号后通过 Supabase 同步。浏览器预览可用于亲自测试功能，不能替代手机上的原生模块、安装包和生命周期验收。Windows 独立安装包推迟到手机端稳定后；届时评估复用 Web 界面接入桌面外壳，并处理桌面数据与升级流程。
 
@@ -21,7 +21,7 @@
 | 应用框架     | React Native + Expo                               | 手机原生界面与构建流程；正式开发采用 development build           |
 | 语言         | TypeScript，开启 strict                           | 明确生日、时光记、农历日期、计算结果和存储接口的类型             |
 | 页面导航     | Expo Router                                       | 管理首页、生日簿、详情和编辑页面；路由文件仅组装页面             |
-| 界面与样式   | React Native 基础组件 + StyleSheet + 统一主题变量 | 复用颜色、字号、间距、按钮和卡片，延续 Demo 的视觉方向           |
+| 界面与样式   | React Native 基础组件 + StyleSheet + 统一主题变量 | 复用颜色、字号、间距、按钮和卡片，保持统一视觉方向                |
 | 界面状态     | React Hooks、Context、useState                    | 集中维护生日快照，局部表单状态留在组件内；当前规模无需额外状态库 |
 | 本地数据库   | SQLite，通过 expo-sqlite 访问                     | 存储原始生日，用版本化迁移管理字段变化                           |
 | 农历引擎     | lunar-javascript 1.7.7，封装为适配器              | 按独立对照表核验声明范围；页面不直接依赖历法库                   |
@@ -33,7 +33,7 @@
 
 导航、本地保存和开发构建参考 [Router 文档](https://docs.expo.dev/router/introduction/)、[SQLite 文档](https://docs.expo.dev/versions/latest/sdk/sqlite/) 和 [development build 文档](https://docs.expo.dev/develop/development-builds/introduction/)。测试环境参考 [Expo 单元测试文档](https://docs.expo.dev/develop/unit-testing/)。
 
-工程使用 Expo SDK 57、React Native 0.86、React 19.2 和匹配的原生模块，提交 npm 锁文件及 `.nvmrc`（Node.js 22.23.2），并用 `expo-doctor` 检查依赖匹配。代码通过 ESLint、Prettier 统一规范。避免分别追逐各依赖的最新版本。Demo 的 Vite、Vinext、浏览器组件和部署配置不迁入手机工程。
+工程使用 Expo SDK 57、React Native 0.86、React 19.2 和匹配的原生模块，提交 npm 锁文件及 `.nvmrc`（Node.js 22.23.2），并用 `expo-doctor` 检查依赖匹配。代码通过 ESLint、Prettier 统一规范。避免分别追逐各依赖的最新版本。仓库根级 `npm run verify` 统一执行文档、测试、类型、Lint、格式与历法核验，GitHub Actions 在 `main` 推送和 Pull Request 上运行同一入口。
 
 Windows 本地 Android 构建使用完整 JDK 17、Android SDK / Build Tools 36 和 NDK 27.1.12297006。原生目录仍由 Expo 生成并保持 Git 忽略；当前工程所在路径包含中文，而该版本 JDK / Gradle / Expo 自动链接在 Windows 上不能稳定贯穿 Unicode 物理路径，因此发布构建将 `mobile/` 输入复制到纯英文临时目录、按同一 `package-lock.json` 执行 `npm ci` 后再运行 `app:assembleRelease`。临时目录只解决工具链路径兼容，不是新的源码来源。测试 APK 使用 Android Debug 证书，仅用于安装验收；正式发布前必须改为独立的安全签名配置，且签名文件和密码不得进入仓库。
 
@@ -118,7 +118,7 @@ mobile/
 
 ## 5. 农历引擎与年度生日规则
 
-历法适配器负责阳历转农历、查询指定农历月份的月首和天数，通过月首加日序得到阳历结果。采用 [lunar-javascript](https://github.com/6tail/lunar-javascript) 并封装项目使用的类型，不能将 Demo 的有限历表直接当作正式引擎。原生打包检查已通过，运行表现仍需真机确认。
+历法适配器负责阳历转农历、查询指定农历月份的月首和天数，通过月首加日序得到阳历结果。采用 [lunar-javascript](https://github.com/6tail/lunar-javascript) 并封装项目使用的类型，正式规则由独立对照数据验证。原生打包检查已通过，运行表现仍需真机确认。
 
 生日模块在适配器之上执行以下规则：
 
@@ -172,7 +172,7 @@ Android 通知内容使用模块内的 `RemoteViews` 和 `NotificationCompat.Dec
 
 `NotificationProvider` 在数据加载、事项变化、通知时间或全屏开关变化、恢复前台和应用重新启动时重建计划。从系统设置返回会重新诊断并重排。总开关与全屏开关默认关闭，设置用 SecureStore 保存在当前手机，不加入业务数据库或 Supabase。Web 使用 localStorage 与无发送能力的替身，仅展示手机界面。
 
-## 7. 手机界面与 Demo 迁移
+## 7. 手机界面
 
 首页保留“日历 / 生日簿 / 时光记”入口，并以 `HomeTab` 驱动动态标题和互斥内容区。日期计算、月历、当天提醒和所选日期事项只属于“日历”；当天提醒卡直接复用 `festivalsOn(today)` 与生日状态，节日和生日重叠时共用一张强调卡片。生日簿和时光记切换后直接渲染各自完整列表，不再在条件内容之前渲染跨标签摘要。手机竖屏中压缩品牌、标题与区块间距，月历先于当天提醒和所选日期面板出现；新增和编辑采用手机页面或模态面板。适配安全区域、键盘遮挡、系统返回和文字放大。
 
@@ -183,16 +183,6 @@ Android 通知内容使用模块内的 `RemoteViews` 和 `NotificationCompat.Dec
 月历生日名称下方使用独立一行显示 `occurrence.kinds` 对应的“农历”“阳历”，按本次发生类型标注，不根据人物是否同时保存两套日期推断。类型标记可换行，长姓名只在名称行尾部省略；生日区预留相同高度，使有无生日的格子保持日期对齐。`MonthCalendar` 通过 `compact` 属性切换手机密度：手机日期格最低高度为 74 像素，并同步收紧星期栏、日期内边距和生日预留区；宽屏继续使用 100 像素日期格。月历头部固定为单行：可点击的年月标题弹性占用剩余空间，翻月与“今天”操作组不收缩；紧凑布局收窄内部间距并保留每个操作至少 44 像素的触控区域，使一位数和两位数月份在 320—443 像素宽度间切换时不会换行或改变头部高度。
 
 表单提供三种生日方式，复用现有月日选择组件；农历与阳历各有独立输入缓冲，切换方式不丢失当前草稿，保存时只提交启用的日期。补充缺失日期需要主动选择，避免误用当前浏览日期。双生日分别展示下一次预览；详情按时间列出接下来的三次生日并注明类型，同一天重合时合并说明。
-
-| Demo 内容                                    | 处理方式                                       |
-| -------------------------------------------- | ---------------------------------------------- |
-| 产品流程、文案、颜色和布局意图               | 作为手机端设计参考                             |
-| TypeScript 类型、校验、日期规则与测试用例    | 按新模块边界整理复用，保留有价值的边界用例     |
-| HTML、CSS、shadcn / Base UI、React DayPicker | 用 React Native 组件重建，不能直接复用网页组件 |
-| 模拟今天、种子数据、演示场景、有限历表       | 仅留作测试材料，不进入正式启动流程             |
-| WebMCP 与 Sites / Vinext 配置                | 保留在 Demo，不作为手机运行依赖                |
-
-迁移以用户行为和计算规则一致为目标，不要求与 Demo 使用相同目录。Demo 测试通过不代表手机界面、SQLite 或原生构建已验证。
 
 ## 8. 后续扩展方式
 
