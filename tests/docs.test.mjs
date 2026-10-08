@@ -156,3 +156,30 @@ test("Android 发布版本在 Expo 与 npm 配置中保持一致", async () => {
   assert.equal(appConfig.expo.version, "0.3.5");
   assert.equal(appConfig.expo.android.versionCode, 8);
 });
+
+test("首页视觉预览与正式导航及数据模块保持隔离", async () => {
+  const route = await readFile(
+    join(root, "mobile", "app", "design-preview.tsx"),
+    "utf8",
+  );
+  const preview = await readFile(
+    join(
+      root,
+      "mobile",
+      "src",
+      "components",
+      "design-preview",
+      "DesignPreviewHome.tsx",
+    ),
+    "utf8",
+  );
+  const navigation = await readFile(
+    join(root, "mobile", "src", "components", "NavigationDrawer.tsx"),
+    "utf8",
+  );
+
+  assert.match(route, /DesignPreviewHome/);
+  assert.doesNotMatch(navigation, /design-preview/);
+  assert.doesNotMatch(preview, /state\/|data\/|sync\/|notifications\/|auth\//);
+  assert.match(preview, /使用示例内容，不会写入你的日历/);
+});

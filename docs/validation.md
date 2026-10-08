@@ -137,6 +137,8 @@ Android `0.3.5` release 测试 APK 已于 2026-10-06 完成最终构建，Androi
 
 仓库结构整理（2026-10-07）：正式应用稳定后完整移除早期 `demo/`，共删除 90 个跟踪文件、21,668 行历史原型源码、配置、测试与锁文件，同时清理本地生成目录和依赖；`mobile/` 业务代码保持不变。根级新增跨平台 `npm run verify`，统一执行文档与仓库配置测试、移动端 Jest、SQLite / IndexedDB / 同步集成测试、TypeScript、ESLint、Prettier 和历法核验；GitHub Actions 在 `main` 推送及 Pull Request 上使用 `mobile/.nvmrc`、npm 缓存和 `npm ci --prefix mobile` 后运行同一入口。响应式布局检查仍作为需要本地 Web 服务与 Chrome 的扩展验证，不进入基础 CI。本地使用 Node.js 24.19.0 完整运行统一入口，15 项文档与配置测试、235 项 Jest、36 项存储与同步集成测试、73,049 天历法、2,475 个农历月份及 4,800 条节气核验全部通过，TypeScript、ESLint 和 Prettier 通过。
 
+独立首页视觉预览（2026-10-08）：新增 `/design-preview` 候选页面与交互测试，覆盖日历主体、月份切换、重要日子选择、回到今天、照片内容占位和示例数据隔离。路由未加入正式 `NavigationDrawer`，组件不引用仓库、应用状态、认证、同步或通知模块；正式首页和业务数据模型未改动。使用 Node.js 24.19.0 运行统一验证，16 项文档与配置测试、237 项 Jest、36 项存储与同步集成测试、TypeScript、ESLint、Prettier、73,049 天历法、2,475 个农历月份和 4,800 条节气核验全部通过；浏览器实际渲染确认电脑端为 430 像素手机画布，月历及下方记录无横向越界，月份切换与回到今天可用。
+
 Android `0.3.3` release 测试 APK 已于 2026-10-05 完成最终构建。本次版本号为 `6`，包含三态品牌通知卡片，以及直接显示当天具体节日、生日或周年的通知主标题。JDK 17、Android SDK / Build Tools 36 和 NDK 27.1 环境下，原生模块 `testReleaseUnitTest` 与 `app:assembleRelease` 联合构建成功，共完成 836 个任务。
 
 产物位于被 Git 忽略的 `releases/suisui-calendar-0.3.3-test.apk`，大小 107,905,495 字节，SHA-256 为 `8C3B54BBCF09213A8A86AD35BD063B00C6287350D473D60045F3CEC48046D3D3`。包名为 `com.suisui.calendar`，版本名 `0.3.3`、版本号 `6`、最低 Android API 24、目标 API 36。APK 通过 ZIP 对齐和 APK Signature Scheme v2 验证；签名证书 SHA-256 为 `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`，与旧版一致。
