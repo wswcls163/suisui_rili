@@ -93,7 +93,16 @@ async function main() {
   await send('Page.enable');
   await send('Runtime.enable');
   const widths = [320, 390, 443, 1200];
-  const reports = [];
+  const reports: {
+    page: 'home' | 'design-preview';
+    width: number;
+    innerWidth: number;
+    scrollWidth: number;
+    today: string;
+    overflow: string[];
+    bottomClearance: number | null;
+    screenshotPath: string;
+  }[] = [];
   for (const width of widths) {
     await send('Emulation.setDeviceMetricsOverride', {
       width,
@@ -140,16 +149,83 @@ async function main() {
     const screenshot = await send<{ data: string }>('Page.captureScreenshot', { format: 'png' });
     const screenshotPath = join(outputDir, `home-${width}.png`);
     writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
-    reports.push({ width, ...metrics, screenshotPath });
+    reports.push({ page: 'home', width, ...metrics, bottomClearance: null, screenshotPath });
+  }
+
+  for (const width of [390, 518, 1200]) {
+    await send('Emulation.setDeviceMetricsOverride', {
+      width,
+      height: 900,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await send('Page.navigate', { url: `${baseUrl}design-preview?layout-check=${width}` });
+    let ready = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      ready = await evaluate<boolean>(
+        `document.body.innerText.includes('近期重要日子') && document.body.innerText.includes('岁岁日历')`,
+      );
+      if (ready) break;
+      await delay(100);
+    }
+    if (!ready) throw new Error(`视觉预览 ${width}px 页面在 10 秒内未完成渲染`);
+    const metrics = await evaluate<{
+      innerWidth: number;
+      scrollWidth: number;
+      today: string;
+      overflow: string[];
+    }>(`(() => {
+      const viewport = document.documentElement.clientWidth;
+      const overflow = [...document.querySelectorAll('*')]
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' &&
+            (rect.left < -0.5 || rect.right > viewport + 0.5);
+        })
+        .slice(0, 8)
+        .map((element) => element.tagName + ':' + (element.textContent || '').trim().slice(0, 30));
+      return {
+        innerWidth: window.innerWidth,
+        scrollWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
+        today: document.body.innerText.includes('近期重要日子') ? 'today-ready' : '',
+        overflow,
+      };
+    })()`);
+    const screenshot = await send<{ data: string }>('Page.captureScreenshot', { format: 'png' });
+    const screenshotPath = join(outputDir, `design-preview-${width}.png`);
+    writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
+    const bottomClearance = await evaluate<number>(`(async () => {
+      const last = document.querySelector('[aria-label^="阿宁的生日，"]');
+      const navigation = document.querySelector('[role="tablist"]');
+      if (!(last instanceof HTMLElement) || !(navigation instanceof HTMLElement)) return -999;
+      let scroller = last.parentElement;
+      while (scroller && scroller.scrollHeight <= scroller.clientHeight + 1) {
+        scroller = scroller.parentElement;
+      }
+      if (!scroller) return -998;
+      scroller.scrollTop = scroller.scrollHeight;
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      return navigation.getBoundingClientRect().top - last.getBoundingClientRect().bottom;
+    })()`);
+    const bottomScreenshot = await send<{ data: string }>('Page.captureScreenshot', { format: 'png' });
+    writeFileSync(
+      join(outputDir, `design-preview-${width}-bottom.png`),
+      Buffer.from(bottomScreenshot.data, 'base64'),
+    );
+    reports.push({ page: 'design-preview', width, ...metrics, bottomClearance, screenshotPath });
   }
   socket.close();
   console.log(JSON.stringify(reports, null, 2));
   const failed = reports.filter(
     (report) =>
-      report.innerWidth !== report.width || report.scrollWidth > report.width || report.overflow.length,
+      report.innerWidth !== report.width ||
+      report.scrollWidth > report.width ||
+      report.overflow.length ||
+      (report.bottomClearance !== null && report.bottomClearance < -0.5),
   );
   if (failed.length)
-    throw new Error(`响应式布局存在横向越界：${failed.map((item) => item.width).join('、')}px`);
+    throw new Error(`响应式布局存在越界：${failed.map((item) => `${item.page}-${item.width}px`).join('、')}`);
 }
 
 void main()

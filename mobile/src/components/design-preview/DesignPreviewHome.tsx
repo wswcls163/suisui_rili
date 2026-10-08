@@ -4,7 +4,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions,
 import { lunarCalendar, lunarLabel } from '../../core/calendar';
 import {
   addDays,
-  chineseFullDate,
+  chineseWeekday,
   dateInMonth,
   FIRST_DATE,
   LAST_DATE,
@@ -18,9 +18,9 @@ type PreviewEvent = {
   id: string;
   date: string;
   title: string;
-  note: string;
+  detail: string;
   kind: 'birthday' | 'memory';
-  tone: 'clay' | 'forest' | 'sand';
+  initial: string;
 };
 
 type DesignPreviewHomeProps = {
@@ -29,21 +29,30 @@ type DesignPreviewHomeProps = {
 
 const palette = {
   canvas: '#E8E5DE',
-  paper: '#F8F6F1',
-  surface: '#FEFDF9',
+  paper: '#F6F4EF',
+  surface: '#FFFEFB',
   ink: '#202827',
-  muted: '#747A76',
-  faint: '#A7AAA5',
-  line: '#E4E1D9',
-  clay: '#B4523D',
-  claySoft: '#F1DED6',
-  forest: '#4D6859',
-  forestSoft: '#DDE7DF',
-  sand: '#B9874D',
-  sandSoft: '#EFE3D2',
+  muted: '#69716D',
+  faint: '#939995',
+  line: '#DFDDD6',
+  clay: '#B4513D',
+  claySoft: '#F3E3DC',
+  forest: '#4F6D5C',
+  forestSoft: '#DFE9E2',
 };
 
 const weekdayLabels = ['日', '一', '二', '三', '四', '五', '六'];
+
+const navItems: {
+  key: string;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+  { key: 'calendar', label: '日历', icon: 'calendar-outline' },
+  { key: 'birthdays', label: '生日簿', icon: 'gift-outline' },
+  { key: 'memories', label: '时光记', icon: 'sparkles-outline' },
+  { key: 'profile', label: '我的', icon: 'person-outline' },
+];
 
 function monthTitle(date: string): string {
   const [year, month] = date.split('-').map(Number);
@@ -59,10 +68,10 @@ function relativeLabel(date: string, today: string): string {
   const distance = Math.round(
     (Date.parse(`${date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000,
   );
-  if (distance === 0) return '就是今天';
+  if (distance === 0) return '今天';
   if (distance === 1) return '明天';
-  if (distance > 1) return `${distance} 天后`;
-  return `${Math.abs(distance)} 天前`;
+  if (distance > 1) return `${distance}天后`;
+  return `${Math.abs(distance)}天前`;
 }
 
 function createPreviewEvents(today: string): PreviewEvent[] {
@@ -71,49 +80,45 @@ function createPreviewEvents(today: string): PreviewEvent[] {
       id: 'mother-birthday',
       date: addDays(today, 4),
       title: '妈妈的生日',
-      note: '准备一束她喜欢的花',
+      detail: '阳历生日 · 已开启提醒',
       kind: 'birthday',
-      tone: 'clay',
+      initial: '妈',
     },
     {
       id: 'travel-memory',
       date: addDays(today, 10),
       title: '一起旅行纪念',
-      note: '青岛海边 · 第 3 年',
+      detail: '每年纪念 · 第 3 年',
       kind: 'memory',
-      tone: 'forest',
+      initial: '',
     },
     {
       id: 'friend-birthday',
       date: addDays(today, 17),
       title: '阿宁的生日',
-      note: '别忘了提前约晚餐',
+      detail: '农历生日 · 已开启提醒',
       kind: 'birthday',
-      tone: 'sand',
+      initial: '宁',
     },
   ];
 }
 
-function eventIcon(kind: PreviewEvent['kind']): keyof typeof Ionicons.glyphMap {
-  return kind === 'birthday' ? 'gift-outline' : 'images-outline';
-}
-
-function PhotoPlaceholder({ event }: { event: PreviewEvent }) {
-  const backgroundColor =
-    event.tone === 'forest'
-      ? palette.forestSoft
-      : event.tone === 'sand'
-        ? palette.sandSoft
-        : palette.claySoft;
-  const color =
-    event.tone === 'forest' ? palette.forest : event.tone === 'sand' ? palette.sand : palette.clay;
+function EventThumb({ event, compact = false }: { event: PreviewEvent; compact?: boolean }) {
+  const birthday = event.kind === 'birthday';
   return (
     <View
-      accessibilityLabel={`${event.title}照片占位`}
-      style={[styles.photoPlaceholder, { backgroundColor }]}
+      accessibilityLabel={birthday ? `${event.title}头像` : `${event.title}缩略图`}
+      style={[
+        styles.eventThumb,
+        compact && styles.eventThumbCompact,
+        birthday ? styles.birthdayThumb : styles.memoryThumb,
+      ]}
     >
-      <Ionicons name={eventIcon(event.kind)} size={22} color={color} accessible={false} />
-      <Text style={[styles.photoPlaceholderText, { color }]}>照片</Text>
+      {birthday ? (
+        <Text style={styles.avatarText}>{event.initial}</Text>
+      ) : (
+        <Ionicons name="images-outline" size={compact ? 17 : 20} color={palette.forest} accessible={false} />
+      )}
     </View>
   );
 }
@@ -152,14 +157,32 @@ function PreviewDay({
       accessibilityLabel={`选择 ${description}`}
       accessibilityState={{ selected }}
       onPress={() => onPress(date)}
-      style={({ pressed }) => [styles.dayCell, pressed && styles.pressedDay]}
+      style={({ pressed }) => [styles.dayCell, pressed && styles.dayCellPressed]}
     >
-      <View style={[styles.dayNumberWrap, isToday && styles.todayRing, selected && styles.selectedDay]}>
-        <Text style={[styles.dayNumber, selected && styles.selectedDayText]}>{day}</Text>
+      <View
+        style={[
+          styles.dayNumberWrap,
+          isToday && !selected && styles.todayRing,
+          selected && styles.selectedDay,
+        ]}
+      >
+        <Text
+          style={[
+            styles.dayNumber,
+            isToday && !selected && styles.todayNumber,
+            selected && styles.selectedDayText,
+          ]}
+        >
+          {day}
+        </Text>
       </View>
       <Text
         numberOfLines={1}
-        style={[styles.dayHelper, festival && styles.festivalHelper, selected && styles.selectedHelper]}
+        style={[
+          styles.dayHelper,
+          festival && styles.festivalHelper,
+          selected && !festival && styles.selectedHelper,
+        ]}
       >
         {helper}
       </Text>
@@ -167,14 +190,75 @@ function PreviewDay({
         {event ? (
           <View
             accessibilityLabel={event.kind === 'birthday' ? '有生日' : '有时光记录'}
-            style={[
-              styles.eventDot,
-              { backgroundColor: event.kind === 'birthday' ? palette.clay : palette.forest },
-            ]}
+            style={[styles.eventDot, event.kind === 'birthday' ? styles.birthdayDot : styles.memoryDot]}
           />
         ) : null}
       </View>
     </Pressable>
+  );
+}
+
+function RecordRow({
+  event,
+  today,
+  onPress,
+  divider = true,
+}: {
+  event: PreviewEvent;
+  today: string;
+  onPress: () => void;
+  divider?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${event.title}，${shortDate(event.date)}，${relativeLabel(event.date, today)}`}
+      onPress={onPress}
+      style={({ pressed }) => [styles.recordRow, divider && styles.rowDivider, pressed && styles.rowPressed]}
+    >
+      <EventThumb event={event} />
+      <View style={styles.recordCopy}>
+        <Text numberOfLines={1} style={styles.recordTitle}>
+          {event.title}
+        </Text>
+        <Text numberOfLines={1} style={styles.recordDetail}>
+          {event.detail}
+        </Text>
+      </View>
+      <View style={styles.recordDateBlock}>
+        <Text style={styles.recordDate}>{shortDate(event.date)}</Text>
+        <Text style={styles.recordRelative}>{relativeLabel(event.date, today)}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={17} color={palette.faint} accessible={false} />
+    </Pressable>
+  );
+}
+
+function BottomNavigation() {
+  return (
+    <View accessibilityRole="tablist" style={styles.bottomNavigation}>
+      {navItems.map((item) => {
+        const selected = item.key === 'calendar';
+        return (
+          <View
+            key={item.key}
+            accessibilityRole="tab"
+            accessibilityLabel={item.label}
+            accessibilityState={{ selected, disabled: !selected }}
+            style={styles.navItem}
+          >
+            <Ionicons
+              name={selected ? 'calendar' : item.icon}
+              size={21}
+              color={selected ? palette.clay : palette.muted}
+              accessible={false}
+            />
+            <Text style={[styles.navLabel, selected && styles.navLabelSelected]}>{item.label}</Text>
+            {selected ? <View style={styles.navIndicator} /> : null}
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
@@ -189,6 +273,7 @@ export function DesignPreviewHome({ today }: DesignPreviewHomeProps) {
   const selectedEvent = eventByDate.get(selectedDate);
   const selectedFestivals = festivalsOn(selectedDate);
   const selectedLunar = lunarLabel(lunarCalendar.lunarOn(selectedDate));
+  const todayFestivals = festivalsOn(today);
   const grid = monthGrid(visibleMonth);
   const canGoPrevious = visibleMonth > monthStart(FIRST_DATE);
   const canGoNext = visibleMonth < monthStart(LAST_DATE);
@@ -213,74 +298,71 @@ export function DesignPreviewHome({ today }: DesignPreviewHomeProps) {
     <View style={[styles.stage, desktopFrame && styles.desktopStage]}>
       <View style={[styles.phone, desktopFrame && styles.desktopPhone]}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <View style={styles.topBar}>
-            <View>
-              <Text style={styles.eyebrow}>岁岁日历</Text>
-              <Text accessibilityRole="header" style={styles.todayTitle}>
-                今天
+          <View style={styles.appBar}>
+            <View style={styles.brandRow}>
+              <View style={styles.brandMark}>
+                <Ionicons name="calendar-outline" size={19} color={palette.clay} accessible={false} />
+              </View>
+              <Text accessibilityRole="header" style={styles.brandName}>
+                岁岁日历
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="新增事项"
+              style={({ pressed }) => [styles.addButton, pressed && styles.rowPressed]}
+            >
+              <Ionicons name="add" size={23} color={palette.surface} accessible={false} />
+            </Pressable>
+          </View>
+
+          <View style={styles.todaySummary}>
+            <View style={styles.todayCopy}>
+              <Text style={styles.todayDate}>
+                {shortDate(today)} {chineseWeekday(today)}
+              </Text>
+              <Text numberOfLines={1} style={styles.todayMeta}>
+                农历{lunarLabel(lunarCalendar.lunarOn(today))}
+                {todayFestivals.length ? ` · ${todayFestivals.join('、')}` : ''}
               </Text>
             </View>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="回到今天"
               onPress={returnToday}
-              style={({ pressed }) => [styles.todayButton, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.todayButton, pressed && styles.rowPressed]}
             >
-              <Ionicons name="locate-outline" size={17} color={palette.ink} accessible={false} />
-              <Text style={styles.todayButtonText}>回到今天</Text>
+              <Text style={styles.todayButtonText}>今天</Text>
             </Pressable>
           </View>
 
-          <Text style={styles.fullDate}>{chineseFullDate(today)}</Text>
-          <Text style={styles.lunarToday}>农历{lunarLabel(lunarCalendar.lunarOn(today))} · 北京时间</Text>
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`最近的重要日子：${nearest.title}，${relativeLabel(nearest.date, today)}`}
-            onPress={() => selectDate(nearest.date)}
-            style={({ pressed }) => [styles.nextEvent, pressed && styles.pressed]}
-          >
-            <View style={styles.nextEventDate}>
-              <Text style={styles.nextEventDay}>{Number(nearest.date.slice(8))}</Text>
-              <Text style={styles.nextEventMonth}>{Number(nearest.date.slice(5, 7))} 月</Text>
-            </View>
-            <View style={styles.nextEventCopy}>
-              <Text style={styles.nextEventLabel}>最近的重要日子</Text>
-              <Text numberOfLines={1} style={styles.nextEventTitle}>
-                {nearest.title}
-              </Text>
-            </View>
-            <View style={styles.nextEventDistance}>
-              <Text style={styles.nextEventDistanceText}>{relativeLabel(nearest.date, today)}</Text>
-              <Ionicons name="chevron-forward" size={17} color="#E5EFE8" accessible={false} />
-            </View>
-          </Pressable>
-
           <View style={styles.calendarSection}>
             <View style={styles.monthToolbar}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="上一个月"
-                accessibilityState={{ disabled: !canGoPrevious }}
-                disabled={!canGoPrevious}
-                onPress={() => changeMonth(-1)}
-                style={({ pressed }) => [styles.monthButton, pressed && styles.pressed]}
-              >
-                <Ionicons name="chevron-back" size={20} color={palette.ink} accessible={false} />
-              </Pressable>
               <Text accessibilityRole="header" style={styles.monthTitle}>
                 {monthTitle(visibleMonth)}
               </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="下一个月"
-                accessibilityState={{ disabled: !canGoNext }}
-                disabled={!canGoNext}
-                onPress={() => changeMonth(1)}
-                style={({ pressed }) => [styles.monthButton, pressed && styles.pressed]}
-              >
-                <Ionicons name="chevron-forward" size={20} color={palette.ink} accessible={false} />
-              </Pressable>
+              <View style={styles.monthActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="上一个月"
+                  accessibilityState={{ disabled: !canGoPrevious }}
+                  disabled={!canGoPrevious}
+                  onPress={() => changeMonth(-1)}
+                  style={({ pressed }) => [styles.monthButton, pressed && styles.rowPressed]}
+                >
+                  <Ionicons name="chevron-back" size={20} color={palette.ink} accessible={false} />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="下一个月"
+                  accessibilityState={{ disabled: !canGoNext }}
+                  disabled={!canGoNext}
+                  onPress={() => changeMonth(1)}
+                  style={({ pressed }) => [styles.monthButton, pressed && styles.rowPressed]}
+                >
+                  <Ionicons name="chevron-forward" size={20} color={palette.ink} accessible={false} />
+                </Pressable>
+              </View>
             </View>
 
             <View style={styles.weekRow}>
@@ -306,86 +388,91 @@ export function DesignPreviewHome({ today }: DesignPreviewHomeProps) {
               </View>
             ))}
 
-            <View style={styles.legend}>
+            <View style={styles.calendarLegend}>
               <View style={styles.legendItem}>
-                <View style={[styles.eventDot, { backgroundColor: palette.clay }]} />
+                <View style={[styles.eventDot, styles.birthdayDot]} />
                 <Text style={styles.legendText}>生日</Text>
               </View>
               <View style={styles.legendItem}>
-                <View style={[styles.eventDot, { backgroundColor: palette.forest }]} />
-                <Text style={styles.legendText}>时光记录</Text>
+                <View style={[styles.eventDot, styles.memoryDot]} />
+                <Text style={styles.legendText}>时光记</Text>
               </View>
             </View>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`下一件事：${nearest.title}，${shortDate(nearest.date)}，${relativeLabel(nearest.date, today)}`}
+              onPress={() => selectDate(nearest.date)}
+              style={({ pressed }) => [styles.nextRow, pressed && styles.rowPressed]}
+            >
+              <View style={styles.nextAccent} />
+              <EventThumb event={nearest} compact />
+              <View style={styles.nextCopy}>
+                <Text style={styles.nextLabel}>下一件事</Text>
+                <Text numberOfLines={1} style={styles.nextTitle}>
+                  {nearest.title}
+                </Text>
+              </View>
+              <View style={styles.nextDateBlock}>
+                <Text style={styles.nextDate}>{shortDate(nearest.date)}</Text>
+                <Text style={styles.nextRelative}>{relativeLabel(nearest.date, today)}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={17} color={palette.faint} accessible={false} />
+            </Pressable>
           </View>
 
-          <View style={styles.selectedSection}>
-            <View style={styles.sectionHeadingRow}>
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
               <View>
-                <Text style={styles.sectionKicker}>所选日期</Text>
+                <Text style={styles.sectionLabel}>所选日期</Text>
                 <Text accessibilityRole="header" style={styles.sectionTitle}>
                   {shortDate(selectedDate)}
                 </Text>
               </View>
-              <Text style={styles.selectedRelative}>{relativeLabel(selectedDate, today)}</Text>
+              <View style={styles.selectedMetaBlock}>
+                <Text style={styles.selectedRelative}>{relativeLabel(selectedDate, today)}</Text>
+                <Text style={styles.selectedLunar}>农历{selectedLunar}</Text>
+              </View>
             </View>
-            <Text style={styles.selectedMeta}>
-              农历{selectedLunar}
-              {selectedFestivals.length ? ` · ${selectedFestivals.join('、')}` : ''}
-            </Text>
-            {selectedEvent ? (
-              <View style={styles.selectedEventRow}>
-                <PhotoPlaceholder event={selectedEvent} />
-                <View style={styles.selectedEventCopy}>
-                  <Text style={styles.selectedEventTitle}>{selectedEvent.title}</Text>
-                  <Text style={styles.selectedEventNote}>{selectedEvent.note}</Text>
+
+            {selectedFestivals.map((festival) => (
+              <View key={festival} style={[styles.detailRow, styles.rowDivider]}>
+                <View style={styles.festivalIcon}>
+                  <Ionicons name="flag-outline" size={19} color={palette.forest} accessible={false} />
+                </View>
+                <View style={styles.recordCopy}>
+                  <Text style={styles.recordTitle}>{festival}</Text>
+                  <Text style={styles.recordDetail}>节日与节气</Text>
                 </View>
               </View>
-            ) : (
-              <Text style={styles.emptyText}>这一天没有额外记录，留一点空白也很好。</Text>
-            )}
+            ))}
+
+            {selectedEvent ? (
+              <RecordRow event={selectedEvent} today={today} onPress={() => {}} divider={false} />
+            ) : selectedFestivals.length === 0 ? (
+              <Text style={styles.emptyText}>暂无生日或纪念日</Text>
+            ) : null}
           </View>
 
-          <View style={styles.recentSection}>
-            <View style={styles.sectionHeadingRow}>
-              <View>
-                <Text style={styles.sectionKicker}>接下来</Text>
-                <Text accessibilityRole="header" style={styles.sectionTitle}>
-                  近期重要日子
-                </Text>
-              </View>
+          <View style={styles.section}>
+            <View style={styles.listHeader}>
+              <Text accessibilityRole="header" style={styles.sectionTitle}>
+                近期重要日子
+              </Text>
               <Text style={styles.recordCount}>{events.length} 条</Text>
             </View>
             {events.map((event, index) => (
-              <Pressable
+              <RecordRow
                 key={event.id}
-                accessibilityRole="button"
-                accessibilityLabel={`${event.title}，${shortDate(event.date)}，${relativeLabel(event.date, today)}`}
+                event={event}
+                today={today}
                 onPress={() => selectDate(event.date)}
-                style={({ pressed }) => [
-                  styles.recordRow,
-                  index < events.length - 1 && styles.recordDivider,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <PhotoPlaceholder event={event} />
-                <View style={styles.recordCopy}>
-                  <Text numberOfLines={1} style={styles.recordTitle}>
-                    {event.title}
-                  </Text>
-                  <Text numberOfLines={1} style={styles.recordNote}>
-                    {event.note}
-                  </Text>
-                </View>
-                <View style={styles.recordDateBlock}>
-                  <Text style={styles.recordDate}>{shortDate(event.date)}</Text>
-                  <Text style={styles.recordRelative}>{relativeLabel(event.date, today)}</Text>
-                </View>
-              </Pressable>
+                divider={index < events.length - 1}
+              />
             ))}
           </View>
-
-          <Text style={styles.previewNote}>独立视觉预览 · 使用示例内容，不会写入你的日历</Text>
         </ScrollView>
+        <BottomNavigation />
       </View>
     </View>
   );
@@ -397,155 +484,203 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: palette.canvas,
     paddingHorizontal: 24,
-    paddingVertical: 30,
+    paddingVertical: 24,
   },
-  phone: { flex: 1, width: '100%', backgroundColor: palette.paper },
+  phone: { flex: 1, position: 'relative', width: '100%', backgroundColor: palette.paper },
   desktopPhone: {
-    maxWidth: 430,
-    borderColor: '#D5D1C8',
-    borderRadius: 30,
+    maxHeight: 860,
+    maxWidth: 420,
+    borderColor: '#D2CFC7',
+    borderRadius: 24,
     borderWidth: 1,
     overflow: 'hidden',
   },
-  scrollContent: { paddingBottom: 32 },
-  topBar: {
+  scrollContent: { paddingBottom: Platform.OS === 'web' ? 94 : 108 },
+  appBar: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 22,
-    paddingTop: Platform.OS === 'web' ? 24 : 52,
+    minHeight: 64,
+    paddingHorizontal: 18,
+    paddingTop: Platform.OS === 'web' ? 8 : 34,
   },
-  eyebrow: {
-    color: palette.muted,
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 2,
-    marginBottom: 2,
+  brandRow: { alignItems: 'center', flexDirection: 'row', gap: 9 },
+  brandMark: {
+    alignItems: 'center',
+    backgroundColor: palette.claySoft,
+    borderRadius: 10,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
   },
-  todayTitle: { color: palette.ink, fontSize: 32, fontWeight: '700', letterSpacing: -1 },
+  brandName: { color: palette.ink, fontSize: 19, fontWeight: '700', letterSpacing: 0.2 },
+  addButton: {
+    alignItems: 'center',
+    backgroundColor: palette.ink,
+    borderRadius: 12,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  todaySummary: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    minHeight: 62,
+    paddingBottom: 10,
+    paddingHorizontal: 18,
+  },
+  todayCopy: { flex: 1, minWidth: 0 },
+  todayDate: { color: palette.ink, fontSize: 18, fontWeight: '700' },
+  todayMeta: { color: palette.muted, fontSize: 13, marginTop: 4 },
   todayButton: {
     alignItems: 'center',
-    flexDirection: 'row',
-    gap: 5,
-    minHeight: 44,
-    paddingHorizontal: 2,
+    borderColor: palette.line,
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'center',
+    marginLeft: 12,
+    minHeight: 40,
+    paddingHorizontal: 14,
   },
-  todayButtonText: { color: palette.ink, fontSize: 14, fontWeight: '600' },
-  fullDate: { color: palette.ink, fontSize: 15, fontWeight: '500', marginLeft: 22, marginTop: 12 },
-  lunarToday: { color: palette.muted, fontSize: 13, marginLeft: 22, marginTop: 4 },
-  nextEvent: {
-    alignItems: 'center',
-    backgroundColor: palette.forest,
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    marginTop: 20,
-    minHeight: 92,
-    paddingHorizontal: 16,
-  },
-  nextEventDate: {
-    alignItems: 'center',
-    borderRightColor: 'rgba(255,255,255,0.26)',
-    borderRightWidth: 1,
-    paddingRight: 15,
-  },
-  nextEventDay: { color: '#FFFDF8', fontSize: 28, fontWeight: '700', lineHeight: 31 },
-  nextEventMonth: { color: '#E5EFE8', fontSize: 11, marginTop: 1 },
-  nextEventCopy: { flex: 1, paddingHorizontal: 15 },
-  nextEventLabel: { color: '#C9D9CE', fontSize: 11, fontWeight: '600', marginBottom: 5 },
-  nextEventTitle: { color: '#FFFDF8', fontSize: 18, fontWeight: '700' },
-  nextEventDistance: { alignItems: 'center', flexDirection: 'row', gap: 2 },
-  nextEventDistanceText: { color: '#FFFDF8', fontSize: 12, fontWeight: '600' },
+  todayButtonText: { color: palette.clay, fontSize: 13, fontWeight: '700' },
   calendarSection: {
     backgroundColor: palette.surface,
     borderBottomColor: palette.line,
     borderBottomWidth: 1,
     borderTopColor: palette.line,
     borderTopWidth: 1,
-    marginTop: 18,
-    paddingBottom: 13,
     paddingHorizontal: 12,
   },
   monthToolbar: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    minHeight: 58,
-    paddingHorizontal: 2,
+    minHeight: 52,
+    paddingLeft: 6,
   },
-  monthButton: { alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 44 },
-  monthTitle: { color: palette.ink, fontSize: 18, fontWeight: '700' },
+  monthTitle: { color: palette.ink, fontSize: 20, fontWeight: '700', letterSpacing: -0.3 },
+  monthActions: { alignItems: 'center', flexDirection: 'row', gap: 2 },
+  monthButton: { alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 42 },
   weekRow: { flexDirection: 'row' },
   weekday: {
     color: palette.muted,
     flex: 1,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
-    paddingBottom: 7,
+    paddingBottom: 8,
     textAlign: 'center',
   },
   weekend: { color: palette.clay },
-  dayCell: { alignItems: 'center', flex: 1, height: 58, paddingTop: 3 },
-  pressedDay: { opacity: 0.56 },
-  dayNumberWrap: { alignItems: 'center', height: 28, justifyContent: 'center', width: 28 },
-  todayRing: { borderColor: palette.clay, borderRadius: 14, borderWidth: 1 },
-  selectedDay: { backgroundColor: palette.clay, borderColor: palette.clay, borderRadius: 14 },
-  dayNumber: { color: palette.ink, fontSize: 14, fontWeight: '600' },
-  selectedDayText: { color: '#FFFFFF' },
-  dayHelper: { color: palette.faint, fontSize: 9, marginTop: 2, maxWidth: '96%' },
-  festivalHelper: { color: palette.clay, fontWeight: '600' },
-  selectedHelper: { color: palette.clay },
-  markerRow: { height: 6, justifyContent: 'flex-end', marginTop: 2 },
+  dayCell: { alignItems: 'center', flex: 1, height: 62, paddingTop: 4 },
+  dayCellPressed: { backgroundColor: '#F2EFE9', borderRadius: 12 },
+  dayNumberWrap: { alignItems: 'center', height: 31, justifyContent: 'center', width: 31 },
+  todayRing: { borderColor: palette.clay, borderRadius: 16, borderWidth: 1.5 },
+  selectedDay: { backgroundColor: palette.clay, borderRadius: 16 },
+  dayNumber: { color: palette.ink, fontSize: 16, fontWeight: '600' },
+  todayNumber: { color: palette.clay, fontWeight: '700' },
+  selectedDayText: { color: '#FFFFFF', fontWeight: '700' },
+  dayHelper: { color: palette.muted, fontSize: 10, marginTop: 2, maxWidth: '96%' },
+  festivalHelper: { color: palette.clay, fontWeight: '700' },
+  selectedHelper: { color: palette.ink, fontWeight: '600' },
+  markerRow: { alignItems: 'center', height: 7, justifyContent: 'flex-end', marginTop: 1 },
   eventDot: { borderRadius: 3, height: 5, width: 5 },
-  legend: { flexDirection: 'row', gap: 18, justifyContent: 'center', paddingTop: 7 },
-  legendItem: { alignItems: 'center', flexDirection: 'row', gap: 6 },
-  legendText: { color: palette.muted, fontSize: 10 },
-  selectedSection: { paddingHorizontal: 22, paddingTop: 23 },
-  sectionHeadingRow: { alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'space-between' },
-  sectionKicker: { color: palette.muted, fontSize: 11, fontWeight: '600', marginBottom: 4 },
-  sectionTitle: { color: palette.ink, fontSize: 21, fontWeight: '700', letterSpacing: -0.3 },
-  selectedRelative: { color: palette.clay, fontSize: 13, fontWeight: '600', paddingBottom: 2 },
-  selectedMeta: { color: palette.muted, fontSize: 12, marginTop: 7 },
-  selectedEventRow: {
-    alignItems: 'center',
-    borderBottomColor: palette.line,
-    borderBottomWidth: 1,
+  birthdayDot: { backgroundColor: palette.clay },
+  memoryDot: { backgroundColor: palette.forest },
+  calendarLegend: {
     flexDirection: 'row',
-    paddingVertical: 16,
+    gap: 18,
+    justifyContent: 'center',
+    minHeight: 30,
+    paddingTop: 5,
   },
-  selectedEventCopy: { flex: 1, marginLeft: 13 },
-  selectedEventTitle: { color: palette.ink, fontSize: 16, fontWeight: '700' },
-  selectedEventNote: { color: palette.muted, fontSize: 12, marginTop: 5 },
+  legendItem: { alignItems: 'center', flexDirection: 'row', gap: 6 },
+  legendText: { color: palette.muted, fontSize: 11 },
+  nextRow: {
+    alignItems: 'center',
+    borderTopColor: palette.line,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    minHeight: 76,
+    paddingHorizontal: 6,
+  },
+  nextAccent: { backgroundColor: palette.forest, borderRadius: 2, height: 30, marginRight: 10, width: 3 },
+  nextCopy: { flex: 1, marginLeft: 11, minWidth: 0 },
+  nextLabel: { color: palette.muted, fontSize: 11, fontWeight: '600' },
+  nextTitle: { color: palette.ink, fontSize: 15, fontWeight: '700', marginTop: 3 },
+  nextDateBlock: { alignItems: 'flex-end', marginLeft: 8, marginRight: 4 },
+  nextDate: { color: palette.ink, fontSize: 12, fontWeight: '600' },
+  nextRelative: { color: palette.forest, fontSize: 11, fontWeight: '600', marginTop: 3 },
+  eventThumb: {
+    alignItems: 'center',
+    borderRadius: 12,
+    height: 46,
+    justifyContent: 'center',
+    width: 46,
+  },
+  eventThumbCompact: { borderRadius: 10, height: 38, width: 38 },
+  birthdayThumb: { backgroundColor: palette.claySoft },
+  memoryThumb: { backgroundColor: palette.forestSoft },
+  avatarText: { color: palette.clay, fontSize: 16, fontWeight: '700' },
+  section: { paddingHorizontal: 18, paddingTop: 22 },
+  sectionHeader: { alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'space-between' },
+  sectionLabel: { color: palette.muted, fontSize: 12, fontWeight: '600', marginBottom: 3 },
+  sectionTitle: { color: palette.ink, fontSize: 20, fontWeight: '700', letterSpacing: -0.2 },
+  selectedMetaBlock: { alignItems: 'flex-end', paddingBottom: 1 },
+  selectedRelative: { color: palette.clay, fontSize: 12, fontWeight: '700' },
+  selectedLunar: { color: palette.muted, fontSize: 11, marginTop: 3 },
+  detailRow: { alignItems: 'center', flexDirection: 'row', minHeight: 68 },
+  festivalIcon: {
+    alignItems: 'center',
+    backgroundColor: palette.forestSoft,
+    borderRadius: 11,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
+  },
   emptyText: {
     borderBottomColor: palette.line,
     borderBottomWidth: 1,
     color: palette.muted,
-    fontSize: 13,
-    lineHeight: 21,
-    paddingVertical: 16,
+    fontSize: 14,
+    paddingVertical: 18,
   },
-  photoPlaceholder: {
+  listHeader: {
     alignItems: 'center',
-    height: 54,
-    justifyContent: 'center',
-    width: 54,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 3,
   },
-  photoPlaceholderText: { fontSize: 8, fontWeight: '600', marginTop: 1 },
-  recentSection: { paddingHorizontal: 22, paddingTop: 25 },
-  recordCount: { color: palette.muted, fontSize: 12, paddingBottom: 2 },
-  recordRow: { alignItems: 'center', flexDirection: 'row', minHeight: 82, paddingVertical: 13 },
-  recordDivider: { borderBottomColor: palette.line, borderBottomWidth: 1 },
-  recordCopy: { flex: 1, marginLeft: 13, minWidth: 0 },
+  recordCount: { color: palette.muted, fontSize: 12 },
+  recordRow: { alignItems: 'center', flexDirection: 'row', minHeight: 74, paddingVertical: 12 },
+  rowDivider: { borderBottomColor: palette.line, borderBottomWidth: 1 },
+  recordCopy: { flex: 1, marginLeft: 12, minWidth: 0 },
   recordTitle: { color: palette.ink, fontSize: 15, fontWeight: '700' },
-  recordNote: { color: palette.muted, fontSize: 11, marginTop: 5 },
-  recordDateBlock: { alignItems: 'flex-end', marginLeft: 8 },
+  recordDetail: { color: palette.muted, fontSize: 12, marginTop: 4 },
+  recordDateBlock: { alignItems: 'flex-end', marginLeft: 8, marginRight: 5 },
   recordDate: { color: palette.ink, fontSize: 12, fontWeight: '600' },
-  recordRelative: { color: palette.clay, fontSize: 10, marginTop: 5 },
-  previewNote: {
-    color: palette.faint,
-    fontSize: 10,
-    marginHorizontal: 22,
-    marginTop: 20,
-    textAlign: 'center',
+  recordRelative: { color: palette.clay, fontSize: 11, fontWeight: '600', marginTop: 4 },
+  bottomNavigation: {
+    backgroundColor: palette.surface,
+    borderTopColor: palette.line,
+    borderTopWidth: 1,
+    bottom: 0,
+    flexDirection: 'row',
+    height: Platform.OS === 'web' ? 72 : 86,
+    left: 0,
+    paddingBottom: Platform.OS === 'web' ? 4 : 15,
+    position: 'absolute',
+    right: 0,
   },
-  pressed: { opacity: 0.66 },
+  navItem: { alignItems: 'center', flex: 1, justifyContent: 'center', position: 'relative' },
+  navLabel: { color: palette.muted, fontSize: 11, fontWeight: '600', marginTop: 4 },
+  navLabelSelected: { color: palette.clay, fontWeight: '700' },
+  navIndicator: {
+    backgroundColor: palette.clay,
+    borderRadius: 2,
+    height: 3,
+    position: 'absolute',
+    top: 0,
+    width: 24,
+  },
+  rowPressed: { opacity: 0.58 },
 });

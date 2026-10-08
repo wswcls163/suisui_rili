@@ -181,5 +181,6 @@ test("首页视觉预览与正式导航及数据模块保持隔离", async () =>
   assert.match(route, /DesignPreviewHome/);
   assert.doesNotMatch(navigation, /design-preview/);
   assert.doesNotMatch(preview, /state\/|data\/|sync\/|notifications\/|auth\//);
-  assert.match(preview, /使用示例内容，不会写入你的日历/);
+  assert.match(preview, /BottomNavigation/);
+  assert.doesNotMatch(preview, /照片占位|独立视觉预览|留一点空白/);
 });

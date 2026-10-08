@@ -77,7 +77,7 @@ mobile/
 
 “日历”和“生日簿”读取同一份生日状态，“时光记”读取独立的时光记集合。选中日期、浏览月份与真实今天分别保存；同一个 `TodayWatcher` 在跨午夜和恢复前台时刷新节日与生日提醒、累计天数和周年倒计时。新增类型通过简单的事项类型目录展示，未开放类型在界面和业务入口都不能提交。
 
-独立视觉评审路由 `app/design-preview.tsx` 只组装 `src/components/design-preview/DesignPreviewHome.tsx`。组件内部持有月份与选中日期状态，示例记录只在内存中生成；它可以读取 `core/dates.ts`、`core/calendar.ts` 和 `core/festivals.ts` 的纯计算结果，但不得引用仓库、应用状态、认证、同步或通知模块。该路由不加入 `NavigationDrawer`，从结构上避免评审页面被误认为正式功能或写入用户数据。
+独立视觉评审路由 `app/design-preview.tsx` 只组装 `src/components/design-preview/DesignPreviewHome.tsx`。组件内部持有月份与选中日期状态，示例记录只在内存中生成；它可以读取 `core/dates.ts`、`core/calendar.ts` 和 `core/festivals.ts` 的纯计算结果，但不得引用仓库、应用状态、认证、同步或通知模块。该路由不加入 `NavigationDrawer`，从结构上避免评审页面被误认为正式功能或写入用户数据。预览内的固定底部导航只将“日历”标记为当前项，其他标签处于未启用状态，不注册 Expo Router 跳转；ScrollView 内容底部预留大于导航高度的空间，防止最后一条记录被吸底导航遮挡。
 
 时光记继续使用兼容标识 `type: 'countup'`，保存标题、`YYYY-MM-DD` 开始日期、可选备注和 `displayMode`。`days` 的显示序号为 `today - startDate + 1`，因此开始当天为第 1 天；`anniversary` 根据开始月日计算已满周年和下一周年，2 月 29 日在平年回退到 2 月 28 日。开始日在未来时，两种方式都展示距离开始的自然日数。纯计算位于 `core/countup.ts`，不依赖界面或存储。
 
