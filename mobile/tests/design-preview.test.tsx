@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { DesignPreviewHome } from '../src/components/design-preview/DesignPreviewHome';
-import { defaultDesignPreviewTheme } from '../src/components/design-preview/designPreviewTheme';
+import { defaultHomeTheme } from '../src/components/home/homeTheme';
 
 describe('独立首页视觉预览', () => {
   test('完整月历后紧接分组事项流，并保留固定导航和新增入口', () => {
@@ -31,8 +31,8 @@ describe('独立首页视觉预览', () => {
   test('页面消费可替换主题 token，选中日期不依赖组件硬编码颜色', () => {
     const selected = '#123456';
     const theme = {
-      ...defaultDesignPreviewTheme,
-      colors: { ...defaultDesignPreviewTheme.colors, selected },
+      ...defaultHomeTheme,
+      colors: { ...defaultHomeTheme.colors, selected },
     };
     render(<DesignPreviewHome today="2026-10-08" theme={theme} />);
 

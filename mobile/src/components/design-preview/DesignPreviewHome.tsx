@@ -13,7 +13,10 @@ import {
   shiftMonth,
 } from '../../core/dates';
 import { festivalsOn } from '../../core/festivals';
-import { defaultDesignPreviewTheme, type DesignPreviewTheme } from './designPreviewTheme';
+import { defaultHomeTheme, type HomeTheme } from '../home/homeTheme';
+
+type DesignPreviewTheme = HomeTheme;
+const defaultDesignPreviewTheme = defaultHomeTheme;
 
 type PreviewEventKind = 'birthday' | 'memory';
 type TimelineKind = PreviewEventKind | 'festival';
@@ -498,7 +501,7 @@ function createStyles(theme: DesignPreviewTheme) {
     phone: { flex: 1, position: 'relative', width: '100%', backgroundColor: colors.surface },
     desktopPhone: {
       maxHeight: 860,
-      maxWidth: size.desktopCanvas,
+      maxWidth: size.previewCanvas,
       borderColor: colors.border,
       borderRadius: radius.md,
       borderWidth: 1,

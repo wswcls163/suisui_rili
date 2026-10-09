@@ -1,4 +1,4 @@
-export type DesignPreviewTheme = {
+export type HomeTheme = {
   colors: {
     backdrop: string;
     background: string;
@@ -19,12 +19,15 @@ export type DesignPreviewTheme = {
     festivalSoft: string;
     memory: string;
     memorySoft: string;
+    success: string;
+    error: string;
     navInactive: string;
     pressed: string;
   };
   typography: {
     appTitle: number;
     monthTitle: number;
+    pageTitle: number;
     sectionTitle: number;
     dayNumber: number;
     body: number;
@@ -47,6 +50,7 @@ export type DesignPreviewTheme = {
   radius: {
     sm: number;
     md: number;
+    lg: number;
     round: number;
   };
   size: {
@@ -56,11 +60,12 @@ export type DesignPreviewTheme = {
     eventIcon: number;
     bottomNavigation: number;
     addButton: number;
-    desktopCanvas: number;
+    previewCanvas: number;
+    homeCanvas: number;
   };
 };
 
-export const defaultDesignPreviewTheme: DesignPreviewTheme = {
+export const defaultHomeTheme: HomeTheme = {
   colors: {
     backdrop: '#E9E8E4',
     background: '#F7F7F5',
@@ -81,12 +86,15 @@ export const defaultDesignPreviewTheme: DesignPreviewTheme = {
     festivalSoft: '#FBF0D8',
     memory: '#45A36F',
     memorySoft: '#E3F2E9',
+    success: '#4D765E',
+    error: '#B13D38',
     navInactive: '#71787A',
     pressed: '#ECEFEC',
   },
   typography: {
     appTitle: 17,
     monthTitle: 26,
+    pageTitle: 22,
     sectionTitle: 13,
     dayNumber: 15,
     body: 15,
@@ -109,6 +117,7 @@ export const defaultDesignPreviewTheme: DesignPreviewTheme = {
   radius: {
     sm: 8,
     md: 13,
+    lg: 18,
     round: 999,
   },
   size: {
@@ -118,6 +127,7 @@ export const defaultDesignPreviewTheme: DesignPreviewTheme = {
     eventIcon: 34,
     bottomNavigation: 68,
     addButton: 50,
-    desktopCanvas: 420,
+    previewCanvas: 420,
+    homeCanvas: 620,
   },
 };

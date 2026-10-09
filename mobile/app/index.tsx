@@ -9,38 +9,32 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useBirthdays } from '../src/state/AppProvider';
-import {
-  adjustmentText,
-  birthdayAgeText,
-  birthdayTitle,
-  birthdayDates,
-  occurrenceLabel,
-  entriesForMonth,
-  type BirthdayRow,
-} from '../src/core/birthday';
-import { lunarCalendar, lunarLabel } from '../src/core/calendar';
-import { festivalsOn } from '../src/core/festivals';
-import { chineseFullDate, dayNumber, supported } from '../src/core/dates';
-import { anniversaryProgress, timeNoteProgressText, type Countup } from '../src/core/countup';
-import { importantDateTitle } from '../src/core/notification';
-import { MonthCalendar } from '../src/components/MonthCalendar';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { DateCalculatorDialog } from '../src/components/DateCalculatorDialog';
-import { Avatar, Button, colors, common, Icon } from '../src/components/ui';
+import { HomeBottomNavigation } from '../src/components/home/HomeBottomNavigation';
+import { HomeCalendarTimeline } from '../src/components/home/HomeCalendarTimeline';
+import { BirthdayBook, CountupBook } from '../src/components/home/HomeRecordList';
+import type { HomeSection } from '../src/components/home/homeNavigation';
+import { defaultHomeTheme, type HomeTheme } from '../src/components/home/homeTheme';
+import { MonthCalendar } from '../src/components/MonthCalendar';
+import { Icon } from '../src/components/ui';
+import { entriesForMonth } from '../src/core/birthday';
+import { lunarCalendar, lunarLabel } from '../src/core/calendar';
+import { chineseFullDate, monthStart, supported } from '../src/core/dates';
 import { storageDescription } from '../src/data/repository';
+import { useBirthdays } from '../src/state/AppProvider';
 import { useAuth } from '../src/state/AuthProvider';
-import { useAccountSync } from '../src/state/SyncProvider';
-import { NavigationDrawer, type HomeSection } from '../src/components/NavigationDrawer';
 
 type HomeTab = HomeSection;
 const PHONE_PREVIEW_WIDTH = 443;
+const theme = defaultHomeTheme;
+const styles = createStyles(theme);
 
-const tabCopy: Record<HomeTab, { eyebrow: string; title: string }> = {
-  calendar: { eyebrow: '记住每一个重要的日子', title: '我的日历' },
-  book: { eyebrow: '把牵挂放在心上', title: '生日簿' },
-  countup: { eyebrow: '看见时间留下痕迹', title: '时光记' },
+const tabTitle: Record<HomeTab, string> = {
+  calendar: '我的日历',
+  book: '生日簿',
+  countup: '时光记',
 };
 
 export function homeLayoutWidth(width: number, platform: string, search: string) {
@@ -56,155 +50,66 @@ export function homeTabFromParam(value: string | string[] | undefined): HomeTab 
   return candidate === 'book' || candidate === 'countup' ? candidate : 'calendar';
 }
 
-function PersonRow({ row }: { row: BirthdayRow }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`查看${birthdayTitle(row.person.name)}${
-        row.next && birthdayAgeText(row.person, row.next) ? `，${birthdayAgeText(row.person, row.next)}` : ''
-      }`}
-      onPress={() => router.push({ pathname: '/birthday/[id]', params: { id: row.person.id } })}
-      style={({ pressed }) => [styles.person, pressed && { backgroundColor: '#FAF8F4' }]}
-    >
-      <Avatar name={row.person.name} id={row.person.id} />
-      <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-        <Text style={styles.personName}>{birthdayTitle(row.person.name)}</Text>
-        <Text style={common.muted}>{birthdayDates(row.person)}</Text>
-        {row.next && (
-          <Text style={common.muted}>
-            下次 · {occurrenceLabel(row.next)}
-            {birthdayAgeText(row.person, row.next) ? ` · ${birthdayAgeText(row.person, row.next)}` : ''}
-          </Text>
-        )}
-      </View>
-      <View style={{ alignItems: 'flex-end', gap: 4 }}>
-        <Text style={[styles.remaining, row.remaining === 0 && { color: colors.accent }]}>
-          {row.remaining === null ? '超出支持范围' : row.remaining === 0 ? '今天' : `${row.remaining} 天后`}
-        </Text>
-        <Text style={common.muted}>{row.next?.solar.replaceAll('-', '.')}</Text>
-      </View>
-      <Icon name="chevron-forward" size={16} color="#9BA19B" />
-    </Pressable>
-  );
+export function accountInitial(email: string | undefined): string {
+  return email ? (Array.from(email.trim())[0]?.toUpperCase() ?? '') : '';
 }
 
-function CountupRow({ item, today }: { item: Countup; today: string }) {
-  const progressText = timeNoteProgressText(item, today);
-  const anniversary = item.displayMode === 'anniversary' ? anniversaryProgress(item.startDate, today) : null;
-  const listText =
-    anniversary?.phase === 'active' &&
-    !anniversary.isAnniversary &&
-    anniversary.nextYears !== null &&
-    anniversary.remaining !== null
-      ? `距 ${anniversary.nextYears} 周年\n${anniversary.remaining} 天`
-      : progressText;
+function AppHeader({ tab, email, onAccount }: { tab: HomeTab; email?: string; onAccount: () => void }) {
+  const initial = accountInitial(email);
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`查看时光记${item.title}，${progressText}`}
-      onPress={() => router.push({ pathname: '/countup/[id]', params: { id: item.id } })}
-      style={({ pressed }) => [styles.person, pressed && { backgroundColor: '#FAF8F4' }]}
-    >
-      <View style={styles.countupIcon}>
-        <Icon name="sparkles-outline" size={21} color={colors.accent} />
-      </View>
-      <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-        <Text style={styles.personName}>{item.title}</Text>
-        <Text style={common.muted}>
-          {item.displayMode === 'anniversary' ? '每年纪念' : '记录天数'} · 从{' '}
-          {item.startDate.replaceAll('-', '.')} 开始
-        </Text>
-        {!!item.note && (
-          <Text numberOfLines={1} style={common.muted}>
-            {item.note}
+    <View style={styles.appBar}>
+      <View style={styles.brandRow}>
+        <View style={styles.brandMark}>
+          <Icon name="calendar" size={18} color={theme.colors.accent} />
+        </View>
+        <View>
+          <Text style={styles.brandName}>岁岁日历</Text>
+          <Text accessibilityRole={tab === 'calendar' ? 'header' : undefined} style={styles.sectionName}>
+            {tabTitle[tab]}
           </Text>
-        )}
+        </View>
       </View>
-      <Text style={styles.countupNumber}>{listText}</Text>
-      <Icon name="chevron-forward" size={16} color="#9BA19B" />
-    </Pressable>
-  );
-}
-
-function TodayReminder({
-  rows,
-  peopleCount,
-  festivals,
-  compact,
-}: {
-  rows: BirthdayRow[];
-  peopleCount: number;
-  festivals: string[];
-  compact: boolean;
-}) {
-  const hasBirthdays = rows.length > 0;
-  const hasFestivals = festivals.length > 0;
-  const hasReminder = hasBirthdays || hasFestivals;
-  const heading = hasReminder
-    ? importantDateTitle([...festivals, ...rows.map((row) => birthdayTitle(row.person.name))])
-    : '今天没有重要日期提醒';
-  const icon = hasFestivals ? (hasBirthdays ? 'notifications-outline' : 'flag-outline') : 'gift-outline';
-  return (
-    <View
-      testID="today-reminder"
-      style={[
-        styles.reminder,
-        compact && styles.reminderNarrow,
-        hasReminder && { backgroundColor: colors.ink, borderColor: colors.ink },
-      ]}
-    >
-      <View
-        style={[
-          styles.reminderIcon,
-          compact && styles.reminderIconNarrow,
-          hasReminder && { backgroundColor: '#465052' },
-        ]}
+      <Pressable
+        testID="首页账号入口"
+        accessibilityRole="button"
+        accessibilityLabel={email ? `账号：${email}` : '我的账号'}
+        accessibilityHint="打开账号与同步"
+        onPress={onAccount}
+        style={({ pressed }) => [styles.accountButton, pressed && styles.pressed]}
       >
-        <Icon name={icon} size={24} color={hasReminder ? '#EDBEA6' : colors.accent} />
-      </View>
-      <View style={{ flex: 1, gap: 7 }}>
-        <Text
-          style={[
-            common.heading,
-            { fontSize: 17 },
-            compact && styles.reminderHeadingNarrow,
-            hasReminder && { color: '#FFF' },
-          ]}
-        >
-          {heading}
-        </Text>
-        {hasFestivals && (
-          <Text style={{ fontSize: 13, lineHeight: 22, color: '#EBE7E1' }}>
-            节日与节气 · {festivals.join('、')}
-          </Text>
+        {initial ? (
+          <Text style={styles.accountInitial}>{initial}</Text>
+        ) : (
+          <Icon name="person-outline" size={20} color={theme.colors.textSecondary} />
         )}
-        {hasBirthdays ? (
-          rows.map(({ person, next }) => (
-            <Pressable
-              key={person.id}
-              accessibilityRole="button"
-              accessibilityLabel={`今天：${birthdayTitle(person.name)}${
-                next && birthdayAgeText(person, next) ? `，${birthdayAgeText(person, next)}` : ''
-              }`}
-              onPress={() => router.push({ pathname: '/birthday/[id]', params: { id: person.id } })}
-            >
-              <Text style={{ fontSize: 13, lineHeight: 22, color: '#EBE7E1' }}>
-                {birthdayTitle(person.name)} · {birthdayDates(person, next?.kinds)}
-                {next && birthdayAgeText(person, next) ? ` · ${birthdayAgeText(person, next)}` : ''}
-                {next?.kinds.length === 2 ? '（农历与阳历生日同一天）' : ''}
-                {next?.adjustments
-                  .map((code) => `（${adjustmentText(code, person.lunar?.month ?? 0)}）`)
-                  .join('')}
-                　›
-              </Text>
-            </Pressable>
-          ))
-        ) : !hasFestivals ? (
-          <Text style={common.muted}>
-            {peopleCount ? '重要的日子，都好好记着。' : '从一个生日开始，把牵挂记在这里。'}
-          </Text>
-        ) : null}
+      </Pressable>
+    </View>
+  );
+}
+
+function DateSummary({ today, onCalculate }: { today: string; onCalculate: () => void }) {
+  const lunar = supported(today) ? lunarCalendar.lunarOn(today) : null;
+  const lunarText = lunar ? `农历${lunarLabel(lunar)}` : '设备日期超出历法支持范围';
+  return (
+    <View testID="日历次级工具栏" style={styles.dateSummary}>
+      <View style={styles.dateSummaryTop}>
+        <Text
+          accessibilityLabel={`今天，${chineseFullDate(today)}，${lunarText}，北京时间`}
+          style={styles.todayDate}
+        >
+          今天 {chineseFullDate(today)}
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="日期计算"
+          onPress={onCalculate}
+          style={({ pressed }) => [styles.calculatorButton, pressed && styles.pressed]}
+        >
+          <Icon name="calculator-outline" size={15} color={theme.colors.textSecondary} />
+          <Text style={styles.calculatorButtonText}>日期计算</Text>
+        </Pressable>
       </View>
+      <Text style={styles.todayLunar}>{lunarText} · 北京时间</Text>
     </View>
   );
 }
@@ -212,504 +117,310 @@ function TodayReminder({
 export default function Home() {
   const state = useBirthdays();
   const auth = useAuth();
-  const sync = useAccountSync();
   const params = useLocalSearchParams<{ tab?: string | string[]; tool?: string | string[] }>();
   const { width } = useWindowDimensions();
   const previewSearch = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.search : '';
   const layoutWidth = homeLayoutWidth(width, Platform.OS, previewSearch);
   const phonePreview = layoutWidth !== width;
-  const wide = layoutWidth >= 900;
-  const narrow = layoutWidth < 600;
-  const veryNarrow = layoutWidth < 360;
+  const shellWidth = phonePreview ? layoutWidth : width >= 700 ? theme.size.homeCanvas : layoutWidth;
   const [tab, setTab] = useState<HomeTab>(() => homeTabFromParam(params.tab));
   const [calculatingDate, setCalculatingDate] = useState(
     () => (Array.isArray(params.tool) ? params.tool[0] : params.tool) === 'calculator',
   );
+
   useFocusEffect(state.refreshToday);
   const entries = useMemo(
     () => entriesForMonth(lunarCalendar, state.people, state.month),
-    [state.people, state.month],
+    [state.month, state.people],
   );
-  const selected = entries.filter((entry) => entry.occurrence.solar === state.selectedDate);
-  const selectedLunar = lunarCalendar.lunarOn(state.selectedDate);
-  const selectedFestivals = festivalsOn(state.selectedDate);
-  const selectedDistance = dayNumber(state.selectedDate) - dayNumber(state.today);
-  const todayFestivals = supported(state.today) ? festivalsOn(state.today) : [];
+  const todayEntries = useMemo(
+    () => entriesForMonth(lunarCalendar, state.people, monthStart(state.today)),
+    [state.people, state.today],
+  );
+  const orderedCountups = useMemo(() => state.countupRows.map(({ item }) => item), [state.countupRows]);
+
   const create = () => router.push('/new');
+  const openBirthday = (id: string) => router.push({ pathname: '/birthday/[id]', params: { id } });
+  const openMemory = (id: string) => router.push({ pathname: '/countup/[id]', params: { id } });
+  const selectTab = (next: HomeTab) => {
+    setTab(next);
+    state.refreshToday();
+  };
+  const returnToday = () => {
+    setTab('calendar');
+    state.selectDate(state.today);
+    state.refreshToday();
+  };
+  const accountParams = {
+    section: 'account',
+    ...(phonePreview ? { preview: 'phone' } : {}),
+  };
+  const openAccount = () => router.push({ pathname: '/account', params: accountParams });
+
   return (
-    <SafeAreaView style={common.page}>
-      <ScrollView
-        contentContainerStyle={[
-          common.content,
-          narrow && styles.mobileContent,
-          phonePreview && { maxWidth: layoutWidth },
-        ]}
-      >
-        <View style={[common.between, !narrow && { marginBottom: 6 }]}>
-          <View style={common.row}>
-            <NavigationDrawer
-              active={tab}
-              birthdayCount={state.people.length}
-              countupCount={state.countups.length}
-              phonePreview={phonePreview}
-              onSelectHomeSection={(section) => {
-                setTab(section);
-                state.refreshToday();
-              }}
-              onOpenDateCalculator={() => {
-                setTab('calendar');
-                setCalculatingDate(true);
-              }}
-            />
-            <View style={[styles.brandIcon, narrow && styles.brandIconNarrow]}>
-              <Icon name="calendar-outline" color="#FFF" size={23} />
-            </View>
-            <View>
-              <Text style={[styles.brand, narrow && styles.brandNarrow]}>岁岁日历</Text>
-              <Text style={[common.eyebrow, { fontSize: 8, marginTop: 4 }]}>SUISUI CALENDAR</Text>
-            </View>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="账号与同步"
-            onPress={() =>
-              router.push({
-                pathname: '/account',
-                params: { section: 'account', ...(phonePreview ? { preview: 'phone' } : {}) },
-              })
-            }
-            style={({ pressed }) => [styles.localChip, pressed && { opacity: 0.68 }]}
-          >
-            <Icon
-              name={auth.session ? 'cloud-done-outline' : 'person-outline'}
-              size={15}
-              color={sync.status === 'error' ? colors.error : colors.green}
-            />
-            <Text style={{ fontSize: 11, color: sync.status === 'error' ? colors.error : colors.green }}>
-              {auth.status === 'unconfigured'
-                ? '本地使用'
-                : !auth.session
-                  ? '登录'
-                  : sync.status === 'syncing'
-                    ? '同步中'
-                    : sync.status === 'error'
-                      ? '同步失败'
-                      : sync.status === 'conflict'
-                        ? '待处理'
-                        : '已登录'}
-            </Text>
-          </Pressable>
-        </View>
-        <View style={[common.between, styles.pageIntro, narrow && styles.pageIntroNarrow]}>
-          <View>
-            <Text style={common.eyebrow}>{tabCopy[tab].eyebrow}</Text>
-            <Text
-              accessibilityRole="header"
-              style={[common.title, { marginTop: narrow ? 4 : 8 }, narrow && styles.pageTitleNarrow]}
+    <SafeAreaView style={styles.stage}>
+      <View style={[styles.shell, { maxWidth: shellWidth }]}>
+        <AppHeader tab={tab} email={auth.session?.email} onAccount={openAccount} />
+
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {state.notice ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="关闭提示"
+              onPress={() => state.setNotice('')}
+              style={({ pressed }) => [styles.notice, pressed && styles.pressed]}
             >
-              {tabCopy[tab].title}
-            </Text>
-          </View>
-          <View accessibilityRole="tablist" style={[styles.tabs, narrow && styles.tabsNarrow]}>
-            {(
-              [
-                { key: 'calendar', label: '日历', icon: 'calendar-outline' },
-                { key: 'book', label: `生日簿 ${state.people.length}`, icon: 'book-outline' },
-                { key: 'countup', label: `时光记 ${state.countups.length}`, icon: 'sparkles-outline' },
-              ] as const
-            ).map((item) => (
-              <Pressable
-                accessibilityRole="tab"
-                accessibilityState={{ selected: tab === item.key }}
-                accessibilityLabel={item.label}
-                key={item.key}
-                onPress={() => {
-                  setTab(item.key);
-                  state.refreshToday();
-                }}
-                style={[styles.tab, narrow && styles.tabNarrow, tab === item.key && styles.activeTab]}
-              >
-                <Icon name={item.icon} color={tab === item.key ? colors.accent : colors.muted} size={16} />
-                <Text
-                  style={{
-                    color: tab === item.key ? colors.accent : colors.muted,
-                    fontSize: 14,
-                    fontWeight: '500',
-                  }}
-                >
-                  {item.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-        {state.status === 'loading' ? (
-          <View style={styles.loading}>
-            <ActivityIndicator color={colors.accent} />
-            <Text style={common.muted}>正在读取事项…</Text>
-          </View>
-        ) : state.status === 'error' ? (
-          <View style={[common.card, { gap: 14 }]}>
-            <Text style={common.heading}>暂时无法读取事项</Text>
-            <Text accessibilityRole="alert" style={common.error}>
-              {state.error}
-            </Text>
-            <Text style={common.muted}>现有数据不会被重置。请重试，或检查设备存储是否可用。</Text>
-            <Button label="重新读取" onPress={() => void state.reload()} />
-          </View>
-        ) : (
-          <>
-            {!!state.notice && (
+              <Text accessibilityLiveRegion="polite" style={styles.noticeText}>
+                {state.notice}
+              </Text>
+              <Icon name="close" size={16} color={theme.colors.success} />
+            </Pressable>
+          ) : null}
+
+          {state.status === 'loading' ? (
+            <View style={styles.feedback}>
+              <ActivityIndicator color={theme.colors.accent} />
+              <Text style={styles.feedbackText}>正在读取事项…</Text>
+            </View>
+          ) : state.status === 'error' ? (
+            <View style={styles.feedback}>
+              <Text style={styles.feedbackTitle}>暂时无法读取事项</Text>
+              <Text accessibilityRole="alert" style={styles.errorText}>
+                {state.error}
+              </Text>
+              <Text style={styles.feedbackText}>现有数据不会被重置，请检查设备存储后重试。</Text>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="关闭提示"
-                onPress={() => state.setNotice('')}
-                style={styles.notice}
+                accessibilityLabel="重新读取"
+                onPress={() => void state.reload()}
+                style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
               >
-                <Text accessibilityLiveRegion="polite" style={{ flex: 1, color: colors.green, fontSize: 14 }}>
-                  {state.notice}
-                </Text>
-                <Icon name="close" size={16} color={colors.green} />
+                <Text style={styles.retryText}>重新读取</Text>
               </Pressable>
-            )}
-            {tab === 'calendar' ? (
-              <View style={styles.section}>
-                <View style={[styles.calendarToolbar, veryNarrow && styles.calendarToolbarVeryNarrow]}>
-                  <View
-                    accessible
-                    accessibilityLabel={`今天，${chineseFullDate(state.today)}，${
-                      supported(state.today)
-                        ? `农历${lunarLabel(lunarCalendar.lunarOn(state.today))}`
-                        : '设备日期超出历法支持范围'
-                    }，北京时间`}
-                    style={styles.todayText}
-                  >
-                    <Text style={styles.todayDate}>今天 {chineseFullDate(state.today)}</Text>
-                    <Text style={common.muted}>
-                      {supported(state.today)
-                        ? `农历${lunarLabel(lunarCalendar.lunarOn(state.today))}`
-                        : '设备日期超出历法支持范围'}{' '}
-                      · 北京时间
-                    </Text>
-                  </View>
-                  <Button
-                    label="日期计算"
-                    icon="calculator-outline"
-                    variant="secondary"
-                    onPress={() => setCalculatingDate(true)}
-                  />
-                </View>
-                <View style={[styles.workspace, { flexDirection: wide ? 'row' : 'column' }]}>
-                  <View style={wide ? { flex: 2.25 } : undefined}>
-                    <MonthCalendar
-                      month={state.month}
-                      today={state.today}
-                      selected={state.selectedDate}
-                      entries={entries}
-                      onSelect={state.selectDate}
-                      onMonth={state.viewMonth}
-                      onToday={() => state.selectDate(state.today)}
-                      compact={narrow}
-                    />
-                  </View>
-                  {!wide && (
-                    <TodayReminder
-                      rows={state.todayRows}
-                      peopleCount={state.people.length}
-                      festivals={todayFestivals}
-                      compact={narrow}
-                    />
-                  )}
-                  <View style={[common.card, styles.selectedDayCard, wide && { flex: 1 }]}>
-                    <View style={common.between}>
-                      <View style={{ gap: 6 }}>
-                        <Text style={common.eyebrow}>
-                          {state.selectedDate === state.today ? '今天' : '所选日期'}
-                        </Text>
-                        <Text style={common.title}>
-                          {Number(state.selectedDate.slice(5, 7))} 月 {Number(state.selectedDate.slice(8))} 日
-                        </Text>
-                        <Text style={common.muted}>
-                          {selectedLunar.year} 农历年 · {lunarLabel(selectedLunar)}
-                        </Text>
-                        {selectedDistance > 0 && (
-                          <Text style={styles.futureDistance}>距离今天还有 {selectedDistance} 天</Text>
-                        )}
-                      </View>
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={`在 ${state.selectedDate} 新建事项`}
-                        onPress={create}
-                        style={styles.add}
-                      >
-                        <Icon name="add" color="#FFF" size={26} />
-                      </Pressable>
-                    </View>
-                    {selectedFestivals.length > 0 && (
-                      <View style={[common.row, { flexWrap: 'wrap' }]}>
-                        {selectedFestivals.map((name) => (
-                          <View key={name} style={styles.festivalTag}>
-                            <Text style={{ color: colors.accent, fontSize: 13, fontWeight: '600' }}>
-                              {name}
-                            </Text>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                    <View style={{ height: 1, backgroundColor: colors.line }} />
-                    <Text style={[common.heading, { fontSize: 14 }]}>
-                      这一天的事项　<Text style={{ color: colors.muted }}>{selected.length}</Text>
-                    </Text>
-                    {selected.length ? (
-                      selected.map(({ id, person, occurrence }) => (
-                        <Pressable
-                          key={id}
-                          accessibilityRole="button"
-                          accessibilityLabel={`查看${birthdayTitle(person.name)}详情${
-                            birthdayAgeText(person, occurrence)
-                              ? `，${birthdayAgeText(person, occurrence)}`
-                              : ''
-                          }`}
-                          onPress={() =>
-                            router.push({ pathname: '/birthday/[id]', params: { id: person.id } })
-                          }
-                          style={[common.row, { alignItems: 'flex-start' }]}
-                        >
-                          <Avatar name={person.name} id={person.id} size={38} />
-                          <View style={{ flex: 1, gap: 5 }}>
-                            <Text style={styles.personName}>{birthdayTitle(person.name)}</Text>
-                            <Text style={common.muted}>
-                              {birthdayDates(person, occurrence.kinds)}
-                              {birthdayAgeText(person, occurrence)
-                                ? ` · ${birthdayAgeText(person, occurrence)}`
-                                : ''}
-                            </Text>
-                            {occurrence.kinds.length === 2 && (
-                              <Text style={[common.muted, { color: colors.green }]}>
-                                农历与阳历生日 · 同一天
-                              </Text>
-                            )}
-                            {occurrence.adjustments.map((code) => (
-                              <Text key={code} style={[common.muted, { color: colors.accent }]}>
-                                {adjustmentText(code, person.lunar?.month ?? 0)}
-                              </Text>
-                            ))}
-                          </View>
-                          <Icon name="chevron-forward" size={16} color={colors.muted} />
-                        </Pressable>
-                      ))
-                    ) : (
-                      <View style={styles.emptyDay}>
-                        <Icon name="leaf-outline" size={32} color="#ABB4A7" />
-                        <Text style={[common.body, { marginTop: 14 }]}>这一天还没有事项</Text>
-                        <Text style={[common.muted, { textAlign: 'center', marginTop: 6 }]}>
-                          点一下右上角的「＋」，{'\n'}记下亲友的生日。
-                        </Text>
-                        {!state.people.length && (
-                          <Button
-                            style={{ marginTop: 18 }}
-                            label="添加第一个生日"
-                            icon="add"
-                            onPress={create}
-                          />
-                        )}
-                      </View>
-                    )}
-                    <Text
-                      style={[
-                        common.muted,
-                        { borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 16 },
-                      ]}
-                    >
-                      农历逐年换算，阳历固定月日，两个生日都能记住。
-                    </Text>
-                  </View>
-                </View>
-                {wide && (
-                  <TodayReminder
-                    rows={state.todayRows}
-                    peopleCount={state.people.length}
-                    festivals={todayFestivals}
-                    compact={false}
-                  />
-                )}
+            </View>
+          ) : tab === 'calendar' ? (
+            <View testID="正式日历首页">
+              <DateSummary today={state.today} onCalculate={() => setCalculatingDate(true)} />
+              <View testID="月历事项一体区">
+                <MonthCalendar
+                  month={state.month}
+                  today={state.today}
+                  selected={state.selectedDate}
+                  entries={entries}
+                  countups={state.countups}
+                  onSelect={state.selectDate}
+                  onMonth={state.viewMonth}
+                  onToday={returnToday}
+                  compact
+                  showTodayAction
+                  theme={theme}
+                />
+                <HomeCalendarTimeline
+                  selectedDate={state.selectedDate}
+                  today={state.today}
+                  birthdayEntries={entries}
+                  todayBirthdayEntries={todayEntries}
+                  people={state.people}
+                  countups={state.countups}
+                  onCreate={create}
+                  onOpenBirthday={openBirthday}
+                  onOpenMemory={openMemory}
+                  theme={theme}
+                />
               </View>
-            ) : tab === 'book' ? (
-              <View style={styles.section}>
-                <View style={common.between}>
-                  <Text style={[common.muted, styles.sectionDescription]}>按下次生日由近到远排列</Text>
-                  <Button label="新建事项" icon="add" onPress={create} />
-                </View>
-                <View style={[common.card, { padding: state.people.length ? 4 : 28 }]}>
-                  {state.people.length ? (
-                    state.rows.map((row) => <PersonRow key={row.person.id} row={row} />)
-                  ) : (
-                    <View style={[styles.emptyDay, { gap: 15 }]}>
-                      <Icon name="book-outline" size={38} color={colors.accent} />
-                      <Text style={common.heading}>还没有记下生日</Text>
-                      <Text style={common.muted}>先从你最牵挂的那个人开始。</Text>
-                      <Button label="添加第一个生日" icon="add" onPress={create} />
-                    </View>
-                  )}
-                </View>
-                <Text style={common.muted}>
-                  闰月缺失时按普通月过；遇到小月三十，提前到二十九。原始生日始终保留。
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.section}>
-                <View style={common.between}>
-                  <Text style={[common.muted, styles.sectionDescription]}>
-                    记录天数或周年，时间会自动更新
-                  </Text>
-                  <Button label="新建时光记" icon="add" onPress={create} />
-                </View>
-                <View style={[common.card, { padding: state.countups.length ? 4 : 28 }]}>
-                  {state.countupRows.length ? (
-                    state.countupRows.map(({ item }) => (
-                      <CountupRow key={item.id} item={item} today={state.today} />
-                    ))
-                  ) : (
-                    <View style={[styles.emptyDay, { gap: 15 }]}>
-                      <Icon name="sparkles-outline" size={40} color={colors.accent} />
-                      <Text style={common.heading}>还没有时光记</Text>
-                      <Text style={[common.muted, { textAlign: 'center' }]}>
-                        记录一件正在发生的事，{`\n`}看时光慢慢留下痕迹。
-                      </Text>
-                      <Button label="添加第一条时光记" icon="add" onPress={create} />
-                    </View>
-                  )}
-                </View>
-                <Text style={common.muted}>适合健身、学习、恋爱、结婚或任何值得记住的开始。</Text>
-              </View>
-            )}
-          </>
-        )}
-        <View
-          style={[common.row, { alignItems: 'flex-start', justifyContent: 'center', paddingHorizontal: 8 }]}
-        >
-          <Icon name="lock-closed-outline" size={14} color={colors.muted} />
-          <Text style={[common.muted, { flexShrink: 1, fontSize: 11, lineHeight: 18 }]}>
-            {storageDescription} 系统提醒可在“设置”中开启。
-          </Text>
-        </View>
-      </ScrollView>
-      {calculatingDate && (
+            </View>
+          ) : tab === 'book' ? (
+            <BirthdayBook rows={state.rows} onCreate={create} onOpen={openBirthday} theme={theme} />
+          ) : (
+            <CountupBook
+              items={orderedCountups}
+              today={state.today}
+              onCreate={create}
+              onOpen={openMemory}
+              theme={theme}
+            />
+          )}
+
+          {state.status === 'ready' && tab !== 'calendar' ? (
+            <View style={styles.storageNote}>
+              <Icon name="lock-closed-outline" size={13} color={theme.colors.textSecondary} />
+              <Text style={styles.storageText}>{storageDescription} 系统提醒可在“我的”中设置。</Text>
+            </View>
+          ) : null}
+        </ScrollView>
+
+        {state.status === 'ready' && tab === 'calendar' ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`在 ${state.selectedDate} 新建事项`}
+            onPress={create}
+            style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
+          >
+            <Icon name="add" size={27} color={theme.colors.selectedText} />
+          </Pressable>
+        ) : null}
+
+        <HomeBottomNavigation
+          active={tab}
+          birthdayCount={state.people.length}
+          countupCount={state.countups.length}
+          onSelect={selectTab}
+          onAccount={openAccount}
+          theme={theme}
+        />
+      </View>
+
+      {calculatingDate ? (
         <DateCalculatorDialog today={state.today} onClose={() => setCalculatingDate(false)} />
-      )}
+      ) : null}
     </SafeAreaView>
   );
 }
-const styles = StyleSheet.create({
-  mobileContent: { padding: 12, gap: 14, paddingBottom: 32 },
-  pageIntro: { flexWrap: 'wrap', gap: 20 },
-  pageIntroNarrow: { alignItems: 'stretch', gap: 12 },
-  pageTitleNarrow: { fontSize: 26 },
-  section: { gap: 16 },
-  calendarToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  calendarToolbarVeryNarrow: { flexDirection: 'column', alignItems: 'stretch' },
-  todayText: { flex: 1, minWidth: 0, gap: 3 },
-  todayDate: { color: colors.ink, fontSize: 14, lineHeight: 21, fontWeight: '600' },
-  futureDistance: { color: colors.accent, fontSize: 13, fontWeight: '600' },
-  sectionDescription: { flex: 1, minWidth: 0 },
-  selectedDayCard: { gap: 20 },
-  festivalTag: { backgroundColor: colors.tint, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 },
-  brand: { fontSize: 22, fontWeight: '600', color: colors.ink, letterSpacing: 3 },
-  brandNarrow: { fontSize: 20, letterSpacing: 2.4 },
-  brandIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 13,
-    backgroundColor: colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  brandIconNarrow: { width: 40, height: 40, borderRadius: 12 },
-  localChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#EAF0E9',
-  },
-  tabs: { flexDirection: 'row', backgroundColor: '#EDEEE9', borderRadius: 13, padding: 4, gap: 2 },
-  tabsNarrow: { width: '100%' },
-  tab: {
-    minHeight: 42,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    paddingHorizontal: 18,
-    borderRadius: 10,
-  },
-  activeTab: { backgroundColor: '#FFF' },
-  tabNarrow: { flex: 1, paddingHorizontal: 7, justifyContent: 'center' },
-  reminder: {
-    backgroundColor: '#FBFAF6',
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 18,
-    padding: 20,
-    flexDirection: 'row',
-    gap: 16,
-    alignItems: 'center',
-  },
-  reminderNarrow: { borderRadius: 16, padding: 14, gap: 12 },
-  reminderIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    backgroundColor: colors.tint,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  reminderIconNarrow: { width: 40, height: 40, borderRadius: 12 },
-  reminderHeadingNarrow: { fontSize: 16 },
-  countupIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: colors.tint,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  countupNumber: {
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: '700',
-    color: colors.accent,
-    textAlign: 'right',
-  },
-  workspace: { gap: 22, alignItems: 'stretch' },
-  add: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyDay: { minHeight: 190, alignItems: 'center', justifyContent: 'center', paddingVertical: 18 },
-  person: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'center',
-    padding: 17,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.line,
-    borderRadius: 15,
-  },
-  personName: { fontSize: 16, fontWeight: '600', color: colors.ink },
-  remaining: { fontSize: 15, fontWeight: '600', color: colors.ink },
-  loading: { minHeight: 300, alignItems: 'center', justifyContent: 'center', gap: 14 },
-  notice: {
-    flexDirection: 'row',
-    gap: 12,
-    backgroundColor: '#EAF0E9',
-    padding: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-});
+
+function createStyles(homeTheme: HomeTheme) {
+  const { colors, typography, spacing, radius, size } = homeTheme;
+  return StyleSheet.create({
+    stage: { alignItems: 'center', backgroundColor: colors.backdrop, flex: 1 },
+    shell: {
+      backgroundColor: colors.surface,
+      flex: 1,
+      position: 'relative',
+      width: '100%',
+    },
+    appBar: {
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      minHeight: 58,
+      paddingHorizontal: spacing.md,
+    },
+    brandRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
+    brandMark: {
+      alignItems: 'center',
+      backgroundColor: colors.accentSoft,
+      borderRadius: radius.sm,
+      height: 34,
+      justifyContent: 'center',
+      width: 34,
+    },
+    brandName: { color: colors.textPrimary, fontSize: typography.appTitle, fontWeight: typography.bold },
+    sectionName: { color: colors.textSecondary, fontSize: typography.caption, marginTop: 1 },
+    accountButton: {
+      alignItems: 'center',
+      backgroundColor: colors.surfaceMuted,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: radius.round,
+      height: size.iconButton,
+      justifyContent: 'center',
+      width: size.iconButton,
+    },
+    accountInitial: {
+      color: colors.accent,
+      fontSize: typography.body,
+      fontWeight: typography.bold,
+    },
+    calculatorButton: {
+      alignItems: 'center',
+      borderRadius: radius.sm,
+      flexDirection: 'row',
+      gap: spacing.xxs,
+      minHeight: 32,
+      justifyContent: 'center',
+      paddingHorizontal: spacing.xs,
+    },
+    calculatorButtonText: {
+      color: colors.textSecondary,
+      fontSize: typography.caption,
+      fontWeight: typography.semibold,
+    },
+    scroll: { flex: 1 },
+    scrollContent: {
+      backgroundColor: colors.surface,
+      paddingBottom: size.addButton + spacing.xl,
+    },
+    dateSummary: {
+      backgroundColor: colors.surfaceMuted,
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      gap: 1,
+      minHeight: 52,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+    },
+    dateSummaryTop: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      minWidth: 0,
+    },
+    todayDate: { color: colors.textPrimary, fontSize: typography.label, fontWeight: typography.semibold },
+    todayLunar: { color: colors.textSecondary, fontSize: typography.caption },
+    notice: {
+      alignItems: 'center',
+      backgroundColor: colors.memorySoft,
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      gap: spacing.sm,
+      minHeight: 44,
+      paddingHorizontal: spacing.md,
+    },
+    noticeText: { color: colors.success, flex: 1, fontSize: typography.label },
+    feedback: {
+      alignItems: 'center',
+      gap: spacing.md,
+      justifyContent: 'center',
+      minHeight: 320,
+      padding: spacing.xl,
+    },
+    feedbackTitle: { color: colors.textPrimary, fontSize: typography.body, fontWeight: typography.semibold },
+    feedbackText: { color: colors.textSecondary, fontSize: typography.label, textAlign: 'center' },
+    errorText: { color: colors.error, fontSize: typography.label, textAlign: 'center' },
+    retryButton: {
+      alignItems: 'center',
+      backgroundColor: colors.accent,
+      borderRadius: radius.sm,
+      minHeight: 42,
+      justifyContent: 'center',
+      paddingHorizontal: spacing.lg,
+    },
+    retryText: { color: colors.selectedText, fontSize: typography.label, fontWeight: typography.semibold },
+    storageNote: {
+      alignItems: 'flex-start',
+      flexDirection: 'row',
+      gap: spacing.xs,
+      justifyContent: 'center',
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.lg,
+    },
+    storageText: {
+      color: colors.textSecondary,
+      flexShrink: 1,
+      fontSize: typography.caption,
+      lineHeight: 16,
+    },
+    addButton: {
+      alignItems: 'center',
+      backgroundColor: colors.accent,
+      borderColor: colors.surface,
+      borderRadius: radius.round,
+      borderWidth: 3,
+      bottom: size.bottomNavigation + spacing.md,
+      height: size.addButton,
+      justifyContent: 'center',
+      position: 'absolute',
+      right: spacing.lg,
+      width: size.addButton,
+    },
+    addButtonPressed: { backgroundColor: colors.selected },
+    pressed: { backgroundColor: colors.pressed },
+  });
+}

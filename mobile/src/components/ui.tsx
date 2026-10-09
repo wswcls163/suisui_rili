@@ -8,6 +8,7 @@ import {
   Text,
   View,
   type StyleProp,
+  type TextStyle,
   type ViewStyle,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -141,11 +142,17 @@ export function Dialog({
   title,
   children,
   onClose,
+  dialogStyle,
+  headerStyle,
+  titleStyle,
 }: {
   visible: boolean;
   title: string;
   children: React.ReactNode;
   onClose: () => void;
+  dialogStyle?: StyleProp<ViewStyle>;
+  headerStyle?: StyleProp<ViewStyle>;
+  titleStyle?: StyleProp<TextStyle>;
 }) {
   return (
     <Modal
@@ -162,9 +169,9 @@ export function Dialog({
           accessibilityLabel="关闭对话框"
           accessibilityRole="button"
         />
-        <View style={styles.dialog}>
-          <View style={[common.between, { marginBottom: 18 }]}>
-            <Text accessibilityRole="header" style={common.heading}>
+        <View style={[styles.dialog, dialogStyle]}>
+          <View style={[common.between, { marginBottom: 18 }, headerStyle]}>
+            <Text accessibilityRole="header" style={[common.heading, titleStyle]}>
               {title}
             </Text>
             <Button variant="quiet" label="关闭" onPress={onClose} />

@@ -4,9 +4,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useAuth } from '../state/AuthProvider';
 import { useAccountSync } from '../state/SyncProvider';
+import type { HomeSection } from './home/homeNavigation';
 import { colors, common, Icon } from './ui';
 
-export type HomeSection = 'calendar' | 'book' | 'countup';
+export type { HomeSection } from './home/homeNavigation';
 export type NavigationSection = HomeSection | 'notifications' | 'account';
 
 type MenuIcon = React.ComponentProps<typeof Icon>['name'];

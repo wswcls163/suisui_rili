@@ -92,9 +92,9 @@ async function main() {
 
   await send('Page.enable');
   await send('Runtime.enable');
-  const widths = [320, 390, 443, 1200];
+  const widths = [320, 390, 443, 518, 1200];
   const reports: {
-    page: 'home' | 'design-preview';
+    page: 'home' | 'calculator' | 'new-form' | 'design-preview';
     width: number;
     innerWidth: number;
     scrollWidth: number;
@@ -139,6 +139,15 @@ async function main() {
       const today = [...document.querySelectorAll('*')]
         .map((element) => (element.textContent || '').trim())
         .find((text) => /^今天 \\d{4} 年 \\d{1,2} 月 \\d{1,2} 日 星期[一二三四五六日]$/.test(text)) || '';
+      const required = ['[aria-label="我的账号"], [aria-label^="账号："]', '[aria-label="跳转日期"]',
+        '[aria-label="回到今天"]', '[aria-label="日期计算"]'];
+      for (const selector of required) {
+        if (!document.querySelector(selector)) overflow.push('缺少布局入口:' + selector);
+      }
+      const title = document.querySelector('[aria-label="跳转日期"]')?.getBoundingClientRect();
+      const todayAction = document.querySelector('[aria-label="回到今天"]')?.getBoundingClientRect();
+      if (title && todayAction && title.right > todayAction.left + 0.5)
+        overflow.push('月份标题与今天入口重叠');
       return {
         innerWidth: window.innerWidth,
         scrollWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
@@ -150,6 +159,100 @@ async function main() {
     const screenshotPath = join(outputDir, `home-${width}.png`);
     writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
     reports.push({ page: 'home', width, ...metrics, bottomClearance: null, screenshotPath });
+
+    if ([320, 390, 443, 518, 1200].includes(width)) {
+      await evaluate<void>(`document.querySelector('[aria-label="日期计算"]')?.click()`);
+      let calculatorReady = false;
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        calculatorReady = await evaluate<boolean>(`document.body.innerText.includes('想计算的日期')`);
+        if (calculatorReady) break;
+        await delay(100);
+      }
+      if (!calculatorReady) throw new Error(`日期计算 ${width}px 弹窗未打开`);
+      await delay(400);
+      const calculatorMetrics = await evaluate<{
+        innerWidth: number;
+        scrollWidth: number;
+        overflow: string[];
+      }>(
+        `(() => {
+          const viewport = document.documentElement.clientWidth;
+          const overflow = [...document.querySelectorAll('*')]
+            .filter((element) => {
+              const rect = element.getBoundingClientRect();
+              const style = getComputedStyle(element);
+              return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' &&
+                (rect.left < -0.5 || rect.right > viewport + 0.5);
+            })
+            .slice(0, 8)
+            .map((element) => element.tagName + ':' + (element.textContent || '').trim().slice(0, 30));
+          return {
+            innerWidth: window.innerWidth,
+            scrollWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
+            overflow,
+          };
+        })()`,
+      );
+      const calculatorScreenshot = await send<{ data: string }>('Page.captureScreenshot', { format: 'png' });
+      const calculatorScreenshotPath = join(outputDir, `calculator-${width}.png`);
+      writeFileSync(calculatorScreenshotPath, Buffer.from(calculatorScreenshot.data, 'base64'));
+      reports.push({
+        page: 'calculator',
+        width,
+        ...calculatorMetrics,
+        today: 'calculator-ready',
+        bottomClearance: null,
+        screenshotPath: calculatorScreenshotPath,
+      });
+      await evaluate<void>(`document.querySelector('[aria-label="完成"]')?.click()`);
+    }
+  }
+
+  for (const width of [320, 518, 1200]) {
+    await send('Emulation.setDeviceMetricsOverride', {
+      width,
+      height: 1000,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await send('Page.navigate', { url: `${baseUrl}new?layout-check=${width}` });
+    let ready = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      ready = await evaluate<boolean>(
+        `document.body.innerText.includes('选择一种事项，开始记录。') && !document.body.innerText.includes('正在读取事项')`,
+      );
+      if (ready) break;
+      await delay(100);
+    }
+    if (!ready) throw new Error(`新建表单 ${width}px 页面在 10 秒内未完成渲染`);
+    const metrics = await evaluate<{ innerWidth: number; scrollWidth: number; overflow: string[] }>(`(() => {
+      const viewport = document.documentElement.clientWidth;
+      const overflow = [...document.querySelectorAll('*')]
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' &&
+            (rect.left < -0.5 || rect.right > viewport + 0.5);
+        })
+        .slice(0, 8)
+        .map((element) => element.tagName + ':' + (element.textContent || '').trim().slice(0, 30));
+      return {
+        innerWidth: window.innerWidth,
+        scrollWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
+        overflow,
+      };
+    })()`);
+    const screenshot = await send<{ data: string }>('Page.captureScreenshot', { format: 'png' });
+    const screenshotPath = join(outputDir, `new-form-${width}.png`);
+    writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
+    reports.push({
+      page: 'new-form',
+      width,
+      ...metrics,
+      today: 'form-ready',
+      bottomClearance: null,
+      screenshotPath,
+    });
   }
 
   for (const width of [390, 518, 1200]) {

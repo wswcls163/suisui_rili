@@ -6,7 +6,7 @@ import { CountupForm } from '../src/components/CountupForm';
 import { DateCalculatorDialog } from '../src/components/DateCalculatorDialog';
 import { MonthCalendar } from '../src/components/MonthCalendar';
 import { AppProvider } from '../src/state/AppProvider';
-import Home, { homeLayoutWidth, homeTabFromParam } from '../app/index';
+import Home, { accountInitial, homeLayoutWidth, homeTabFromParam } from '../app/index';
 import NewBirthday from '../app/new';
 import BirthdayDetails from '../app/birthday/[id]';
 import CountupDetails from '../app/countup/[id]';
@@ -33,9 +33,29 @@ test('电脑手机预览参数固定使用 443 像素布局宽度', () => {
   expect(homeLayoutWidth(390, 'android', '?preview=phone')).toBe(390);
   expect(homeTabFromParam('book')).toBe('book');
   expect(homeTabFromParam('invalid')).toBe('calendar');
+  expect(accountInitial('alice@example.com')).toBe('A');
+  expect(accountInitial('')).toBe('');
 });
 
-test('左侧功能菜单直接切换首页功能并提供独立设置入口', async () => {
+test('正式首页顶部只保留账号入口，今天和日期计算位于日历工具区', async () => {
+  render(
+    <AppProvider repo={memoryRepository()} clock={clock}>
+      <Home />
+    </AppProvider>,
+  );
+  await screen.findByTestId('首页账号入口');
+  expect(screen.getByRole('button', { name: '我的账号' })).toBeTruthy();
+  expect(screen.getByTestId('日历次级工具栏')).toBeTruthy();
+  expect(screen.getByRole('button', { name: '回到今天' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: '日期计算' })).toBeTruthy();
+  fireEvent.press(screen.getByRole('button', { name: '我的账号' }));
+  expect(router.push).toHaveBeenCalledWith({
+    pathname: '/account',
+    params: { section: 'account' },
+  });
+});
+
+test('底部导航切换真实功能，“我的”进入账号与设置', async () => {
   render(
     <AppProvider
       repo={memoryRepository([fixture('a')], [countupFixture('a', { title: '开始健身' })])}
@@ -44,20 +64,44 @@ test('左侧功能菜单直接切换首页功能并提供独立设置入口', as
       <Home />
     </AppProvider>,
   );
-  await screen.findByRole('button', { name: '打开功能菜单' });
-  fireEvent.press(screen.getByRole('button', { name: '打开功能菜单' }));
-  expect(screen.getByRole('button', { name: '功能菜单：生日簿 1' })).toBeTruthy();
-  expect(screen.getByRole('button', { name: '功能菜单：重要日期提醒' })).toBeTruthy();
-  fireEvent.press(screen.getByRole('button', { name: '功能菜单：时光记 1' }));
+  await screen.findByRole('tab', { name: '生日簿 1' });
+  fireEvent.press(screen.getByRole('tab', { name: '时光记 1' }));
   expect(screen.getByRole('header', { name: '时光记' })).toBeTruthy();
-  expect(screen.queryByRole('button', { name: '功能菜单：生日簿 1' })).toBeNull();
+  expect(screen.getByRole('tab', { name: '时光记 1' }).props.accessibilityState).toEqual({
+    selected: true,
+  });
 
-  fireEvent.press(screen.getByRole('button', { name: '打开功能菜单' }));
-  fireEvent.press(screen.getByRole('button', { name: '功能菜单：重要日期提醒' }));
+  fireEvent.press(screen.getByRole('tab', { name: '我的' }));
   expect(router.push).toHaveBeenCalledWith({
     pathname: '/account',
-    params: { section: 'notifications' },
+    params: { section: 'account' },
   });
+});
+
+test('正式首页用真实数据组成完整月历和紧邻事项流，新增入口沿用原流程', async () => {
+  render(
+    <AppProvider
+      repo={memoryRepository(
+        [fixture('real', { name: '真实亲友' })],
+        [countupFixture('real', { title: '真实时光', startDate: today })],
+      )}
+      clock={clock}
+    >
+      <Home />
+    </AppProvider>,
+  );
+
+  await screen.findByTestId('正式日历首页');
+  const flow = screen.getByTestId('月历事项一体区');
+  expect(within(flow).getByTestId('完整月历')).toBeTruthy();
+  expect(within(flow).getByTestId('事项列表')).toBeTruthy();
+  expect(screen.getByRole('button', { name: /2026-09-04.*真实亲友.*真实时光/ })).toBeTruthy();
+  expect(screen.getByRole('button', { name: '查看真实亲友的生日详情' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: '查看时光记真实时光，第 1 天' })).toBeTruthy();
+  expect(screen.queryByText('一起旅行纪念')).toBeNull();
+
+  fireEvent.press(screen.getByRole('button', { name: `在 ${today} 新建事项` }));
+  expect(router.push).toHaveBeenLastCalledWith('/new');
 });
 
 test('新建先选择类型，预填所选闰月日期；未开放类型不可点击', async () => {
@@ -204,6 +248,8 @@ test('日期计算的月份和日期无需前导零，并立即计算到今天�
   const close = jest.fn();
   render(<DateCalculatorDialog today="2026-09-08" onClose={close} />);
   enterCalculatorDate('2016', '7', '1');
+  expect(screen.getByTestId('日期计算输入区')).toBeTruthy();
+  expect(screen.getByTestId('日期计算结果')).toBeTruthy();
   expect(screen.getByLabelText('月份').props.value).toBe('7');
   expect(screen.getByLabelText('日期').props.value).toBe('1');
   expect(screen.getByText('2016年7月1日 距今天')).toBeTruthy();
@@ -253,7 +299,8 @@ test('月历七列、选日回调和多人标记；首尾月份禁止越界', ()
     />,
   );
   const day = screen.getByRole('button', { name: /2026-09-04.*2/ });
-  expect(day).toHaveStyle({ minHeight: 74, marginVertical: 1, paddingVertical: 4 });
+  expect(day).toHaveStyle({ height: 57, paddingTop: 3 });
+  expect(within(day).getAllByTestId('birthday-marker')).toHaveLength(1);
   fireEvent.press(day);
   expect(select).toHaveBeenCalledWith(today);
   rerender(
@@ -304,28 +351,26 @@ test.each([9, 10, 11, 12])(
     expect(screen.getByTestId('month-calendar-header')).toHaveStyle({
       flexDirection: 'row',
       flexWrap: 'nowrap',
-      gap: 2,
-      paddingHorizontal: 0,
+      minHeight: 58,
+      paddingLeft: 6,
     });
     expect(screen.getByTestId('month-calendar-title')).toHaveStyle({
       flex: 1,
       minWidth: 0,
-      minHeight: 44,
+      minHeight: 40,
       flexDirection: 'row',
-      gap: 2,
+      gap: 6,
     });
-    expect(screen.getByText(`2026 年 ${monthNumber} 月`)).toHaveStyle({ fontSize: 16 });
+    expect(screen.getByText(`2026年${monthNumber}月`)).toHaveStyle({ fontSize: 26 });
     expect(screen.getByTestId('month-calendar-actions')).toHaveStyle({
       flexDirection: 'row',
       flexShrink: 0,
-      gap: 2,
     });
-    expect(screen.getByRole('button', { name: '上个月' })).toHaveStyle({ width: 44, minHeight: 44 });
-    expect(screen.getByRole('button', { name: '下个月' })).toHaveStyle({ width: 44, minHeight: 44 });
+    expect(screen.getByRole('button', { name: '上个月' })).toHaveStyle({ width: 40, height: 40 });
+    expect(screen.getByRole('button', { name: '下个月' })).toHaveStyle({ width: 40, height: 40 });
     expect(screen.getByRole('button', { name: '今天' })).toHaveStyle({
-      minWidth: 44,
-      minHeight: 44,
-      paddingHorizontal: 8,
+      minHeight: 40,
+      paddingHorizontal: 6,
     });
     unmount();
   },
@@ -415,14 +460,14 @@ test('节日同日保留生日姓名与完整无障碍日期，选择后显示�
   });
   expect(within(date).getByText('中秋节')).toBeTruthy();
   expect(within(date).getByText('+1')).toBeTruthy();
-  expect(within(date).getByText('团圆的生日')).toBeTruthy();
-  expect(within(date).getAllByTestId('birthday-cake')).toHaveLength(1);
+  expect(within(date).getAllByTestId('birthday-marker')).toHaveLength(1);
   expect(
-    within(screen.getByRole('button', { name: /2020-10-02，/ })).queryByTestId('birthday-cake'),
+    within(screen.getByRole('button', { name: /2020-10-02，/ })).queryByTestId('birthday-marker'),
   ).toBeNull();
   fireEvent.press(date);
-  expect(screen.getAllByText('中秋节', { exact: true })).toHaveLength(2);
-  expect(screen.getByText('国庆节', { exact: true })).toBeTruthy();
+  const timeline = screen.getByTestId('事项列表');
+  expect(within(timeline).getByText('中秋节', { exact: true })).toBeTruthy();
+  expect(within(timeline).getByText('国庆节', { exact: true })).toBeTruthy();
   expect(screen.getByText('2020 农历年 · 八月十五')).toBeTruthy();
   expect(screen.getByRole('button', { name: '查看团圆的生日详情' })).toBeTruthy();
   expect(screen.getByText('今天没有重要日期提醒')).toBeTruthy();
@@ -478,7 +523,7 @@ test.each([
     </AppProvider>,
   );
   const day = await screen.findByRole('button', { name: /2026-09-04.*2 位生日/ });
-  expect(within(day).getByText(`${title} +1`)).toBeTruthy();
+  expect(within(day).getAllByTestId('birthday-marker')).toHaveLength(1);
   const entry = screen.getByRole('button', { name: `查看${title}详情` });
   expect(within(entry).getByText(title)).toBeTruthy();
   expect(screen.getByRole('button', { name: '查看江源浩生日详情' })).toBeTruthy();
@@ -616,14 +661,12 @@ test('同一个人的月历生日按本次发生类型标明阳历和农历，�
   );
   const solar = screen.getByRole('button', { name: /2027-01-11.*阳历生日/ });
   const lunar = screen.getByRole('button', { name: /2027-01-16.*农历生日/ });
-  expect(within(solar).getByText('我的生日').props.ellipsizeMode).toBe('tail');
-  expect(within(solar).getByText('阳历')).toHaveStyle({ color: '#FFF', fontSize: 10 });
-  expect(within(solar).getByTestId('birthday-cake')).toHaveStyle({ color: '#FFE2AF' });
-  expect(within(lunar).getByTestId('birthday-cake')).toHaveStyle({ color: '#B8523E' });
-  expect(within(solar).queryByText('农历')).toBeNull();
-  expect(within(lunar).getByText('我的生日')).toBeTruthy();
-  expect(within(lunar).getByText('农历')).toBeTruthy();
-  expect(within(lunar).queryByText('阳历')).toBeNull();
+  expect(within(solar).getAllByTestId('birthday-marker')).toHaveLength(1);
+  expect(within(lunar).getAllByTestId('birthday-marker')).toHaveLength(1);
+  expect(solar.props.accessibilityLabel).toContain('阳历生日');
+  expect(solar.props.accessibilityLabel).not.toContain('农历生日');
+  expect(lunar.props.accessibilityLabel).toContain('农历生日');
+  expect(lunar.props.accessibilityLabel).not.toContain('阳历生日');
   fireEvent.press(lunar);
   expect(select).toHaveBeenCalledWith('2027-01-16');
 });
@@ -642,9 +685,9 @@ test('多人生日的类型标记属于当前展示的首个人，保留额外�
     />,
   );
   const day = screen.getByRole('button', { name: /2026-09-04.*2 位生日/ });
-  expect(within(day).getByText('亲友a的生日 +1')).toBeTruthy();
-  expect(within(day).getByText('阳历')).toBeTruthy();
-  expect(within(day).queryByText('农历')).toBeNull();
+  expect(day.props.accessibilityLabel).toContain('亲友a的生日');
+  expect(day.props.accessibilityLabel).toContain('亲友b的生日');
+  expect(within(day).getAllByTestId('birthday-marker')).toHaveLength(1);
 });
 
 test('双生日同一天在提醒、月历和事项中只算一人，生日簿保留两套日期', async () => {
@@ -656,9 +699,8 @@ test('双生日同一天在提醒、月历和事项中只算一人，生日簿�
   await screen.findByText('今天是亲友a的生日');
   const day = screen.getByRole('button', { name: /2026-09-04.*1 位生日.*农历与阳历生日/ });
   expect(within(day).queryByText(/\+1/)).toBeNull();
-  expect(within(day).getAllByTestId('birthday-cake')).toHaveLength(1);
-  expect(within(day).getByText('农历')).toBeTruthy();
-  expect(within(day).getByText('阳历')).toBeTruthy();
+  expect(within(day).getAllByTestId('birthday-marker')).toHaveLength(1);
+  expect(day.props.accessibilityLabel).toContain('农历与阳历生日');
   expect(screen.getAllByRole('button', { name: '查看亲友a的生日详情' })).toHaveLength(1);
   expect(screen.getByText('农历与阳历生日 · 同一天')).toBeTruthy();
   fireEvent.press(screen.getByRole('tab', { name: '生日簿 1' }));
@@ -776,7 +818,7 @@ test('首页按标签直接展示对应内容，时光记不再跨标签预览�
   );
   await screen.findByRole('header', { name: '我的日历' });
   expect(screen.queryByRole('button', { name: '查看时光记开始健身' })).toBeNull();
-  expect(screen.queryByRole('button', { name: '查看时光记开始健身，第 1 天' })).toBeNull();
+  expect(screen.getByRole('button', { name: '查看时光记开始健身，第 1 天' })).toBeTruthy();
 
   fireEvent.press(screen.getByRole('tab', { name: '生日簿 1' }));
   expect(screen.getByRole('header', { name: '生日簿' })).toBeTruthy();

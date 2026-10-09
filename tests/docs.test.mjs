@@ -173,15 +173,28 @@ test("首页视觉预览与正式导航及数据模块保持隔离", async () =>
     ),
     "utf8",
   );
-  const previewTheme = await readFile(
+  const home = await readFile(join(root, "mobile", "app", "index.tsx"), "utf8");
+  const calendar = await readFile(
+    join(root, "mobile", "src", "components", "MonthCalendar.tsx"),
+    "utf8",
+  );
+  const homeTheme = await readFile(
+    join(root, "mobile", "src", "components", "home", "homeTheme.ts"),
+    "utf8",
+  );
+  const homeTimeline = await readFile(
     join(
       root,
       "mobile",
       "src",
       "components",
-      "design-preview",
-      "designPreviewTheme.ts",
+      "home",
+      "HomeCalendarTimeline.tsx",
     ),
+    "utf8",
+  );
+  const dateCalculator = await readFile(
+    join(root, "mobile", "src", "components", "DateCalculatorDialog.tsx"),
     "utf8",
   );
   const navigation = await readFile(
@@ -193,11 +206,25 @@ test("首页视觉预览与正式导航及数据模块保持隔离", async () =>
   assert.doesNotMatch(navigation, /design-preview/);
   assert.doesNotMatch(preview, /state\/|data\/|sync\/|notifications\/|auth\//);
   assert.match(preview, /BottomNavigation/);
-  assert.match(preview, /defaultDesignPreviewTheme/);
+  assert.match(preview, /defaultHomeTheme/);
   assert.doesNotMatch(preview, /#[0-9a-f]{3,8}/i);
   assert.match(
-    previewTheme,
+    homeTheme,
     /selected:[\s\S]*birthday:[\s\S]*festival:[\s\S]*memory:/,
+  );
+  assert.match(home, /HomeBottomNavigation/);
+  assert.match(home, /HomeCalendarTimeline/);
+  assert.match(home, /defaultHomeTheme/);
+  assert.match(home, /useAuth/);
+  assert.match(home, /首页账号入口/);
+  assert.match(home, /showTodayAction/);
+  assert.match(home, /<MonthCalendar[\s\S]*<HomeCalendarTimeline/);
+  assert.doesNotMatch(home, /NavigationDrawer/);
+  assert.match(dateCalculator, /defaultHomeTheme/);
+  assert.match(dateCalculator, /日期计算输入区/);
+  assert.doesNotMatch(
+    [home, calendar, homeTimeline, dateCalculator].join("\n"),
+    /#[0-9a-f]{3,8}/i,
   );
   assert.doesNotMatch(preview, /照片占位|独立视觉预览|留一点空白/);
 });
