@@ -21,7 +21,7 @@
 | 应用框架     | React Native + Expo                               | 手机原生界面与构建流程；正式开发采用 development build           |
 | 语言         | TypeScript，开启 strict                           | 明确生日、时光记、农历日期、计算结果和存储接口的类型             |
 | 页面导航     | Expo Router                                       | 管理首页、生日簿、详情和编辑页面；路由文件仅组装页面             |
-| 界面与样式   | React Native 基础组件 + StyleSheet + 统一主题变量 | 复用颜色、字号、间距、按钮和卡片，保持统一视觉方向                |
+| 界面与样式   | React Native 基础组件 + StyleSheet + 统一主题变量 | 复用颜色、字号、间距、按钮和卡片，保持统一视觉方向               |
 | 界面状态     | React Hooks、Context、useState                    | 集中维护生日快照，局部表单状态留在组件内；当前规模无需额外状态库 |
 | 本地数据库   | SQLite，通过 expo-sqlite 访问                     | 存储原始生日，用版本化迁移管理字段变化                           |
 | 农历引擎     | lunar-javascript 1.7.7，封装为适配器              | 按独立对照表核验声明范围；页面不直接依赖历法库                   |
@@ -77,7 +77,7 @@ mobile/
 
 “日历”和“生日簿”读取同一份生日状态，“时光记”读取独立的时光记集合。选中日期、浏览月份与真实今天分别保存；同一个 `TodayWatcher` 在跨午夜和恢复前台时刷新节日与生日提醒、累计天数和周年倒计时。新增类型通过简单的事项类型目录展示，未开放类型在界面和业务入口都不能提交。
 
-独立视觉评审路由 `app/design-preview.tsx` 只组装 `src/components/design-preview/DesignPreviewHome.tsx`。组件内部持有月份与选中日期状态，示例记录只在内存中生成；它可以读取 `core/dates.ts`、`core/calendar.ts` 和 `core/festivals.ts` 的纯计算结果，但不得引用仓库、应用状态、认证、同步或通知模块。该路由不加入 `NavigationDrawer`，从结构上避免评审页面被误认为正式功能或写入用户数据。预览内的固定底部导航只将“日历”标记为当前项，其他标签处于未启用状态，不注册 Expo Router 跳转；ScrollView 内容底部预留大于导航高度的空间，防止最后一条记录被吸底导航遮挡。
+独立视觉评审路由 `app/design-preview.tsx` 只组装 `src/components/design-preview/DesignPreviewHome.tsx`。组件内部持有月份与选中日期状态，示例记录只在内存中生成；它可以读取 `core/dates.ts`、`core/calendar.ts` 和 `core/festivals.ts` 的纯计算结果，但不得引用仓库、应用状态、认证、同步或通知模块。`src/components/design-preview/designPreviewTheme.ts` 定义 `DesignPreviewTheme` 和唯一默认主题，将颜色、字体、间距、圆角、尺寸以及节日、生日、时光记状态色集中为语义令牌；页面组件通过可选 `theme` 参数消费令牌，不直接硬编码颜色，也不提前建立多主题设置。完整月历和事项流被放在同一结构容器中，事项流是月历后的直接相邻内容；底部导航只将“日历”标记为当前项，其他标签不注册 Expo Router 跳转，悬浮新增按钮与导航共用稳定的安全区布局。该路由不加入 `NavigationDrawer`，从结构上避免评审页面被误认为正式功能或写入用户数据；ScrollView 内容底部预留大于导航高度的空间，防止最后一条事项被吸底导航遮挡。
 
 时光记继续使用兼容标识 `type: 'countup'`，保存标题、`YYYY-MM-DD` 开始日期、可选备注和 `displayMode`。`days` 的显示序号为 `today - startDate + 1`，因此开始当天为第 1 天；`anniversary` 根据开始月日计算已满周年和下一周年，2 月 29 日在平年回退到 2 月 28 日。开始日在未来时，两种方式都展示距离开始的自然日数。纯计算位于 `core/countup.ts`，不依赖界面或存储。
 

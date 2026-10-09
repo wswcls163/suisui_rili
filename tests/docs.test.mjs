@@ -173,6 +173,17 @@ test("首页视觉预览与正式导航及数据模块保持隔离", async () =>
     ),
     "utf8",
   );
+  const previewTheme = await readFile(
+    join(
+      root,
+      "mobile",
+      "src",
+      "components",
+      "design-preview",
+      "designPreviewTheme.ts",
+    ),
+    "utf8",
+  );
   const navigation = await readFile(
     join(root, "mobile", "src", "components", "NavigationDrawer.tsx"),
     "utf8",
@@ -182,5 +193,11 @@ test("首页视觉预览与正式导航及数据模块保持隔离", async () =>
   assert.doesNotMatch(navigation, /design-preview/);
   assert.doesNotMatch(preview, /state\/|data\/|sync\/|notifications\/|auth\//);
   assert.match(preview, /BottomNavigation/);
+  assert.match(preview, /defaultDesignPreviewTheme/);
+  assert.doesNotMatch(preview, /#[0-9a-f]{3,8}/i);
+  assert.match(
+    previewTheme,
+    /selected:[\s\S]*birthday:[\s\S]*festival:[\s\S]*memory:/,
+  );
   assert.doesNotMatch(preview, /照片占位|独立视觉预览|留一点空白/);
 });

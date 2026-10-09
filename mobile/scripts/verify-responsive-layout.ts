@@ -163,7 +163,7 @@ async function main() {
     let ready = false;
     for (let attempt = 0; attempt < 100; attempt += 1) {
       ready = await evaluate<boolean>(
-        `document.body.innerText.includes('近期重要日子') && document.body.innerText.includes('岁岁日历')`,
+        `document.body.innerText.includes('接下来') && document.body.innerText.includes('岁岁日历')`,
       );
       if (ready) break;
       await delay(100);
@@ -188,7 +188,7 @@ async function main() {
       return {
         innerWidth: window.innerWidth,
         scrollWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
-        today: document.body.innerText.includes('近期重要日子') ? 'today-ready' : '',
+        today: document.body.innerText.includes('接下来') ? 'today-ready' : '',
         overflow,
       };
     })()`);
