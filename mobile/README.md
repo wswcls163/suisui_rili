@@ -45,22 +45,24 @@ Android 生产提醒使用持久化的原生 AlarmManager + BroadcastReceiver �
 没有云端配置时应用继续本地运行，“账号与同步”页面会明确显示尚未配置。需要联调账号时：
 
 1. 创建 Supabase 开发项目，将 `.env.example` 复制为 `.env`，填写项目 URL 与 publishable key。不要把数据库密码或 `service_role` 放进客户端环境变量。
-2. 使用 Supabase CLI 关联开发项目，按顺序执行 `supabase/migrations/` 中的全部迁移（包括 `202609130001_account_security_hardening.sql`），并部署 `delete-account` Edge Function。安全加固后客户端只有查询权限，增删改统一经过版本与幂等 RPC。
+2. 使用 Supabase CLI 关联开发项目，然后通过仓库的受保护部署入口按顺序应用 `supabase/migrations/` 并部署 `delete-account` Edge Function。安全加固后客户端只有查询权限，增删改统一经过版本与幂等 RPC。
 3. 在 Supabase Auth 的 URL 配置中加入开发网页 `http://localhost:8081/auth/callback`、原生 `suisui://auth/callback`，以及以后实际使用的生产回调地址。
 4. 开发阶段可用 Supabase 测试邮件；正式发布前配置自己的 SMTP、发件域名和中文邮件模板。
 
-账号头像对应迁移为 `202610090001_account_avatars.sql`。它创建私有 `account-avatars` Storage bucket，并把查询、上传、覆盖和删除限制为当前登录用户的固定路径 `<auth.uid()>/avatar.jpg`。本次代码只生成迁移和注销函数变更，**没有替用户部署到远端 Supabase**；应用在迁移未部署或离线时仍会立即显示本机头像，并标为待同步。部署迁移并重新部署 `delete-account` Edge Function 后，头像才会跨设备恢复，注销账号也会先删除云端头像。
+账号头像对应迁移为 `202610090001_account_avatars.sql`。它已于 2026-10-10 部署到“岁岁日历-dev”，创建私有 `account-avatars` Storage bucket，并把查询、上传、覆盖和删除限制为当前登录用户的固定路径 `<auth.uid()>/avatar.jpg`。`delete-account` 同日重新部署为开启 JWT 验证的版本 2，注销账号会先删除该用户头像，再删除 Auth 用户。现有真实账号的本机待上传头像已同步成功，刷新后仍可认证下载显示。
 
 原生端使用系统照片选择器和方形裁剪，不调用相机，也不在启动时申请相册权限；客户端再次居中裁成 1:1、缩放为 512×512，并重新编码为中等压缩 JPEG，因此不保留原照片 EXIF 或定位信息。手机文件位于应用私有文档目录，浏览器文件位于浏览器私有 Cache Storage；本地键值仅保存账号范围、文件引用、哈希、路径、时间和同步状态，不保存二进制或 Base64。头像拥有独立同步通道，失败不会阻塞生日与时光记同步。
 
-示例命令如下，其中项目标识来自自己的 Supabase 项目：
+本仓库的开发项目固定为 `zjsvkdmpjxtlxqyzaxpa`。首次关联后先运行只读检查，再通过受保护入口部署：
 
 ```sh
 copy .env.example .env
-npx supabase link --project-ref <project-ref>
-npx supabase db push
-npx supabase functions deploy delete-account
+npx supabase link --project-ref zjsvkdmpjxtlxqyzaxpa
+npm run deploy:supabase:check
+npm run deploy:supabase
 ```
+
+`deploy:supabase` 使用锁定的 Supabase CLI，先检查链接项目、客户端 URL、迁移文件命名和远端历史。远端缺少既有旧版本、出现未知版本或顺序分叉时会失败；脚本不会自动 repair、reset 或关闭函数 JWT 验证。正式迁移禁止复制到 Dashboard SQL Editor 单独执行，必须提交版本化 migration 后使用该入口。紧急人工 SQL 也必须随后补齐等价迁移、评审并登记历史，避免再次出现“结构已经存在、迁移历史为空”。
 
 登录后，生日和时光记仍先写入 SQLite 或 IndexedDB，再自动同步；断网修改保留在队列中，恢复前台、定时检查或手动点击时重试。云端需依次应用 `202609050002_countups.sql` 和 `202609050003_time_notes.sql`，否则时光记或展示方式会保留在本机并提示同步失败。首次登录不会自动搬走访客数据，需在账号页点“合并并同步”；云端确认成功且没有冲突后才清理访客副本。
 

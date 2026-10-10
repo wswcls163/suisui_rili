@@ -36,4 +36,6 @@ npm run verify
 
 统一验证依次执行文档与仓库配置测试、移动端 Jest、SQLite / IndexedDB / 同步集成测试、TypeScript、ESLint、Prettier 和历法批量核验。GitHub Actions 在推送到 `main` 或创建 Pull Request 时执行相同命令。
 
+Supabase 正式变更必须从仓库根目录运行 `npm run deploy:supabase`。该入口固定目标项目并在部署前比对本地与远端迁移历史；项目不匹配、旧历史缺失、顺序分叉或远端出现未知版本时会直接失败，不会自动修复或重置数据库。只读预检可运行 `npm run deploy:supabase:check`。
+
 响应式布局验证需要先单独运行 `npm --prefix mobile run web`，再在另一终端执行 `npm run verify:layout`；它依赖本机 Chrome 和开发服务，不进入基础 CI。

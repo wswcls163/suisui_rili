@@ -6,7 +6,9 @@
   },
   "scripts": {
     "verify": "npm run verify:docs && npm --prefix mobile test && npm --prefix mobile run test:storage && npm --prefix mobile run typecheck && npm --prefix mobile run lint -- --max-warnings 0 && npm --prefix mobile run format:check && npm --prefix mobile run verify:calendar",
-    "verify:docs": "node --test tests/docs.test.mjs",
-    "verify:layout": "npm --prefix mobile run verify:layout"
+    "verify:docs": "node --test tests/docs.test.mjs tests/supabase-deploy.test.mjs",
+    "verify:layout": "npm --prefix mobile run verify:layout",
+    "deploy:supabase": "npm --prefix mobile run deploy:supabase",
+    "deploy:supabase:check": "npm --prefix mobile run deploy:supabase:check"
   }
 }

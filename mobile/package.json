@@ -50,6 +50,7 @@
     "prettier": "^3.9.6",
     "react-test-renderer": "19.2.3",
     "sharp": "^0.34.5",
+    "supabase": "2.120.0",
     "tsx": "^4.21.0",
     "typescript": "~6.0.3"
   },
@@ -66,6 +67,8 @@
     "build:bundles": "expo export --platform android --platform ios --output-dir dist-native",
     "verify:calendar": "tsx scripts/verify-calendar.ts",
     "verify:layout": "tsx scripts/verify-responsive-layout.ts",
+    "deploy:supabase": "node scripts/deploy-supabase.mjs",
+    "deploy:supabase:check": "node scripts/deploy-supabase.mjs --check",
     "format": "prettier --write app src tests scripts *.json *.js",
     "format:check": "prettier --check app src tests scripts *.json *.js"
   },

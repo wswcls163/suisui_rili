@@ -37,7 +37,7 @@ test("根级统一验证与 GitHub Actions 使用同一入口", async () => {
   assert.equal(packageConfig.engines?.node, ">=22.13.0");
   assert.equal(
     packageConfig.scripts?.["verify:docs"],
-    "node --test tests/docs.test.mjs",
+    "node --test tests/docs.test.mjs tests/supabase-deploy.test.mjs",
   );
   assert.match(verify, /verify:docs/);
   assert.match(verify, /--prefix mobile test/);
@@ -114,6 +114,10 @@ test("账号登录技术方案覆盖认证、同步和安全边界", async () =>
   assert.match(content, /account-avatars/);
   assert.match(content, /512×512/);
   assert.match(content, /不含图片二进制或 Base64/);
+  assert.match(content, /zjsvkdmpjxtlxqyzaxpa/);
+  assert.match(content, /migration repair/);
+  assert.match(content, /npm run deploy:supabase/);
+  assert.match(content, /禁止把正式迁移复制到 Dashboard SQL Editor/);
 });
 
 test("AGENTS 记录适度模块化的长期代码准则", async () => {
