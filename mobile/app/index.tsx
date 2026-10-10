@@ -12,6 +12,7 @@ import {
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DateCalculatorDialog } from '../src/components/DateCalculatorDialog';
+import { AccountAvatar } from '../src/components/AccountAvatar';
 import { HomeBottomNavigation } from '../src/components/home/HomeBottomNavigation';
 import { HomeCalendarTimeline } from '../src/components/home/HomeCalendarTimeline';
 import { BirthdayBook, CountupBook } from '../src/components/home/HomeRecordList';
@@ -25,6 +26,8 @@ import { chineseFullDate, monthStart, supported } from '../src/core/dates';
 import { storageDescription } from '../src/data/repository';
 import { useBirthdays } from '../src/state/AppProvider';
 import { useAuth } from '../src/state/AuthProvider';
+import { useAccountAvatar } from '../src/state/AvatarProvider';
+export { avatarInitial as accountInitial } from '../src/avatar/model';
 
 type HomeTab = HomeSection;
 const PHONE_PREVIEW_WIDTH = 443;
@@ -50,12 +53,17 @@ export function homeTabFromParam(value: string | string[] | undefined): HomeTab 
   return candidate === 'book' || candidate === 'countup' ? candidate : 'calendar';
 }
 
-export function accountInitial(email: string | undefined): string {
-  return email ? (Array.from(email.trim())[0]?.toUpperCase() ?? '') : '';
-}
-
-function AppHeader({ tab, email, onAccount }: { tab: HomeTab; email?: string; onAccount: () => void }) {
-  const initial = accountInitial(email);
+function AppHeader({
+  tab,
+  email,
+  avatarUri,
+  onAccount,
+}: {
+  tab: HomeTab;
+  email?: string;
+  avatarUri: string | null;
+  onAccount: () => void;
+}) {
   return (
     <View style={styles.appBar}>
       <View style={styles.brandRow}>
@@ -77,11 +85,7 @@ function AppHeader({ tab, email, onAccount }: { tab: HomeTab; email?: string; on
         onPress={onAccount}
         style={({ pressed }) => [styles.accountButton, pressed && styles.pressed]}
       >
-        {initial ? (
-          <Text style={styles.accountInitial}>{initial}</Text>
-        ) : (
-          <Icon name="person-outline" size={20} color={theme.colors.textSecondary} />
-        )}
+        <AccountAvatar uri={avatarUri} email={email} loggedIn={Boolean(email)} size={theme.size.iconButton} />
       </Pressable>
     </View>
   );
@@ -117,6 +121,7 @@ function DateSummary({ today, onCalculate }: { today: string; onCalculate: () =>
 export default function Home() {
   const state = useBirthdays();
   const auth = useAuth();
+  const avatar = useAccountAvatar();
   const params = useLocalSearchParams<{ tab?: string | string[]; tool?: string | string[] }>();
   const { width } = useWindowDimensions();
   const previewSearch = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.search : '';
@@ -160,7 +165,7 @@ export default function Home() {
   return (
     <SafeAreaView style={styles.stage}>
       <View style={[styles.shell, { maxWidth: shellWidth }]}>
-        <AppHeader tab={tab} email={auth.session?.email} onAccount={openAccount} />
+        <AppHeader tab={tab} email={auth.session?.email} avatarUri={avatar.uri} onAccount={openAccount} />
 
         <ScrollView
           style={styles.scroll}
@@ -314,18 +319,10 @@ function createStyles(homeTheme: HomeTheme) {
     sectionName: { color: colors.textSecondary, fontSize: typography.caption, marginTop: 1 },
     accountButton: {
       alignItems: 'center',
-      backgroundColor: colors.surfaceMuted,
-      borderColor: colors.border,
-      borderWidth: 1,
       borderRadius: radius.round,
       height: size.iconButton,
       justifyContent: 'center',
       width: size.iconButton,
-    },
-    accountInitial: {
-      color: colors.accent,
-      fontSize: typography.body,
-      fontWeight: typography.bold,
     },
     calculatorButton: {
       alignItems: 'center',

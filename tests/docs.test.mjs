@@ -111,6 +111,9 @@ test("账号登录技术方案覆盖认证、同步和安全边界", async () =>
   assert.match(content, /PKCE/);
   assert.match(content, /客户端角色只保留[\s\S]*SELECT/);
   assert.match(content, /apply_birthday_mutation/);
+  assert.match(content, /account-avatars/);
+  assert.match(content, /512×512/);
+  assert.match(content, /不含图片二进制或 Base64/);
 });
 
 test("AGENTS 记录适度模块化的长期代码准则", async () => {

@@ -24,6 +24,10 @@ const birthYearMigration = readFileSync(
   join(root, 'supabase', 'migrations', '202609220001_birthday_birth_year.sql'),
   'utf8',
 );
+const avatarMigration = readFileSync(
+  join(root, 'supabase', 'migrations', '202610090001_account_avatars.sql'),
+  'utf8',
+);
 const deletionFunction = readFileSync(
   join(root, 'supabase', 'functions', 'delete-account', 'index.ts'),
   'utf8',
@@ -74,8 +78,29 @@ test('注销函数先验证当前会话，服务端密钥只用于删除该用�
   assert.match(config, /verify_jwt\s*=\s*true/i);
   assert.match(deletionFunction, /userClient\.auth\.getUser\(\)/);
   assert.match(deletionFunction, /SUPABASE_SERVICE_ROLE_KEY/);
+  assert.match(deletionFunction, /storage\.from\('account-avatars'\)\.remove/);
+  assert.match(deletionFunction, /`\$\{data\.user\.id\}\/avatar\.jpg`/);
+  assert.ok(
+    deletionFunction.indexOf("storage.from('account-avatars').remove") <
+      deletionFunction.indexOf('admin.auth.admin.deleteUser'),
+  );
   assert.match(deletionFunction, /admin\.auth\.admin\.deleteUser\(data\.user\.id\)/);
   assert.doesNotMatch(deletionFunction, /deleteUser\(request|deleteUser\([^d]/);
+});
+
+test('头像存储桶保持私有，并把读写删除限制到当前用户唯一对象路径', () => {
+  assert.match(avatarMigration, /'account-avatars', 'account-avatars', false/i);
+  assert.match(avatarMigration, /file_size_limit[\s\S]+1048576/i);
+  assert.match(avatarMigration, /allowed_mime_types[\s\S]+image\/jpeg/i);
+  assert.equal(
+    (avatarMigration.match(/name = \(select auth\.uid\(\)\)::text \|\| '\/avatar\.jpg'/gi) ?? []).length,
+    5,
+  );
+  assert.match(avatarMigration, /for select to authenticated/i);
+  assert.match(avatarMigration, /for insert to authenticated/i);
+  assert.match(avatarMigration, /for update to authenticated/i);
+  assert.match(avatarMigration, /for delete to authenticated/i);
+  assert.doesNotMatch(avatarMigration, /public\s*=\s*true/i);
 });
 
 test('安全加固禁止客户端绕过同步 RPC 直接写表，并隔离幂等结果', () => {

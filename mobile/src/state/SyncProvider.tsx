@@ -12,6 +12,7 @@ import {
 } from '../sync/model';
 import { remoteGateway as defaultGateway } from '../sync/remote';
 import { useAuth } from './AuthProvider';
+import { useAccountAvatar } from './AvatarProvider';
 
 export type SyncStatus = 'local' | 'syncing' | 'synced' | 'error' | 'conflict' | 'unavailable';
 
@@ -61,6 +62,7 @@ export function SyncProvider({
   gateway?: RemoteBirthdayGateway | null;
 }) {
   const auth = useAuth();
+  const avatar = useAccountAvatar();
   const local = isSyncBirthdayRepository(repo) ? repo : null;
   const coordinator = useMemo(
     () => (local && gateway ? new SyncCoordinator(local, gateway) : null),
@@ -229,14 +231,16 @@ export function SyncProvider({
         await local.clearOwner(previousOwner);
       },
       async deleteAccount() {
-        if (!local || !auth.session) return auth.deleteAccount();
-        const previousOwner = ownerRef.current;
+        if (!auth.session) return auth.deleteAccount();
+        const previousOwner = accountOwner(auth.session.userId);
         await auth.deleteAccount();
-        await local.clearOwner(previousOwner);
+        await avatar.clearLocalOwner(previousOwner);
+        if (local) await local.clearOwner(previousOwner);
       },
     }),
     [
       auth,
+      avatar,
       conflicts,
       error,
       guestCount,

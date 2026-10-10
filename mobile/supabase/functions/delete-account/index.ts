@@ -31,6 +31,9 @@ Deno.serve(async (request) => {
   const admin = createClient(url, serviceRole, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+  const avatar = await admin.storage.from('account-avatars').remove([`${data.user.id}/avatar.jpg`]);
+  if (avatar.error)
+    return Response.json({ error: 'DELETE_AVATAR_FAILED' }, { status: 500, headers: cors });
   const result = await admin.auth.admin.deleteUser(data.user.id);
   if (result.error)
     return Response.json({ error: 'DELETE_FAILED' }, { status: 500, headers: cors });

@@ -15,7 +15,9 @@ import { birthdayDates, birthdayTitle, type Birthday } from '../core/birthday';
 import type { Countup } from '../core/countup';
 import { itemType, type CalendarItem, type RemoteItem } from '../sync/model';
 import { useAuth } from '../state/AuthProvider';
+import { useAccountAvatar } from '../state/AvatarProvider';
 import { useAccountSync, type SyncStatus } from '../state/SyncProvider';
+import { AccountAvatar } from './AccountAvatar';
 import { Button, colors, common, Dialog, Icon } from './ui';
 import { NotificationSettingsCard } from './NotificationSettingsCard';
 import { NavigationDrawer } from './NavigationDrawer';
@@ -214,11 +216,13 @@ function RecoveryAccount() {
 
 function SignedInAccount() {
   const auth = useAuth();
+  const avatar = useAccountAvatar();
   const sync = useAccountSync();
   const copy = syncCopy[sync.status];
   const [actionError, setActionError] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [forceSignOutOpen, setForceSignOutOpen] = useState(false);
+  const [avatarDeleteOpen, setAvatarDeleteOpen] = useState(false);
   const [working, setWorking] = useState(false);
   const run = async (work: () => Promise<void>) => {
     setWorking(true);
@@ -247,9 +251,7 @@ function SignedInAccount() {
       <View style={[common.card, { gap: 18 }]}>
         <View style={[common.between, { alignItems: 'flex-start' }]}>
           <View style={[common.row, { flex: 1, alignItems: 'flex-start' }]}>
-            <View style={[styles.accountMark, { width: 48, height: 48, marginBottom: 0 }]}>
-              <Icon name="person-outline" color={colors.accent} size={24} />
-            </View>
+            <AccountAvatar uri={avatar.uri} email={auth.session?.email} loggedIn size={58} />
             <View style={{ flex: 1, gap: 5 }}>
               <Text style={common.heading}>已登录</Text>
               <Text style={common.body}>{auth.session?.email}</Text>
@@ -260,6 +262,39 @@ function SignedInAccount() {
             <Text style={{ color: copy.color, fontSize: 12, fontWeight: '600' }}>{copy.label}</Text>
           </View>
         </View>
+        <View style={styles.avatarActions}>
+          <View style={{ flex: 1, gap: 4, minWidth: 190 }}>
+            <Text style={styles.label}>账号头像</Text>
+            <Text style={common.muted}>
+              {avatar.status === 'pending'
+                ? '头像已保存在本机，等待同步到云端'
+                : avatar.status === 'syncing'
+                  ? '正在同步头像…'
+                  : avatar.uri
+                    ? '首页与账号页会使用同一张头像'
+                    : '选择一张照片，裁剪后只用于当前账号'}
+            </Text>
+          </View>
+          <View style={styles.avatarButtons}>
+            <Button
+              label={avatar.uri ? '更换头像' : '选择头像'}
+              variant="secondary"
+              busy={avatar.status === 'loading' || avatar.status === 'syncing'}
+              onPress={() => void avatar.chooseAvatar().catch(() => {})}
+            />
+            {avatar.uri ? (
+              <Button label="删除头像" variant="quiet" onPress={() => setAvatarDeleteOpen(true)} />
+            ) : null}
+            {avatar.status === 'pending' || avatar.status === 'error' ? (
+              <Button
+                label="重试头像同步"
+                variant="quiet"
+                onPress={() => void avatar.retry().catch(() => {})}
+              />
+            ) : null}
+          </View>
+        </View>
+        {avatar.error ? <Message error={avatar.error} notice="" /> : null}
         <View style={styles.syncPanel}>
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={common.body}>{copy.detail}</Text>
@@ -356,6 +391,25 @@ function SignedInAccount() {
               onPress={() =>
                 void run(() => sync.signOut(true))
                   .then(() => setForceSignOutOpen(false))
+                  .catch(() => {})
+              }
+            />
+          </View>
+        </View>
+      </Dialog>
+      <Dialog visible={avatarDeleteOpen} title="删除账号头像？" onClose={() => setAvatarDeleteOpen(false)}>
+        <View style={{ gap: 16 }}>
+          <Text style={common.body}>将删除本机和云端头像，首页会恢复显示邮箱首字母。</Text>
+          <View style={styles.dialogActions}>
+            <Button label="取消" variant="secondary" onPress={() => setAvatarDeleteOpen(false)} />
+            <Button
+              label="确认删除头像"
+              variant="danger"
+              busy={avatar.status === 'syncing'}
+              onPress={() =>
+                void avatar
+                  .deleteAvatar()
+                  .then(() => setAvatarDeleteOpen(false))
                   .catch(() => {})
               }
             />
@@ -499,6 +553,16 @@ const styles = StyleSheet.create({
     padding: 15,
     flexWrap: 'wrap',
   },
+  avatarActions: {
+    alignItems: 'center',
+    backgroundColor: '#F8F7F3',
+    borderRadius: 14,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    padding: 15,
+  },
+  avatarButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   importCard: { flexDirection: 'row', alignItems: 'center', gap: 14, flexWrap: 'wrap' },
   importIcon: {
     width: 42,

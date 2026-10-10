@@ -94,7 +94,7 @@ async function main() {
   await send('Runtime.enable');
   const widths = [320, 390, 443, 518, 1200];
   const reports: {
-    page: 'home' | 'calculator' | 'new-form' | 'design-preview';
+    page: 'home' | 'calculator' | 'new-form' | 'account' | 'design-preview';
     width: number;
     innerWidth: number;
     scrollWidth: number;
@@ -250,6 +250,57 @@ async function main() {
       width,
       ...metrics,
       today: 'form-ready',
+      bottomClearance: null,
+      screenshotPath,
+    });
+  }
+
+  for (const width of widths) {
+    await send('Emulation.setDeviceMetricsOverride', {
+      width,
+      height: 1000,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await send('Page.navigate', { url: `${baseUrl}account?section=account&layout-check=${width}` });
+    let ready = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      ready = await evaluate<boolean>(
+        `document.body.innerText.includes('账号与同步') && (` +
+          `document.body.innerText.includes('登录岁岁日历') || ` +
+          `document.body.innerText.includes('已登录') || ` +
+          `document.body.innerText.includes('账号服务尚未配置'))`,
+      );
+      if (ready) break;
+      await delay(100);
+    }
+    if (!ready) throw new Error(`账号页面 ${width}px 在 10 秒内未完成渲染`);
+    const metrics = await evaluate<{ innerWidth: number; scrollWidth: number; overflow: string[] }>(`(() => {
+      const viewport = document.documentElement.clientWidth;
+      const overflow = [...document.querySelectorAll('*')]
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' &&
+            (rect.left < -0.5 || rect.right > viewport + 0.5);
+        })
+        .slice(0, 8)
+        .map((element) => element.tagName + ':' + (element.textContent || '').trim().slice(0, 30));
+      if (!document.querySelector('[aria-label="返回"]')) overflow.push('缺少账号返回入口');
+      return {
+        innerWidth: window.innerWidth,
+        scrollWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
+        overflow,
+      };
+    })()`);
+    const screenshot = await send<{ data: string }>('Page.captureScreenshot', { format: 'png' });
+    const screenshotPath = join(outputDir, `account-${width}.png`);
+    writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
+    reports.push({
+      page: 'account',
+      width,
+      ...metrics,
+      today: 'account-ready',
       bottomClearance: null,
       screenshotPath,
     });

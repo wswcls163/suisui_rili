@@ -41,6 +41,14 @@
       "expo-sqlite",
       "expo-secure-store",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "允许岁岁日历选择一张照片作为账号头像。",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/android-icon-monochrome.png",
